@@ -1,0 +1,367 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  --background: #ffffff;
+  --foreground: oklch(0.145 0 0);
+  --card: #ffffff;
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #030213;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.0058 264.53);
+  --secondary-foreground: #030213;
+  --muted: #ececf0;
+  --muted-foreground: #717182;
+  --accent: #e9ebef;
+  --accent-foreground: #030213;
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --input: transparent;
+  --input-background: #f3f3f5;
+  --switch-background: #cbced4;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #030213;
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Part Catalog Theme Colors */
+  --primary-blue: #2264A0;
+  --primary-blue-dark: #1a4f7a;
+  --success-green: #5AA02A;
+  --danger-red: #C12B2B;
+  --warning-orange: #F58300;
+  --neutral-gray: #8C8C8C;
+  --light-background: #F5F5F5;
+  --border-color: #DDDDDD;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Term Page Color System */
+  --color-term-blue: var(--primary-blue);
+  --color-term-blue-dark: var(--primary-blue-dark);
+  --color-term-red: var(--danger-red);
+  --color-term-green: #006666;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /**
+  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
+  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
+  */
+
+  html {
+    font-size: var(--font-size);
+  }
+
+  h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h2 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h4 {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  label {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  button {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  input {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+  }
+
+  /* ★ FULL-WIDTH LAYOUT - ใช้พื้นที่เต็มหน้าจอ */
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Page Container for Full-Width Layout */
+.page-container {
+  width: 100%;
+  min-height: 100vh;
+  padding: 0 15px;
+  /* เว้นขอบซ้าย-ขวาเล็กน้อย */
+  box-sizing: border-box;
+}
+
+/* Grid Full Width */
+.RadGrid {
+  width: 100% !important;
+}
+
+/* ============================================
+   ITEM FORM SPECIFIC STYLES
+   ============================================ */
+
+/* Form Header - Full width gradient */
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: linear-gradient(to right, #2264A0, #1a4f7a);
+  color: white;
+  margin: 0 -20px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.form-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.item-code-badge {
+  background: #5AA02A;
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  display: inline-block;
+}
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  color: #333;
+}
+
+.required-field label::after {
+  content: " *";
+  color: #C12B2B;
+  font-weight: bold;
+}
+
+.display-only {
+  background-color: #F5F5F5 !important;
+  cursor: not-allowed;
+}
+
+.help-text {
+  font-size: 11px;
+  color: #8C8C8C;
+  font-style: italic;
+  display: block;
+  margin-top: 4px;
+}
+
+/* Checkbox Group */
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Action Bar - Footer buttons */
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: #F5F5F5;
+  border-top: 2px solid #2264A0;
+  margin: 20px -20px 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
+}
+
+.audit-info {
+  color: #8C8C8C;
+  font-size: 12px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+/* Button Color Variants */
+.btn-success {
+  background: #5AA02A !important;
+  color: white !important;
+}
+
+.btn-success:hover {
+  background: #4a8722 !important;
+}
+
+.btn-danger {
+  background: #C12B2B !important;
+  color: white !important;
+}
+
+.btn-danger:hover {
+  background: #a12323 !important;
+}
+
+.btn-warning {
+  background: #F58300 !important;
+  color: white !important;
+}
+
+.btn-warning:hover {
+  background: #d67300 !important;
+}
+
+/* Character Counter */
+.char-count {
+  text-align: right;
+  color: #8C8C8C;
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+.longdesc-container {
+  width: 100%;
+}
+
+/* Permit Group */
+.permit-group {
+  padding-top: 10px;
+  border-top: 1px solid #DDDDDD;
+}
