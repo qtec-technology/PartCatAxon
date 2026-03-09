@@ -4,7 +4,7 @@ import { env } from '#src/config/env.js';
 import type { AuthUser } from '#src/types/common.types.js';
 import { logger } from '#src/utils/logger.js';
 
-// ── Role lists parsed once at startup from env ──────────────────────────────
+// Role lists parsed once at startup from env for non-production role simulation.
 const ROLE_MANAGERS = new Set(
     (process.env.ROLE_MANAGERS || '')
         .split(',')
@@ -23,7 +23,7 @@ function checkRole(username: string, roleSet: Set<string>): boolean {
     return roleSet.has(username.toLowerCase());
 }
 
-// ── Dev-mode: cache local user info (no need to look up every request) ──────
+// Dev-mode: cache local user info (no need to look up every request)
 let _cachedDevUser: { username: string; domain: string } | null = null;
 
 function getDevUser(): { username: string; domain: string } {
@@ -51,8 +51,8 @@ function getDevUser(): { username: string; domain: string } {
  *   - Uses Node.js os.userInfo() (cached — no child process spawning)
  *
  * Role check:
- *   - Production: uses permissions.is_manager / is_supervisor from Win Auth
- *   - Development: uses ROLE_MANAGERS / ROLE_SUPERVISORS env vars
+ *   - Production: uses Windows Auth permissions only
+ *   - Non-production: uses ROLE_MANAGERS / ROLE_SUPERVISORS env vars
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
     try {
@@ -101,12 +101,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
                     firstname = username;
                 }
             }
-
-            // Fallback role check from env vars (if permissions not in header)
-            if (!isManager) isManager = checkRole(username, ROLE_MANAGERS);
-            if (!isSupervisor) isSupervisor = checkRole(username, ROLE_SUPERVISORS);
         } else {
-            // ── Development: Use cached local user + optional DEV_ env vars ──
+            // Non-production: Use cached local user + optional DEV_ env vars
             const devUser = getDevUser();
             username = devUser.username;
             domain = devUser.domain;
@@ -185,3 +181,4 @@ export function requireManager(req: Request, res: Response, next: NextFunction):
     }
     next();
 }
+
