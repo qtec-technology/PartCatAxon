@@ -6,17 +6,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const SERVER_ROOT_DIR = path.resolve(__dirname, '../..');
-const DEFAULT_ITEM_IMAGE_DIR = path.resolve(SERVER_ROOT_DIR, 'storage', 'item-images');
-const DEFAULT_ATTACHMENT_DIR = path.resolve(SERVER_ROOT_DIR, 'storage', 'attachments');
 
 function isAbsoluteWindowsPath(value: string): boolean {
     return /^([a-zA-Z]:\\|\\\\)/.test(value);
 }
 
-function normalizeWindowsDirPath(input: string | undefined, fallback: string): string {
-    const raw = (input || '').trim();
+function normalizeWindowsDirPath(input: string): string {
+    const raw = String(input || '').trim();
     if (!raw) {
-        return fallback;
+        throw new Error('Directory path must not be empty');
     }
 
     let normalized = raw.replace(/\//g, '\\');
@@ -37,6 +35,15 @@ function normalizeWindowsDirPath(input: string | undefined, fallback: string): s
 
     // Resolve relative paths from server root (e.g. "..\\picture").
     return path.resolve(SERVER_ROOT_DIR, cleaned.replace(/\\/g, path.sep));
+}
+
+function normalizeOptionalWindowsDirPath(input: string | undefined, fallback: string): string {
+    const raw = String(input || '').trim();
+    if (!raw) {
+        return fallback;
+    }
+
+    return normalizeWindowsDirPath(raw);
 }
 
 function getRequiredEnv(name: string): string {
@@ -88,9 +95,9 @@ export const env = {
     DB_NAME_SAP: getRequiredEnv('DB_NAME_SAP'),
     DB_USER: getRequiredEnv('DB_USER'),
     DB_PASSWORD: getRequiredEnv('DB_PASSWORD'),
-    ITEM_IMAGE_DIR: normalizeWindowsDirPath(process.env.ITEM_IMAGE_DIR, DEFAULT_ITEM_IMAGE_DIR),
-    ATTACHMENT_DIR: normalizeWindowsDirPath(process.env.ATTACHMENT_DIR, DEFAULT_ATTACHMENT_DIR),
-    USER_PICTURE_DIR: normalizeWindowsDirPath(process.env.USER_PICTURE_DIR, ''),
+    ITEM_IMAGE_DIR: normalizeWindowsDirPath(getRequiredEnv('ITEM_IMAGE_DIR')),
+    ATTACHMENT_DIR: normalizeWindowsDirPath(getRequiredEnv('ATTACHMENT_DIR')),
+    USER_PICTURE_DIR: normalizeOptionalWindowsDirPath(process.env.USER_PICTURE_DIR, ''),
 
     // CORS
     CORS_ALLOWED_ORIGINS: corsAllowedOrigins,
