@@ -121,7 +121,7 @@ export interface TermFormLookups {
     subLocations: string[];
     currencies: CurrencyLookupOption[];
     freightTypes: FreightTypeLookupOption[];
-    salesPersons: string[];
+    salesPersons: SalesPersonLookupOption[];
     uoms: LookupOption[];
 }
 
@@ -334,7 +334,13 @@ export const lookupApi = {
                 }))
                 .filter((row) => row.code !== '');
 
-            const salesPersons = uniqueTextList((data.salesPersons || []).map((row) => asText(row.SlpName)));
+            const salesPersons = (data.salesPersons || [])
+                .map((row) => ({
+                    slpCode: asText(row.SlpCode),
+                    slpName: asText(row.SlpName),
+                    active: asText(row.Active),
+                }))
+                .filter((row) => row.slpCode !== '' && row.slpName !== '');
 
             const uoms = (data.uoms || [])
                 .map((row) => ({

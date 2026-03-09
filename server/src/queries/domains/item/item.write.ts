@@ -81,7 +81,8 @@ BEGIN TRY
         WHERE ItemID = @ItemID
     )
     BEGIN
-        THROW 50001, 'Item not found', 1;
+        RAISERROR ('Item not found', 16, 1);
+        RETURN;
     END
 
     IF EXISTS (
@@ -90,7 +91,8 @@ BEGIN TRY
         WHERE ItemID = @ItemID
     )
     BEGIN
-        THROW 50002, 'Cannot delete item that has existing terms. Delete terms first.', 1;
+        RAISERROR ('Cannot delete item that has existing terms. Delete terms first.', 16, 1);
+        RETURN;
     END
 
     DELETE FROM ${attachmentTableName}
@@ -104,7 +106,8 @@ BEGIN TRY
 
     IF (@itemRows <> 1)
     BEGIN
-        THROW 50003, 'Delete item failed due to unexpected row count.', 1;
+        RAISERROR ('Delete item failed due to unexpected row count.', 16, 1);
+        RETURN;
     END
 
     COMMIT TRANSACTION;
@@ -114,10 +117,11 @@ BEGIN TRY
         @attachmentRows AS AttachmentRowsAffected;
 END TRY
 BEGIN CATCH
+    DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
     IF @@TRANCOUNT > 0
     BEGIN
         ROLLBACK TRANSACTION;
     END
-    THROW;
+    RAISERROR (@ErrorMessage, 16, 1);
 END CATCH;
 `;

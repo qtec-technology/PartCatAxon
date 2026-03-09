@@ -2,6 +2,7 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ExternalLink, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../common/atoms';
+import { InlineSelect } from '../../common/InlineSelect';
 import { NumberInput } from '../../common/NumberInput';
 import {
   Dialog,
@@ -49,12 +50,9 @@ const moneyFormatter = new Intl.NumberFormat('en-US', {
 });
 
 const ATTACHMENT_CATEGORIES = [
-  'Quotation',
-  'Drawing',
-  'Specification',
-  'Photo',
-  'Certificate',
-  'Other',
+  'Term-Certificate',
+  'Vendor Quotation',
+  'Others',
 ] as const;
 
 const ensureUomOptions = (
@@ -87,6 +85,9 @@ export const RightColumn = memo(function RightColumn({
   const idBase = useId();
   const fmt = (v: number) => moneyFormatter.format(v);
   const f = 'focus:outline-none focus:border-term-green focus:ring-1 focus:ring-term-green disabled:bg-white disabled:text-gray-500 enabled:border-gray-500';
+  const salesOutputCls = 'w-[156px] px-3 py-1.5 border rounded text-sm font-mono text-right';
+  const salesInputCls = `w-[74px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-white text-right ${f}`;
+  const salesMarkupCls = `w-[74px] px-2 py-1 border border-gray-300 rounded text-xs bg-white text-center ${f}`;
   const stockConvDisplay = Number.isFinite(formData.numInBuy) ? formData.numInBuy.toFixed(2) : '0.00';
   const salesConvDisplay = Number.isFinite(formData.numInSale) ? formData.numInSale.toFixed(2) : '0.00';
 
@@ -117,10 +118,10 @@ export const RightColumn = memo(function RightColumn({
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
 
-  const attachmentCategoryRef = useRef<HTMLSelectElement>(null);
+  const attachmentCategoryRef = useRef<HTMLButtonElement>(null);
   const attachFileInputRef = useRef<HTMLInputElement>(null);
 
-  const ids = useMemo(
+      const ids = useMemo(
     () => ({
       purchaseUom: `${idBase}-purchaseUom`,
       numInBuy: `${idBase}-numInBuy`,
@@ -128,9 +129,10 @@ export const RightColumn = memo(function RightColumn({
       salesUom: `${idBase}-salesUom`,
       spk: `${idBase}-spk`,
       qoc: `${idBase}-qoc`,
+      salesCostPerUnit: `${idBase}-salesCostPerUnit`,
+      totalPrice: `${idBase}-totalPrice`,
       markup: `${idBase}-markup`,
-      addAttachmentTitle: `${idBase}-addAttachmentTitle`,
-      addAttachmentDesc: `${idBase}-addAttachmentDesc`,
+      markupAmount: `${idBase}-markupAmount`,
       attachmentCategory: `${idBase}-attachmentCategory`,
       attachmentFileName: `${idBase}-attachmentFileName`,
       attachmentFile: `${idBase}-attachmentFile`,
@@ -158,6 +160,7 @@ export const RightColumn = memo(function RightColumn({
         category: attachCategory,
         fileName: attachFile.name,
         filePath: '',
+        file: attachFile,
       });
       closeAttachmentDialog();
     } catch (error) {
@@ -194,16 +197,17 @@ export const RightColumn = memo(function RightColumn({
         <div className="p-3 space-y-2.5 bg-white">
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
             <label htmlFor={ids.purchaseUom} className="text-sm text-left sm:text-right text-gray-700 whitespace-nowrap w-full sm:w-[170px]">Purchase UOM (หน่วยซื้อ)</label>
-            <select
+            <InlineSelect
               id={ids.purchaseUom}
               value={formData.purchaseUOM || ''}
-              onChange={(e) => updateFormData('purchaseUOM', e.target.value)}
+              onValueChange={(nextValue) => updateFormData('purchaseUOM', nextValue)}
               disabled={isReadOnly}
-              className={`w-full sm:w-[160px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-white ${f}`}
-            >
-              <option value="">- Please Select -</option>
-              {purchaseUomOptions.map((row) => <option key={row.value} value={row.value}>{row.label}</option>)}
-            </select>
+              placeholder="- Please Select -"
+              allowClear
+              size="sm"
+              className={`w-full sm:w-[160px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-white ${f} disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`}
+              options={purchaseUomOptions.map((row) => ({ value: row.value, label: row.label }))}
+            />
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
@@ -243,16 +247,17 @@ export const RightColumn = memo(function RightColumn({
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
             <label htmlFor={ids.salesUom} className="text-sm text-left sm:text-right text-gray-700 whitespace-nowrap w-full sm:w-[170px]">Sales UOM (หน่วยขาย)</label>
-            <select
+            <InlineSelect
               id={ids.salesUom}
               value={formData.salesUOM || ''}
-              onChange={(e) => updateFormData('salesUOM', e.target.value)}
+              onValueChange={(nextValue) => updateFormData('salesUOM', nextValue)}
               disabled={isReadOnly}
-              className={`w-full sm:w-[160px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-white ${f}`}
-            >
-              <option value="">- Please Select -</option>
-              {salesUomOptions.map((row) => <option key={row.value} value={row.value}>{row.label}</option>)}
-            </select>
+              placeholder="- Please Select -"
+              allowClear
+              size="sm"
+              className={`w-full sm:w-[160px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-white ${f} disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`}
+              options={salesUomOptions.map((row) => ({ value: row.value, label: row.label }))}
+            />
           </div>
 
           <div className="bg-term-green text-white text-center py-1.5 rounded text-sm -mx-3 -mb-3 mt-2">
@@ -267,12 +272,14 @@ export const RightColumn = memo(function RightColumn({
         </div>
         <div className="p-3 space-y-2.5 bg-white">
           <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-700">ต้นทุนสินค้าต่อ 1 หน่วยขาย</label>
+            <label htmlFor={ids.salesCostPerUnit} className="text-sm text-gray-700">ต้นทุนสินค้าต่อ 1 หน่วยขาย</label>
             <input
+              id={ids.salesCostPerUnit}
+              name="salesCostPerUnit"
               type="text"
               value={fmt(calcResults.QLC3)}
               readOnly
-              className="w-[120px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-200 font-mono text-right text-gray-900"
+              className={`${salesOutputCls} border-gray-300 bg-gray-200 text-gray-900`}
             />
           </div>
           <div className="flex items-center justify-between">
@@ -283,7 +290,7 @@ export const RightColumn = memo(function RightColumn({
                 value={formData.spk}
                 onChange={(v) => updateFormData('spk', v)}
                 disabled={isReadOnly}
-                className={`w-[58px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-white text-right ${f}`}
+                className={salesInputCls}
                 placeholder="SPK"
               />
               <NumberInput
@@ -291,44 +298,48 @@ export const RightColumn = memo(function RightColumn({
                 value={formData.qoc}
                 onChange={(v) => updateFormData('qoc', v)}
                 disabled={isReadOnly}
-                className={`w-[58px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-white text-right ${f}`}
+                className={salesInputCls}
                 placeholder="QOC"
               />
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-700">ต้นทุนรวม SPK และ QOC</span>
+            <label htmlFor={ids.totalPrice} className="text-sm text-gray-700">ต้นทุนรวม SPK และ QOC</label>
             <input
+              id={ids.totalPrice}
+              name="totalPrice"
               type="text"
               value={fmt(calcResults.TOTAL_PRICE)}
               readOnly
-              className="w-[120px] px-2 py-1.5 border border-term-red rounded text-sm bg-red-50 font-mono text-right font-bold text-gray-900"
+              className={`${salesOutputCls} border-term-red bg-red-50 font-bold text-gray-900`}
             />
           </div>
           <div className="space-y-1.5 pt-2 border-t border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 flex-1">
                 <label htmlFor={ids.markup} className="text-xs text-gray-700">Markup %</label>
-                <select
+                <InlineSelect
                   id={ids.markup}
                   value={formData.markup || 0}
-                  onChange={(e) => updateFormData('markup', parseInt(e.target.value, 10) || 0)}
+                  onValueChange={(nextValue) => updateFormData('markup', parseInt(nextValue, 10) || 0)}
                   disabled={isReadOnly}
-                  className={`w-[60px] px-1.5 py-1 border border-gray-300 rounded text-xs bg-white text-center ${f}`}
-                >
-                  {typeof formData.markup === 'number' && (formData.markup < 0 || formData.markup > 25) && (
-                    <option value={formData.markup}>{formData.markup}</option>
-                  )}
-                  {Array.from({ length: 26 }, (_, i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </select>
+                  size="sm"
+                  className={`${salesMarkupCls} disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`}
+                  options={[
+                    ...(typeof formData.markup === 'number' && (formData.markup < 0 || formData.markup > 25)
+                      ? [{ value: String(formData.markup), label: String(formData.markup) }]
+                      : []),
+                    ...Array.from({ length: 26 }, (_, i) => ({ value: String(i), label: String(i) })),
+                  ]}
+                />
               </div>
               <input
+                id={ids.markupAmount}
+                name="markupAmount"
                 type="text"
                 value={fmt(calcResults.MK_THB || 0)}
                 readOnly
-                className="w-[120px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-200 font-mono text-right text-gray-900"
+                className={`${salesOutputCls} border-gray-300 bg-gray-200 text-gray-900`}
               />
             </div>
           </div>
@@ -336,7 +347,7 @@ export const RightColumn = memo(function RightColumn({
           <div className="border-t border-gray-100 pt-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-gray-800">SALE PRICE (THB)</span>
-              <div className="bg-gradient-to-r from-term-green to-[#3D8B1C] text-white w-[160px] px-3 py-2 rounded-md shadow-sm text-right">
+              <div className="w-[196px] rounded-md bg-gradient-to-r from-term-green to-[#3D8B1C] px-4 py-2 text-right text-white shadow-sm">
                 <span className="text-xl font-bold font-mono tracking-wide">{fmt(calcResults.SALES_PRICE)}</span>
               </div>
             </div>
@@ -478,10 +489,10 @@ export const RightColumn = memo(function RightColumn({
       >
         <DialogContent className="max-w-[420px] border-gray-400 bg-[#F0F0F0] p-0 gap-0">
           <DialogHeader className="px-3 py-2 bg-gradient-to-r from-[#E8E8E8] to-[#D0D0D0] border-b border-gray-300">
-            <DialogTitle id={ids.addAttachmentTitle} className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+            <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-gray-800">
               <Paperclip className="w-4 h-4" /> Add Attachment
             </DialogTitle>
-            <DialogDescription id={ids.addAttachmentDesc} className="sr-only">
+            <DialogDescription className="sr-only">
               Choose an attachment category and file to add to this term.
             </DialogDescription>
           </DialogHeader>
@@ -489,24 +500,24 @@ export const RightColumn = memo(function RightColumn({
           <div className="p-5 space-y-4">
             <div className="flex items-center gap-3">
               <label htmlFor={ids.attachmentCategory} className="text-sm text-gray-700 w-16 text-right">Category</label>
-              <select
+              <InlineSelect
                 ref={attachmentCategoryRef}
                 id={ids.attachmentCategory}
-                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm bg-white"
                 value={attachCategory}
-                onChange={(e) => setAttachCategory(e.target.value)}
-              >
-                <option value="">- Please Select -</option>
-                {ATTACHMENT_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
+                onValueChange={(nextValue) => setAttachCategory(nextValue)}
+                placeholder="- Please Select -"
+                allowClear
+                size="sm"
+                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm bg-white"
+                options={ATTACHMENT_CATEGORIES.map((category) => ({ value: category, label: category }))}
+              />
             </div>
 
             <div className="flex items-center gap-3">
               <label htmlFor={ids.attachmentFileName} className="text-sm text-gray-700 w-16 text-right">Upload</label>
               <input
                 id={ids.attachmentFileName}
+                name="attachmentFileName"
                 type="text"
                 readOnly
                 value={attachFile?.name || ''}
@@ -515,6 +526,7 @@ export const RightColumn = memo(function RightColumn({
               <input
                 ref={attachFileInputRef}
                 id={ids.attachmentFile}
+                name="attachmentFile"
                 type="file"
                 className="hidden"
                 onChange={(e) => setAttachFile(e.target.files?.[0] || null)}

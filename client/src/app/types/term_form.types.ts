@@ -2,6 +2,7 @@ export interface TermFormData {
     supplier: string;
     supplierName: string;
     contactPerson: string;
+    contactPersonName: string;
     contractNo: string;
     mfgPartNo: string;
     suppOrderCode: string;
@@ -10,6 +11,7 @@ export interface TermFormData {
     validTo: string;
     purchaseTerm: string;
     purchaseTermLocation: string;
+    purchaseTermLocationName: string;
     purchaseSubLocation: string;
     salesTerm: string;
     salesSubLocation: string;
@@ -42,7 +44,9 @@ export interface TermFormData {
     scc: number;
     zoneRate: number;
     salesPerson: string;
+    salesPersonName: string;
     sourcedBy: string;
+    sourcedByName: string;
     remark: string;
     leadTime: string;
     moq: string;
@@ -156,6 +160,12 @@ export interface TermSupplierOption {
     name: string;
 }
 
+export interface TermContactOption {
+    code: string;
+    name: string;
+    active: string;
+}
+
 export interface TermLocationOption {
     code: string;
     name: string;
@@ -176,6 +186,12 @@ export interface TermFreightTypeOption {
     rate: number;
 }
 
+export interface TermSalesPersonOption {
+    code: string;
+    name: string;
+    active: string;
+}
+
 export interface TermAttachmentItem {
     id: string;
     category: string;
@@ -188,6 +204,7 @@ export interface CreateTermAttachmentInput {
     category: string;
     fileName: string;
     filePath?: string;
+    file: File;
 }
 
 export interface TermPageDataState {
@@ -196,13 +213,14 @@ export interface TermPageDataState {
     formData: TermFormData;
     attachments: TermAttachmentItem[];
     suppliers: TermSupplierOption[];
-    contacts: string[];
+    contacts: TermContactOption[];
     orderTerms: string[];
     locations: TermLocationOption[];
-    subLocations: string[];
+    purchaseSubLocations: string[];
+    salesSubLocations: string[];
     currencies: TermCurrencyOption[];
     freightTypes: TermFreightTypeOption[];
-    salesPersons: string[];
+    salesPersons: TermSalesPersonOption[];
     uomOptions: Array<{ value: string; label: string }>;
 }
 
@@ -212,6 +230,7 @@ export const defaultTermFormData: TermFormData = {
     supplier: '',
     supplierName: '',
     contactPerson: '',
+    contactPersonName: '',
     contractNo: '',
     mfgPartNo: '',
     suppOrderCode: '',
@@ -220,6 +239,7 @@ export const defaultTermFormData: TermFormData = {
     validTo: '',
     purchaseTerm: '',
     purchaseTermLocation: '',
+    purchaseTermLocationName: '',
     purchaseSubLocation: '',
     salesTerm: '',
     salesSubLocation: '',
@@ -252,7 +272,9 @@ export const defaultTermFormData: TermFormData = {
     scc: 0,
     zoneRate: 0,
     salesPerson: '',
+    salesPersonName: '',
     sourcedBy: '',
+    sourcedByName: '',
     remark: '',
     leadTime: '',
     moq: '',

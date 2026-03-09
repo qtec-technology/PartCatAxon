@@ -91,7 +91,7 @@ export async function query<T = any>(
     }
 
     const result = await request.query<T>(sqlText);
-    return result.recordset; // คืนค่าเป็น Array เสมอ (เหมือน .ToList() ใน .NET)
+    return result.recordset ?? [];
 }
 
 /**
@@ -173,3 +173,4 @@ export async function closePool(): Promise<void> {
 
 // Export sql types เพื่อให้ไฟล์อื่นเรียกใช้ Type ได้ง่าย (เช่น sql.Int, sql.NVarChar)
 export { sql };
+

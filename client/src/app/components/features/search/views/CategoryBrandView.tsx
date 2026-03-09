@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, useId } from 'react';
 import { format } from 'date-fns';
 import {
   useReactTable,
@@ -50,6 +50,8 @@ const measureTextWidth = (text: string, font: string) => {
 };
 
 export function CategoryBrandView() {
+  const categoryInputId = useId();
+  const brandInputId = useId();
   const [selectedCategory, setSelectedCategory] = useState<string>(() => readStoredFilterValue(CATEGORY_BRAND_CATEGORY_FILTER_KEY));
   const [selectedBrand, setSelectedBrand] = useState<string>(() => readStoredFilterValue(CATEGORY_BRAND_BRAND_FILTER_KEY));
   const [brandInput, setBrandInput] = useState(() => readStoredFilterValue(CATEGORY_BRAND_BRAND_FILTER_KEY));
@@ -400,13 +402,13 @@ export function CategoryBrandView() {
       {/* Filter Section */}
       <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2 min-w-0">
-          <label className="text-base font-semibold text-gray-700 whitespace-nowrap">Category:</label>
+          <label htmlFor={categoryInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">Category:</label>
           <Select
             key={selectedCategory ? 'category-selected' : 'category-empty'}
             value={selectedCategory || undefined}
             onValueChange={handleCategoryChange}
           >
-            <SelectTrigger className="w-[220px] sm:w-[280px] h-10 bg-white border-gray-300 text-base">
+            <SelectTrigger id={categoryInputId} name="categorySearch" className="w-[220px] sm:w-[280px] h-10 bg-white border-gray-300 text-base">
               <SelectValue placeholder="Please select category" />
             </SelectTrigger>
             <SelectContent>
@@ -417,9 +419,12 @@ export function CategoryBrandView() {
           </Select>
         </div>
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <label className="text-base font-semibold text-gray-700 whitespace-nowrap">Brand:</label>
+          <label htmlFor={brandInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">Brand:</label>
           <div className="relative w-full sm:w-[360px] max-w-full" ref={brandRef}>
               <input
+                id={brandInputId}
+                name="categoryBrandSearch"
+                aria-label="Brand search by category"
                 type="text"
                 value={brandInput}
                 placeholder={selectedCategory ? 'Please select brand' : 'Select category first'}

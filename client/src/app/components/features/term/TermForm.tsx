@@ -22,7 +22,7 @@ interface TermFormProps {
   attachments?: TermAttachmentItem[];
   currencies: Array<{ code: string; name: string; exRate: number }>;
   freightTypes: Array<{ code: string; name: string; rate: number }>;
-  salesPersons: string[];
+  salesPersons: Array<{ code: string; name: string; active: string }>;
   uoms: Array<{ value: string; label: string }>;
   onAddAttachment?: (input: CreateTermAttachmentInput) => Promise<void>;
   onDeleteAttachment?: (attachmentId: string) => Promise<void>;
@@ -102,7 +102,9 @@ export function TermForm({
       moq: formData.moq,
       vendorBPA: formData.vendorBPA,
       salesPerson: formData.salesPerson,
+      salesPersonName: formData.salesPersonName,
       sourcedBy: formData.sourcedBy,
+      sourcedByName: formData.sourcedByName,
       updatedBy: formData.updatedBy,
       updatedDate: formData.updatedDate,
     }),
@@ -119,7 +121,9 @@ export function TermForm({
       formData.moq,
       formData.vendorBPA,
       formData.salesPerson,
+      formData.salesPersonName,
       formData.sourcedBy,
+      formData.sourcedByName,
       formData.updatedBy,
       formData.updatedDate,
     ]

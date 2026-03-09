@@ -49,7 +49,6 @@ export const dbObjects = {
             contact: qtecObject('DB_TABLE_CONTACT', '@OCPR'),
             brandVendor: qtecObject('DB_TABLE_BRAND_VENDOR', '@PITM1_BRAND_VENDOR'),
             vendorBrand: qtecObject('DB_TABLE_VENDOR_BRAND', '@PITM1_VENDOR_BRAND'),
-            auditLog: qtecObject('DB_TABLE_AUDIT_LOG', '@AUDITLOG'),
         },
     },
     views: {
@@ -77,6 +76,7 @@ export const dbObjects = {
         getVendorEmailByTermId: qtecProcedure('DB_SP_GET_VENDOR_EMAIL_BY_TERM_ID', 'SPIT_GetVendorEmailByTermID'),
     },
     qualifiedProcedures: {
+        createAttachFile: qualifiedQtecProcedure('DB_SP_CREATE_ATTACH_FILE', 'SPIT_CreateAttachFile'),
         searchItemByDescriptionFts: qualifiedQtecProcedure('DB_SP_SEARCH_FTS', 'SPIT_SearchItemByDescriptionFTS'),
         searchItemByDescriptionFtsGetBrand: qualifiedQtecProcedure('DB_SP_SEARCH_FTS_GET_BRAND', 'SPIT_SearchItemByDescriptionFTS_GetBrand'),
         searchItemByDescriptionFtsGetAutocomplete: qualifiedQtecProcedure('DB_SP_SEARCH_FTS_GET_AUTOCOMPLETE', 'SPIT_SearchItemByDescriptionFTS_GetCL'),

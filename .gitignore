@@ -45,6 +45,7 @@ coverage/
 # ------------------------------
 *.log
 logs/
+server/storage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -77,3 +78,8 @@ Desktop.ini
 # ------------------------------
 .agents/
 .codex/
+
+# ------------------------------
+# Local planning docs
+# ------------------------------
+docs/

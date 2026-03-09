@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { DatePicker } from '../../ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
-import type { TermFormData, TermLocationOption, TermSupplierOption, UpdateTermFormData } from '../../../types/term_form.types';
+import { InlineSelect } from '../../common/InlineSelect';
+import type {
+  TermContactOption,
+  TermFormData,
+  TermLocationOption,
+  TermSupplierOption,
+  UpdateTermFormData,
+} from '../../../types/term_form.types';
 
 interface TermInfoRowProps {
   itemCode: string;
@@ -10,10 +17,11 @@ interface TermInfoRowProps {
   updateFormData: UpdateTermFormData;
   isReadOnly?: boolean;
   suppliers: TermSupplierOption[];
-  contacts: string[];
+  contacts: TermContactOption[];
   orderTerms: string[];
   locations: TermLocationOption[];
-  subLocations: string[];
+  purchaseSubLocations: string[];
+  salesSubLocations: string[];
   onSuppOrderCodeCommit?: () => Promise<void> | void;
   onSupplierChange?: (supplierCode: string) => void;
 }
@@ -22,6 +30,14 @@ const ensureOption = (list: string[], value: string) => {
   const normalized = String(value || '').trim();
   if (!normalized) return list;
   return list.includes(normalized) ? list : [normalized, ...list];
+};
+
+const ensureContactOption = (list: TermContactOption[], code: string, name: string): TermContactOption[] => {
+  const normalizedCode = String(code || '').trim();
+  if (!normalizedCode) return list;
+  return list.some((contact) => contact.code === normalizedCode)
+    ? list
+    : [{ code: normalizedCode, name: String(name || '').trim() || normalizedCode, active: 'Y' }, ...list];
 };
 
 export function TermInfoRow({
@@ -34,7 +50,8 @@ export function TermInfoRow({
   contacts,
   orderTerms,
   locations,
-  subLocations,
+  purchaseSubLocations,
+  salesSubLocations,
   onSuppOrderCodeCommit,
   onSupplierChange,
 }: TermInfoRowProps) {
@@ -76,8 +93,8 @@ export function TermInfoRow({
   }, [formData.supplier, formData.supplierName, suppliers]);
 
   const contactOptions = useMemo(
-    () => ensureOption(contacts, formData.contactPerson || ''),
-    [contacts, formData.contactPerson]
+    () => ensureContactOption(contacts, formData.contactPerson || '', formData.contactPersonName || ''),
+    [contacts, formData.contactPerson, formData.contactPersonName]
   );
   const purchaseTermOptions = useMemo(
     () => ensureOption(orderTerms, formData.purchaseTerm || ''),
@@ -89,31 +106,31 @@ export function TermInfoRow({
   );
 
   const locationOptions = useMemo(() => {
-    const selectedLocationName = String(formData.purchaseTermLocation || '').trim();
-    if (!selectedLocationName) return locations;
+    const selectedLocationCode = String(formData.purchaseTermLocation || '').trim();
+    if (!selectedLocationCode) return locations;
 
-    const exists = locations.some((location) => location.name === selectedLocationName);
+    const exists = locations.some((location) => location.code === selectedLocationCode);
     if (exists) return locations;
 
     return [
       {
-        code: selectedLocationName,
-        name: selectedLocationName,
+        code: selectedLocationCode,
+        name: String(formData.purchaseTermLocationName || '').trim() || selectedLocationCode,
         priority: 0,
         zoneName: '',
         zoneRate: Number(formData.zoneRate || 0),
       },
       ...locations,
     ];
-  }, [formData.purchaseTermLocation, formData.zoneRate, locations]);
+  }, [formData.purchaseTermLocation, formData.purchaseTermLocationName, formData.zoneRate, locations]);
 
-  const subLocationOptions = useMemo(
-    () => ensureOption(subLocations, formData.purchaseSubLocation || ''),
-    [formData.purchaseSubLocation, subLocations]
+  const purchaseSubLocationOptions = useMemo(
+    () => ensureOption(purchaseSubLocations, formData.purchaseSubLocation || ''),
+    [formData.purchaseSubLocation, purchaseSubLocations]
   );
   const salesSubLocationOptions = useMemo(
-    () => ensureOption(subLocations, formData.salesSubLocation || ''),
-    [formData.salesSubLocation, subLocations]
+    () => ensureOption(salesSubLocations, formData.salesSubLocation || ''),
+    [formData.salesSubLocation, salesSubLocations]
   );
 
   const selectedSupplier = useMemo(
@@ -174,6 +191,7 @@ export function TermInfoRow({
   const inputCls = `w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white ${f}`;
   const readOnlyCls = 'w-full px-2 py-1 bg-gray-200 border border-gray-300 rounded text-sm text-gray-900';
   const selectCls = `w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white ${f}`;
+  const inlineSelectCls = `${selectCls} disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`;
   const labelCls = 'text-xs text-gray-600 whitespace-nowrap text-right';
 
   return (
@@ -302,10 +320,21 @@ export function TermInfoRow({
 
           <div className="grid items-center gap-3" style={{ gridTemplateColumns: '100px 1fr 100px 1fr' }}>
             <label htmlFor={ids.contactPerson} className={labelCls}>Contact Person</label>
-            <select id={ids.contactPerson} value={formData.contactPerson} onChange={(event) => updateFormData('contactPerson', event.target.value)} disabled={isReadOnly} className={selectCls}>
-              <option value="">- Please Select -</option>
-              {contactOptions.map((contact) => <option key={contact} value={contact}>{contact}</option>)}
-            </select>
+            <InlineSelect
+              id={ids.contactPerson}
+              value={formData.contactPerson}
+              onValueChange={(nextCode) => {
+                const nextContact = contactOptions.find((contact) => contact.code === nextCode);
+                updateFormData('contactPerson', nextCode);
+                updateFormData('contactPersonName', nextContact?.name || '');
+              }}
+              disabled={isReadOnly}
+              placeholder="- Please Select -"
+              allowClear
+              size="sm"
+              className={inlineSelectCls}
+              options={contactOptions.map((contact) => ({ value: contact.code, label: contact.name }))}
+            />
             <label htmlFor={ids.contractNo} className={labelCls}>Contract No</label>
             <input id={ids.contractNo} type="text" value={formData.contractNo} onChange={(event) => updateFormData('contractNo', event.target.value)} disabled={isReadOnly} className={inputCls} />
           </div>
@@ -379,21 +408,30 @@ export function TermInfoRow({
           </div>
 
           <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100/50 space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
+            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
+              <div className="min-w-0 space-y-1.5">
                 <span className="text-[12px] uppercase font-bold text-gray-500 tracking-wider">Purchase Term</span>
-                <div className="grid items-center gap-1" style={{ gridTemplateColumns: '80px 1fr' }}>
+                <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: '80px minmax(0, 1fr)' }}>
                   <label htmlFor={ids.purchaseTerm} className="text-[11px] text-gray-600 text-right">Purchase Term</label>
-                  <select id={ids.purchaseTerm} value={formData.purchaseTerm || ''} onChange={(event) => updateFormData('purchaseTerm', event.target.value)} disabled={isReadOnly} className={selectCls}>
-                    {purchaseTermOptions.map((term) => <option key={term} value={term}>{term}</option>)}
-                  </select>
+                  <InlineSelect
+                    id={ids.purchaseTerm}
+                    value={formData.purchaseTerm || ''}
+                    onValueChange={(nextValue) => updateFormData('purchaseTerm', nextValue)}
+                    disabled={isReadOnly}
+                    placeholder="Please select"
+                    allowClear
+                    size="sm"
+                    className={`${inlineSelectCls} min-w-0 h-[30px] py-1`}
+                    options={purchaseTermOptions.map((term) => ({ value: term, label: term }))}
+                  />
 
                   <span className="text-[11px] text-gray-600 text-right">Term Location</span>
                   <Select
                     value={formData.purchaseTermLocation || undefined}
-                    onValueChange={(locationName) => {
-                      const selectedLocation = locationOptions.find((row) => row.name === locationName);
-                      updateFormData('purchaseTermLocation', locationName);
+                    onValueChange={(locationCode) => {
+                      const selectedLocation = locationOptions.find((row) => row.code === locationCode);
+                      updateFormData('purchaseTermLocation', locationCode);
+                      updateFormData('purchaseTermLocationName', selectedLocation?.name || '');
                       updateFormData('zoneRate', Number(selectedLocation?.zoneRate ?? 0));
                     }}
                     disabled={isReadOnly}
@@ -401,15 +439,15 @@ export function TermInfoRow({
                     <SelectTrigger
                       aria-label="Purchase term location"
                       size="sm"
-                      className={`${selectCls} h-[30px] py-1 data-[size=sm]:h-[30px] font-normal disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`}
+                      className={`${selectCls} min-w-0 h-[30px] py-1 data-[size=sm]:h-[30px] font-normal disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`}
                     >
                       <SelectValue placeholder="Please select" className="text-sm font-normal" />
                     </SelectTrigger>
                     <SelectContent side="bottom" avoidCollisions={false}>
                       {locationOptions.map((location) => (
                         <SelectItem
-                          key={location.name}
-                          value={location.name}
+                          key={location.code}
+                          value={location.code}
                           subLabel={`${location.zoneName || '-'} | ${fmtZoneRate(location.zoneRate)}`}
                         >
                           {location.name}
@@ -419,37 +457,59 @@ export function TermInfoRow({
                   </Select>
 
                   <label htmlFor={ids.purchaseSubLocation} className="text-[11px] text-gray-600 text-right">Sub Location</label>
-                  <select id={ids.purchaseSubLocation} value={formData.purchaseSubLocation || ''} onChange={(event) => updateFormData('purchaseSubLocation', event.target.value)} disabled={isReadOnly} className={selectCls}>
-                    <option value="">Please select</option>
-                    {subLocationOptions.map((subLocation) => <option key={subLocation} value={subLocation}>{subLocation}</option>)}
-                  </select>
+                  <InlineSelect
+                    id={ids.purchaseSubLocation}
+                    value={formData.purchaseSubLocation || ''}
+                    onValueChange={(nextValue) => updateFormData('purchaseSubLocation', nextValue)}
+                    disabled={isReadOnly}
+                    placeholder="Please select"
+                    allowClear
+                    size="sm"
+                    className={`${inlineSelectCls} min-w-0 h-[30px] py-1`}
+                    options={purchaseSubLocationOptions.map((subLocation) => ({ value: subLocation, label: subLocation }))}
+                  />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="min-w-0 space-y-1.5">
                 <span className="text-[12px] uppercase font-bold text-gray-500 tracking-wider">Sales Term</span>
-                <div className="grid items-center gap-1" style={{ gridTemplateColumns: '80px 1fr' }}>
+                <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: '80px minmax(0, 1fr)' }}>
                   <label htmlFor={ids.salesTerm} className="text-[11px] text-gray-600 text-right">Sales Term</label>
-                  <select id={ids.salesTerm} value={formData.salesTerm || ''} onChange={(event) => updateFormData('salesTerm', event.target.value)} disabled={isReadOnly} className={selectCls}>
-                    {salesTermOptions.map((term) => <option key={term} value={term}>{term}</option>)}
-                  </select>
+                  <InlineSelect
+                    id={ids.salesTerm}
+                    value={formData.salesTerm || ''}
+                    onValueChange={(nextValue) => updateFormData('salesTerm', nextValue)}
+                    disabled={isReadOnly}
+                    placeholder="Please select"
+                    allowClear
+                    size="sm"
+                    className={`${inlineSelectCls} min-w-0 h-[30px] py-1`}
+                    options={salesTermOptions.map((term) => ({ value: term, label: term }))}
+                  />
 
                   <label htmlFor={ids.salesSubLocation} className="text-[11px] text-gray-600 text-right">Sub Location</label>
-                  <select id={ids.salesSubLocation} value={formData.salesSubLocation || ''} onChange={(event) => updateFormData('salesSubLocation', event.target.value)} disabled={isReadOnly} className={selectCls}>
-                    <option value="">Please select</option>
-                    {salesSubLocationOptions.map((subLocation) => <option key={subLocation} value={subLocation}>{subLocation}</option>)}
-                  </select>
+                  <InlineSelect
+                    id={ids.salesSubLocation}
+                    value={formData.salesSubLocation || ''}
+                    onValueChange={(nextValue) => updateFormData('salesSubLocation', nextValue)}
+                    disabled={isReadOnly}
+                    placeholder="Please select"
+                    allowClear
+                    size="sm"
+                    className={`${inlineSelectCls} min-w-0 h-[30px] py-1`}
+                    options={salesSubLocationOptions.map((subLocation) => ({ value: subLocation, label: subLocation }))}
+                  />
                 </div>
 
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-100">
-                  <span className="text-xs text-term-blue font-medium truncate" title={formData.incoterm || 'Incoterms 2020'}>
+                <div className="mt-2 flex items-center justify-between gap-2 border-t border-blue-100 pt-2">
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-term-blue" title={formData.incoterm || 'Incoterms 2020'}>
                     {formData.incoterm || 'Incoterms 2020'}
                   </span>
                   <button
                     type="button"
                     disabled
                     aria-disabled="true"
-                    className="text-[10px] bg-white border border-term-blue text-term-blue px-2 py-0.5 rounded opacity-60 cursor-not-allowed"
+                    className="shrink-0 rounded border border-term-blue bg-white px-2 py-0.5 text-[10px] text-term-blue opacity-60 cursor-not-allowed"
                     title="Incoterm chart is not available yet"
                   >
                     CHART

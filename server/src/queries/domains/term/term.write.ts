@@ -74,7 +74,9 @@ export function buildUpdateTermSql(tableName: string): string {
     return `
     UPDATE ${tableName}
     SET ${setClause}
-    WHERE TermID = @TermID;`;
+    WHERE TermID = @TermID;
+
+    SELECT @@ROWCOUNT AS RowsAffected;`;
 }
 
 export const buildDeleteTermSql = (
@@ -94,7 +96,8 @@ BEGIN TRY
         WHERE TermID = @TermID
     )
     BEGIN
-        THROW 50021, 'Term not found', 1;
+        RAISERROR ('Term not found', 16, 1);
+        RETURN;
     END
 
     DELETE FROM ${attachmentTableName}
@@ -108,7 +111,8 @@ BEGIN TRY
 
     IF (@termRows <> 1)
     BEGIN
-        THROW 50022, 'Delete term failed due to unexpected row count.', 1;
+        RAISERROR ('Delete term failed due to unexpected row count.', 16, 1);
+        RETURN;
     END
 
     COMMIT TRANSACTION;
@@ -118,10 +122,11 @@ BEGIN TRY
         @attachmentRows AS AttachmentRowsAffected;
 END TRY
 BEGIN CATCH
+    DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
     IF @@TRANCOUNT > 0
     BEGIN
         ROLLBACK TRANSACTION;
     END
-    THROW;
+    RAISERROR (@ErrorMessage, 16, 1);
 END CATCH;
 `;

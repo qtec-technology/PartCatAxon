@@ -22,6 +22,9 @@ interface DatePickerProps {
 }
 
 export function DatePicker({ value, onChange, disabled, className, placeholder = "Pick a date", id, 'aria-label': ariaLabel }: DatePickerProps) {
+    const generatedId = React.useId();
+    const buttonId = String(id || generatedId);
+    const buttonName = buttonId;
     // Parse initial date safely
     const dateValue = React.useMemo(() => {
         if (!value) return undefined;
@@ -50,7 +53,8 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         <Popover>
             <PopoverTrigger asChild>
                 <Button
-                    id={id}
+                    id={buttonId}
+                    name={buttonName}
                     aria-label={ariaLabel}
                     variant={"outline"}
                     disabled={disabled}

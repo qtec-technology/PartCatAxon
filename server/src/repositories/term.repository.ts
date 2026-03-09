@@ -32,6 +32,52 @@ function resolveAttachmentTableName(): string {
     return dbObjects.tables.sap.attachment;
 }
 
+const TERM_TEXT_LABELS = {
+    VendorCode: 'Vendor Code',
+    VendorStockItemNo: 'Vendor Stock Item No',
+    U_OrderTerm: 'Purchase Term',
+    U_TermLocation: 'Term Location',
+    SubLocation: 'Sub Location',
+    U_PurCurr: 'Purchase Currency',
+    U_FreightType: 'Freight Type',
+    BuyUnitMsr: 'Purchase UOM',
+    SalUnitMsr: 'Sales UOM',
+    U_MOQ: 'MOQ/MOV',
+    LeadTime: 'Lead Time',
+    U_VendorBPA: 'Vendor BPA',
+    U_SalesTerm: 'Sales Term',
+    U_Remark: 'Remark',
+    SaleSubLocation: 'Sales Sub Location',
+    ContractNo: 'Contract No',
+    U_DimUnit: 'Dimension Unit',
+    U_ShipMode: 'Ship Mode',
+    Updatedby: 'Updated By',
+} as const;
+
+function createBadRequestError(message: string): Error & { statusCode: number } {
+    const err = new Error(message) as Error & { statusCode: number };
+    err.statusCode = 400;
+    return err;
+}
+
+function normalizeTermText(
+    field: keyof typeof TERM_TEXT_LABELS,
+    value: unknown,
+    maxLength: number,
+    strategy: 'reject' | 'truncate' = 'reject',
+): string {
+    const normalized = value === null || value === undefined ? '' : String(value).trim();
+    if (normalized.length <= maxLength) {
+        return normalized;
+    }
+
+    if (strategy === 'truncate') {
+        return normalized.slice(0, maxLength);
+    }
+
+    throw createBadRequestError(`${TERM_TEXT_LABELS[field]} exceeds max length ${maxLength}`);
+}
+
 /**
  * Merge user input + calculated fields into a flat SQL params object.
  */
@@ -46,25 +92,25 @@ function buildTermParams(
 
     return {
         // User-input fields
-        VendorCode: data.VendorCode ?? '',
-        VendorStockItemNo: data.VendorStockItemNo ?? '',
-        U_OrderTerm: data.U_OrderTerm ?? '',
-        U_TermLocation: data.U_TermLocation ?? '',
-        SubLocation: data.SubLocation ?? '',
+        VendorCode: normalizeTermText('VendorCode', data.VendorCode, 15),
+        VendorStockItemNo: normalizeTermText('VendorStockItemNo', data.VendorStockItemNo, 100),
+        U_OrderTerm: normalizeTermText('U_OrderTerm', data.U_OrderTerm, 30),
+        U_TermLocation: normalizeTermText('U_TermLocation', data.U_TermLocation, 10),
+        SubLocation: normalizeTermText('SubLocation', data.SubLocation, 50),
         U_ProdCost: data.U_ProdCost ?? 0,
-        U_PurCurr: data.U_PurCurr ?? '',
+        U_PurCurr: normalizeTermText('U_PurCurr', data.U_PurCurr, 10),
         U_PurRate: data.U_PurRate ?? 1,
         U_PKH: data.U_PKH ?? 0,
         U_SOC: data.U_SOC ?? 0,
         U_ShipModeNo: modeNo,
-        U_ShipMode: shipModeLabel(modeNo),
+        U_ShipMode: normalizeTermText('U_ShipMode', shipModeLabel(modeNo), 10),
         U_DimUnitNo: unitNo,
-        U_DimUnit: dimUnitLabel(unitNo),
+        U_DimUnit: normalizeTermText('U_DimUnit', dimUnitLabel(unitNo), 5),
         U_Length: data.U_Length ?? 0,
         U_Width: data.U_Width ?? 0,
         U_Height: data.U_Height ?? 0,
         U_Weight: data.U_Weight ?? 0,
-        U_FreightType: data.U_FreightType ?? '',
+        U_FreightType: normalizeTermText('U_FreightType', data.U_FreightType, 30),
         U_FreightRate: data.U_FreightRate ?? 0,
         U_FR: data.U_FR ?? calculatedFields.U_FR ?? 0,
         INS_Percent: data.INS_Percent ?? 0,
@@ -78,23 +124,23 @@ function buildTermParams(
         U_STK_Percent: data.U_STK_Percent ?? 0,
         U_SPK: data.U_SPK ?? 0,
         U_QOC: data.U_QOC ?? 0,
-        BuyUnitMsr: data.BuyUnitMsr ?? '',
+        BuyUnitMsr: normalizeTermText('BuyUnitMsr', data.BuyUnitMsr, 20),
         NumInBuy: data.NumInBuy ?? 1,
-        SalUnitMsr: data.SalUnitMsr ?? '',
+        SalUnitMsr: normalizeTermText('SalUnitMsr', data.SalUnitMsr, 20),
         NumInSale: data.NumInSale ?? 1,
-        U_MOQ: data.U_MOQ ?? '',
-        LeadTime: data.LeadTime ?? '',
-        U_VendorBPA: data.U_VendorBPA ?? '',
+        U_MOQ: normalizeTermText('U_MOQ', data.U_MOQ, 50),
+        LeadTime: normalizeTermText('LeadTime', data.LeadTime, 5),
+        U_VendorBPA: normalizeTermText('U_VendorBPA', data.U_VendorBPA, 3),
         CntctCode: data.CntctCode ?? null,
         SlpCode: data.SlpCode ?? null,
         SlpSprtCode: data.SlpSprtCode ?? null,
         U_ValidFrom: data.U_ValidFrom ?? null,
         U_ValidTo: data.U_ValidTo ?? null,
-        U_SalesTerm: data.U_SalesTerm ?? '',
-        U_Remark: data.U_Remark ?? '',
-        SaleSubLocation: data.SaleSubLocation ?? '',
+        U_SalesTerm: normalizeTermText('U_SalesTerm', data.U_SalesTerm, 20),
+        U_Remark: normalizeTermText('U_Remark', data.U_Remark, 254),
+        SaleSubLocation: normalizeTermText('SaleSubLocation', data.SaleSubLocation, 50),
         Active: data.Active !== false,
-        ContractNo: data.ContractNo ?? '',
+        ContractNo: normalizeTermText('ContractNo', data.ContractNo, 50),
 
         // Server-calculated fields (from calculation engine)
         U_OP: calculatedFields.U_OP ?? 0,
@@ -118,7 +164,7 @@ function buildTermParams(
         U_QLC3: calculatedFields.U_QLC3 ?? 0,
 
         // Audit
-        Updatedby: updatedBy,
+        Updatedby: normalizeTermText('Updatedby', updatedBy, 50, 'truncate'),
         UpdatedDate: new Date(),
     };
 }
@@ -181,10 +227,15 @@ export async function updateTerm(
         ...buildTermParams(data, calculatedFields, updatedBy),
     };
 
-    await queryOne(
+    const result = await queryOne<{ RowsAffected: number }>(
         buildUpdateTermSql(targetTable),
         params,
     );
+
+    const rowsAffected = Number(result?.RowsAffected ?? 0);
+    if (!Number.isFinite(rowsAffected) || rowsAffected !== 1) {
+        throw new Error(`Failed to update term: TermID ${termId} was not found`);
+    }
 }
 
 // ใช้สำหรับลบ Term และ Attachment ที่เกี่ยวข้องใน transaction

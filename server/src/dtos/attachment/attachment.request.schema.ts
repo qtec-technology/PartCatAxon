@@ -18,6 +18,7 @@ export const createAttachmentBodySchema = z.object({
     fileName: z.string().trim().min(1, 'fileName is required'),
     filePath: z.string().trim().optional(),
     fileType: z.string().trim().optional(),
+    contentBase64: z.string().trim().optional(),
 }).passthrough();
 
 export const attachmentIdParamSchema = z.object({

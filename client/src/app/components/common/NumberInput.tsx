@@ -18,8 +18,11 @@ export function NumberInput({
     zeroAsInteger,
     ...inputProps
 }: NumberInputProps) {
+    const generatedId = React.useId();
     const [isFocused, setIsFocused] = React.useState(false);
     const [localVal, setLocalVal] = React.useState('');
+    const fieldId = String(inputProps.id || generatedId);
+    const fieldName = String(inputProps.name || fieldId);
 
     React.useEffect(() => {
         if (!isFocused) {
@@ -69,7 +72,10 @@ export function NumberInput({
         }
     };
 
-    return <input type="text"
+    return <input
+        type="text"
+        id={fieldId}
+        name={fieldName}
         value={localVal}
         onChange={handleChange}
         onFocus={handleFocus}

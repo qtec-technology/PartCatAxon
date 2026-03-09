@@ -21,6 +21,17 @@ interface ItemAttachmentView {
     updatedDate: string;
 }
 
+const mapAttachmentRows = (rows: Array<Record<string, unknown>>): ItemAttachmentView[] =>
+    rows
+        .map((row) => ({
+            id: String(row.AttachmentID ?? row.id ?? ''),
+            category: String(row.Category ?? ''),
+            fileName: String(row.Attachement ?? row.fileName ?? ''),
+            updatedBy: String(row.Updatedby ?? row.updatedBy ?? ''),
+            updatedDate: String(row.UpdatedDate ?? row.updatedDate ?? ''),
+        }))
+        .filter((row) => row.id || row.fileName);
+
 export default function ItemPage({ mode: initialMode }: ItemFormPageProps) {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
@@ -31,6 +42,63 @@ export default function ItemPage({ mode: initialMode }: ItemFormPageProps) {
     const [attachments, setAttachments] = useState<ItemAttachmentView[]>([]);
     const [prefetchedLookups, setPrefetchedLookups] = useState<ItemFormLookups | null>(null);
     const [loading, setLoading] = useState(false);
+
+    const syncItemArtifacts = async (itemId: number, options: ItemFormSaveOptions) => {
+        const pendingAttachments = options?.pendingAttachments || [];
+        const imageFile = options?.imageFile || null;
+
+        let attachmentSyncFailed = false;
+        let imageUploadFailed = false;
+
+        if (pendingAttachments.length > 0) {
+            const results = await Promise.allSettled(
+                pendingAttachments.map((item) => attachmentApi.createAttachment({
+                    relatedId: itemId,
+                    relatedType: 'ITEM',
+                    fileName: item.fileName,
+                    filePath: '',
+                    fileType: item.category,
+                    file: item.file,
+                }))
+            );
+
+            if (results.some((result) => result.status === 'rejected')) {
+                attachmentSyncFailed = true;
+                results
+                    .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+                    .forEach((result) => clientLogger.error('Attachment save failed', result.reason));
+            }
+        }
+
+        if (imageFile) {
+            try {
+                await itemApi.uploadItemImage(itemId, imageFile);
+            } catch (imageErr) {
+                imageUploadFailed = true;
+                clientLogger.error('Image upload failed', imageErr);
+            }
+        }
+
+        return {
+            attachmentSyncFailed,
+            imageUploadFailed,
+        };
+    };
+
+    const refreshItemArtifacts = async (itemId: number) => {
+        const [itemResult, attachmentResult] = await Promise.allSettled([
+            itemApi.getItemById(itemId),
+            lookupApi.getItemAttachments(itemId),
+        ]);
+
+        if (itemResult.status === 'fulfilled') {
+            setData(itemResult.value);
+        }
+
+        if (attachmentResult.status === 'fulfilled') {
+            setAttachments(mapAttachmentRows(attachmentResult.value));
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -116,14 +184,7 @@ export default function ItemPage({ mode: initialMode }: ItemFormPageProps) {
 
                 if (!cancelled) {
                     if (attachmentResult.status === 'fulfilled') {
-                        const mapped = attachmentResult.value.map((row) => ({
-                            id: String(row.AttachmentID ?? row.id ?? ''),
-                            category: String(row.Category ?? ''),
-                            fileName: String(row.Attachement ?? row.fileName ?? ''),
-                            updatedBy: String(row.Updatedby ?? row.updatedBy ?? ''),
-                            updatedDate: String(row.UpdatedDate ?? row.updatedDate ?? ''),
-                        }));
-                        setAttachments(mapped.filter((row) => row.id || row.fileName));
+                        setAttachments(mapAttachmentRows(attachmentResult.value));
                     } else {
                         setAttachments([]);
                     }
@@ -164,43 +225,23 @@ export default function ItemPage({ mode: initialMode }: ItemFormPageProps) {
             }
             if (mode === 'NEW') {
                 const newItemId = await itemApi.createItem(formData);
-                toast.success('Item created successfully');
-                navigate(`/item/${newItemId}`);
+                const { attachmentSyncFailed, imageUploadFailed } = await syncItemArtifacts(newItemId, options);
+
+                if (attachmentSyncFailed || imageUploadFailed) {
+                    const warnings: string[] = [];
+                    if (attachmentSyncFailed) warnings.push('attachments');
+                    if (imageUploadFailed) warnings.push('image');
+                    toast.warning(`Item created, but failed to sync ${warnings.join(' and ')}`);
+                } else {
+                    toast.success('Item created successfully');
+                }
+
+                navigate(`/item/${newItemId}`, { replace: true });
             } else {
                 if (!id) return;
                 await itemApi.updateItem(id, formData);
                 const itemId = Number(id);
-                const pendingAttachments = options?.pendingAttachments || [];
-                const imageFile = options?.imageFile || null;
-
-                let attachmentSyncFailed = false;
-                let imageUploadFailed = false;
-
-                if (pendingAttachments.length > 0) {
-                    try {
-                        await Promise.all(
-                            pendingAttachments.map((item) => attachmentApi.createAttachment({
-                                relatedId: itemId,
-                                relatedType: 'ITEM',
-                                fileName: item.fileName,
-                                filePath: '',
-                                fileType: item.category,
-                            }))
-                        );
-                    } catch (attachmentErr) {
-                        attachmentSyncFailed = true;
-                        clientLogger.error('Attachment save failed', attachmentErr);
-                    }
-                }
-
-                if (imageFile) {
-                    try {
-                        await itemApi.uploadItemImage(itemId, imageFile);
-                    } catch (imageErr) {
-                        imageUploadFailed = true;
-                        clientLogger.error('Image upload failed', imageErr);
-                    }
-                }
+                const { attachmentSyncFailed, imageUploadFailed } = await syncItemArtifacts(itemId, options);
 
                 if (attachmentSyncFailed || imageUploadFailed) {
                     const warnings: string[] = [];
@@ -210,6 +251,8 @@ export default function ItemPage({ mode: initialMode }: ItemFormPageProps) {
                 } else {
                     toast.success('Item updated successfully');
                 }
+
+                await refreshItemArtifacts(itemId);
                 setMode('VIEW');
             }
         } catch (err: any) {

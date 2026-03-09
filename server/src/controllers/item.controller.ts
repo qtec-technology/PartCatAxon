@@ -22,15 +22,9 @@ import { resolveUpdatedByFirstName } from '#src/utils/auth.js';
 import { writeAuditLog, AuditAction, AuditEntity } from '#src/services/audit.service.js';
 import { env } from '#src/config/env.js';
 import { logger } from '#src/utils/logger.js';
+import { normalizeItemImageExt } from '#src/services/attachment-legacy.service.js';
 
-const ITEM_IMAGE_EXTENSIONS = ['.jpg', '.png', '.gif', '.jpeg', '.webp'] as const;
-const ITEM_IMAGE_MIME_TO_EXT: Record<string, (typeof ITEM_IMAGE_EXTENSIONS)[number]> = {
-    'image/jpeg': '.jpg',
-    'image/jpg': '.jpg',
-    'image/png': '.png',
-    'image/gif': '.gif',
-    'image/webp': '.webp',
-};
+const ITEM_IMAGE_EXTENSIONS = ['.jpg', '.png', '.gif'] as const;
 
 function resolveItemImageDir(): string {
     return path.resolve(env.ITEM_IMAGE_DIR);
@@ -38,34 +32,6 @@ function resolveItemImageDir(): string {
 
 function getItemImageBaseName(itemId: number): string {
     return `IIMG${itemId}`;
-}
-
-/**
- * Build the full image path and validate it stays within ITEM_IMAGE_DIR.
- * Prevents path traversal attacks (defense-in-depth).
- */
-function buildSafeImagePath(itemId: number, ext: string): string {
-    const imageDir = resolveItemImageDir();
-    const baseName = getItemImageBaseName(itemId);
-    const fullPath = path.resolve(imageDir, `${baseName}${ext}`);
-    if (!fullPath.startsWith(imageDir)) {
-        throw new Error('Invalid image path: path traversal detected');
-    }
-    return fullPath;
-}
-
-function normalizeItemImageExt(fileName: string, mimeType: string): string {
-    const extFromName = path.extname(String(fileName || '').trim()).toLowerCase();
-    if (ITEM_IMAGE_EXTENSIONS.includes(extFromName as (typeof ITEM_IMAGE_EXTENSIONS)[number])) {
-        return extFromName;
-    }
-
-    const extFromMime = ITEM_IMAGE_MIME_TO_EXT[String(mimeType || '').trim().toLowerCase()];
-    if (extFromMime) {
-        return extFromMime;
-    }
-
-    throw new Error('Unsupported image type. Allowed: jpg, jpeg, png, gif, webp');
 }
 
 async function deleteItemImageCandidates(itemId: number): Promise<void> {
@@ -196,7 +162,7 @@ export async function getItemImage(req: Request, res: Response, next: NextFuncti
     }
 }
 
-/** POST /api/items/:id/image - Upload item image to configured ITEM_IMAGE_DIR */
+/** POST /api/items/:id/image - Upload legacy item image to ITEM_IMAGE_DIR */
 export async function uploadItemImage(req: Request, res: Response, next: NextFunction) {
     try {
         const { itemId } = toItemIdParamDTO(req.params);
@@ -219,6 +185,18 @@ export async function uploadItemImage(req: Request, res: Response, next: NextFun
         }
 
         const saved = await saveItemImageToFolder(itemId, fileName, mimeType, contentBuffer);
+        const updatedBy = resolveUpdatedByFirstName(req);
+
+        try {
+            await itemRepo.updateItem(itemId, {}, updatedBy);
+        } catch (touchErr) {
+            try {
+                await fs.unlink(saved.filePath);
+            } catch {
+                // Best effort cleanup only.
+            }
+            throw touchErr;
+        }
 
         res.json(success(saved, 'Item image uploaded successfully'));
     } catch (err) {

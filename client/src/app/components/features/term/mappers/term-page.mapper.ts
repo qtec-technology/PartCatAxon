@@ -1,5 +1,11 @@
-import type { TermAttachmentItem, TermFormData, TermSupplierOption } from '../../../../types/term_form.types';
-import type { ContactLookupOption, VendorLookupOption } from '../../../../services/lookup.api';
+import type {
+    TermAttachmentItem,
+    TermContactOption,
+    TermFormData,
+    TermSalesPersonOption,
+    TermSupplierOption,
+} from '../../../../types/term_form.types';
+import type { ContactLookupOption, SalesPersonLookupOption, VendorLookupOption } from '../../../../services/lookup.api';
 
 const toNumber = (value: unknown, fallback = 0): number => {
     const parsed = Number(value);
@@ -49,8 +55,34 @@ export function mapVendorsToSuppliers(vendors: VendorLookupOption[]): TermSuppli
     });
 }
 
-export function mapContactsToNames(rows: ContactLookupOption[]): string[] {
-    return uniqueStrings(rows.map((row) => row.name));
+export function mapContactsToOptions(rows: ContactLookupOption[]): TermContactOption[] {
+    const byCode = new Map<string, TermContactOption>();
+    for (const row of rows) {
+        const code = String(row.cntctCode || '').trim();
+        const name = String(row.name || '').trim();
+        if (!code || !name || byCode.has(code)) continue;
+        byCode.set(code, {
+            code,
+            name,
+            active: String(row.active || '').trim(),
+        });
+    }
+    return Array.from(byCode.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function mapSalesPersonsToOptions(rows: SalesPersonLookupOption[]): TermSalesPersonOption[] {
+    const byCode = new Map<string, TermSalesPersonOption>();
+    for (const row of rows) {
+        const code = String(row.slpCode || '').trim();
+        const name = String(row.slpName || '').trim();
+        if (!code || !name || byCode.has(code)) continue;
+        byCode.set(code, {
+            code,
+            name,
+            active: String(row.active || '').trim(),
+        });
+    }
+    return Array.from(byCode.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function mapTermRecordToFormData(raw: Record<string, unknown>, prev: TermFormData): TermFormData {
@@ -58,13 +90,15 @@ export function mapTermRecordToFormData(raw: Record<string, unknown>, prev: Term
         ...prev,
         supplier: toText(raw.VendorCode),
         supplierName: toText(raw.CardName),
-        contactPerson: toText(raw.CntctName),
+        contactPerson: toText(raw.CntctCode),
+        contactPersonName: toText(raw.CntctName),
         active: toBoolean(raw.Active, true),
         contractNo: toText(raw.ContractNo),
         mfgPartNo: toText(raw.U_CatalogNo ?? raw.U_CalalogNo),
         suppOrderCode: toText(raw.VendorStockItemNo),
         purchaseTerm: toText(raw.U_OrderTerm),
-        purchaseTermLocation: toText(raw.TermLocationName ?? raw.U_TermLocation),
+        purchaseTermLocation: toText(raw.U_TermLocation),
+        purchaseTermLocationName: toText(raw.TermLocationName ?? raw.U_TermLocation),
         purchaseSubLocation: toText(raw.SubLocation),
         salesTerm: toText(raw.U_SalesTerm),
         salesSubLocation: toText(raw.SaleSubLocation),
@@ -95,8 +129,10 @@ export function mapTermRecordToFormData(raw: Record<string, unknown>, prev: Term
         scc: toNumber(raw.U_ASP, 0),
         zoneRate: toNumber(raw.U_ZoneRate, 0),
         cWeight: toNumber(raw.U_CWeight, 0),
-        salesPerson: toText(raw.SlpName),
-        sourcedBy: toText(raw.SlpSprtName),
+        salesPerson: toText(raw.SlpCode),
+        salesPersonName: toText(raw.SlpName),
+        sourcedBy: toText(raw.SlpSprtCode),
+        sourcedByName: toText(raw.SlpSprtName),
         remark: toText(raw.U_Remark),
         leadTime: toText(raw.LeadTime),
         moq: toText(raw.U_MOQ),

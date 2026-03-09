@@ -1,14 +1,15 @@
 import { memo, useId, useMemo } from 'react';
 import { format } from 'date-fns';
 import { NumberInput } from '../../common/NumberInput';
-import type { TermCalcResults, TermFormData, UpdateTermFormData } from '../../../types/term_form.types';
+import { InlineSelect } from '../../common/InlineSelect';
+import type { TermCalcResults, TermFormData, TermSalesPersonOption, UpdateTermFormData } from '../../../types/term_form.types';
 
 interface MiddleColumnProps {
   formData: MiddleColumnFormData;
   updateFormData: UpdateTermFormData;
   isReadOnly: boolean;
   calcResults: TermCalcResults;
-  salesPersons: string[];
+  salesPersons: TermSalesPersonOption[];
 }
 
 type MiddleColumnFormData = Pick<
@@ -25,7 +26,9 @@ type MiddleColumnFormData = Pick<
   | 'moq'
   | 'vendorBPA'
   | 'salesPerson'
+  | 'salesPersonName'
   | 'sourcedBy'
+  | 'sourcedByName'
   | 'updatedBy'
   | 'updatedDate'
 >;
@@ -34,9 +37,12 @@ const f = 'focus:outline-none focus:border-term-red focus:ring-1 focus:ring-term
 const DUTY_OPTIONS = [0, 1, 3, 5, 10, 15, 20, 25, 30, 40, 50, 1000];
 const moneyFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const ensureOption = (list: string[], value: string) => {
-  if (!value) return list;
-  return list.includes(value) ? list : [value, ...list];
+const ensureOption = (list: TermSalesPersonOption[], code: string, name: string): TermSalesPersonOption[] => {
+  const normalizedCode = String(code || '').trim();
+  if (!normalizedCode) return list;
+  return list.some((row) => row.code === normalizedCode)
+    ? list
+    : [{ code: normalizedCode, name: String(name || '').trim() || normalizedCode, active: 'Y' }, ...list];
 };
 
 function CalcRow({
@@ -54,10 +60,13 @@ function CalcRow({
   isWhite?: boolean;
   isSans?: boolean;
 }) {
+  const fieldId = useId();
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-      <span className={`text-xs text-left text-gray-700 whitespace-nowrap flex-1 ${labelClass || 'sm:text-right'}`}>{label}</span>
+      <label htmlFor={fieldId} className={`text-xs text-left text-gray-700 whitespace-nowrap flex-1 ${labelClass || 'sm:text-right'}`}>{label}</label>
       <input
+        id={fieldId}
+        name={fieldId}
         type="text"
         value={value}
         readOnly
@@ -83,12 +92,12 @@ export const MiddleColumn = memo(function MiddleColumn({
   const idBase = useId();
   const fmt = (v: number) => moneyFormatter.format(v);
   const salesPersonOptions = useMemo(
-    () => ensureOption(salesPersons, formData.salesPerson || ''),
-    [formData.salesPerson, salesPersons]
+    () => ensureOption(salesPersons, formData.salesPerson || '', formData.salesPersonName || ''),
+    [formData.salesPerson, formData.salesPersonName, salesPersons]
   );
   const sourcedByOptions = useMemo(
-    () => ensureOption(salesPersons, formData.sourcedBy || ''),
-    [formData.sourcedBy, salesPersons]
+    () => ensureOption(salesPersons, formData.sourcedBy || '', formData.sourcedByName || ''),
+    [formData.sourcedBy, formData.sourcedByName, salesPersons]
   );
   const shouldShowZoneRate = useMemo(() => {
     const purchaseTerm = String(formData.purchaseTerm || '').trim().toUpperCase();
@@ -99,6 +108,7 @@ export const MiddleColumn = memo(function MiddleColumn({
   const ids = useMemo(
     () => ({
       insPercent: `${idBase}-insPercent`,
+      insAmount: `${idBase}-insAmount`,
       fr: `${idBase}-fr`,
       zoneRate: `${idBase}-zoneRate`,
       dutyPercent: `${idBase}-dutyPercent`,
@@ -112,6 +122,7 @@ export const MiddleColumn = memo(function MiddleColumn({
     }),
     [idBase]
   );
+  const inlineSelectCls = `flex-1 w-full sm:w-[180px] px-2 py-1 border border-gray-300 rounded text-sm bg-white ${f} disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`;
 
   return (
     <div className="flex flex-col gap-4 h-full min-h-0">
@@ -136,9 +147,12 @@ export const MiddleColumn = memo(function MiddleColumn({
               />
               <span className="text-[10px] text-gray-500">%</span>
               <input
+                id={ids.insAmount}
+                name="insuranceAmount"
                 type="text"
                 value={fmt(calcResults.INS)}
                 readOnly
+                aria-label="Insurance amount"
                 className="w-[85px] px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-200 font-mono text-right text-gray-900"
               />
             </div>
@@ -177,7 +191,7 @@ export const MiddleColumn = memo(function MiddleColumn({
         </div>
         <div className="p-3 space-y-2 bg-white">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-700">Duty</label>
+            <p className="text-xs font-semibold text-gray-700">Duty</p>
             <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 mb-2">
               {DUTY_OPTIONS.map((v) => (
                 <button
@@ -266,6 +280,7 @@ export const MiddleColumn = memo(function MiddleColumn({
               onChange={(e) => updateFormData('leadTime', e.target.value)}
               disabled={isReadOnly}
               type="text"
+              maxLength={5}
               className={`w-full px-2 py-1 border border-gray-300 rounded text-xs bg-white text-center ${f}`}
             />
             <label htmlFor={ids.moq} className="min-w-0 text-xs text-gray-700 font-medium leading-tight">MOQ/MOV</label>
@@ -309,29 +324,39 @@ export const MiddleColumn = memo(function MiddleColumn({
         <div className="p-3 space-y-2.5">
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
             <label htmlFor={ids.salesPerson} className="text-xs text-left sm:text-right text-gray-700 w-full sm:w-[80px] font-medium">Call By</label>
-            <select
+            <InlineSelect
               id={ids.salesPerson}
               value={formData.salesPerson || ''}
-              onChange={(e) => updateFormData('salesPerson', e.target.value)}
+              onValueChange={(nextCode) => {
+                const nextSalesPerson = salesPersonOptions.find((row) => row.code === nextCode);
+                updateFormData('salesPerson', nextCode);
+                updateFormData('salesPersonName', nextSalesPerson?.name || '');
+              }}
               disabled={isReadOnly}
-              className={`flex-1 w-full sm:w-[180px] px-2 py-1 border border-gray-300 rounded text-sm bg-white ${f}`}
-            >
-              <option value="">- Please Select -</option>
-              {salesPersonOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-            </select>
+              placeholder="- Please Select -"
+              allowClear
+              size="sm"
+              className={inlineSelectCls}
+              options={salesPersonOptions.map((row) => ({ value: row.code, label: row.name }))}
+            />
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
             <label htmlFor={ids.sourcedBy} className="text-xs text-left sm:text-right text-gray-700 w-full sm:w-[80px] font-medium">Sourced By</label>
-            <select
+            <InlineSelect
               id={ids.sourcedBy}
               value={formData.sourcedBy || ''}
-              onChange={(e) => updateFormData('sourcedBy', e.target.value)}
+              onValueChange={(nextCode) => {
+                const nextSalesPerson = sourcedByOptions.find((row) => row.code === nextCode);
+                updateFormData('sourcedBy', nextCode);
+                updateFormData('sourcedByName', nextSalesPerson?.name || '');
+              }}
               disabled={isReadOnly}
-              className={`flex-1 w-full sm:w-[180px] px-2 py-1 border border-gray-300 rounded text-sm bg-white ${f}`}
-            >
-              <option value="">- Please Select -</option>
-              {sourcedByOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-            </select>
+              placeholder="- Please Select -"
+              allowClear
+              size="sm"
+              className={inlineSelectCls}
+              options={sourcedByOptions.map((row) => ({ value: row.code, label: row.name }))}
+            />
           </div>
         </div>
       </div>

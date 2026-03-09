@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Search, RotateCcw, Plus, ShoppingCart, Filter, Loader2 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -55,6 +55,13 @@ export function SearchCriteriaPanel({
   disableAddTerm,
   isSearching = false,
 }: SearchCriteriaPanelProps) {
+  const idBase = useId();
+  const ids = useMemo(() => ({
+    keyword: `${idBase}-keyword`,
+    searchType: `${idBase}-searchType`,
+    brand: `${idBase}-brand`,
+    criteria: `${idBase}-criteria`,
+  }), [idBase]);
 
   const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
     FTS: 'Full-Text Search',
@@ -359,6 +366,9 @@ export function SearchCriteriaPanel({
             {isFTSMode ? (
               <div className="relative">
                 <Input
+                  id={ids.keyword}
+                  name="keyword"
+                  aria-label="Keyword search"
                   type="text"
                   value={keyword}
                   onChange={(e) => {
@@ -417,6 +427,9 @@ export function SearchCriteriaPanel({
               </div>
             ) : (
               <Input
+                id={ids.keyword}
+                name="keyword"
+                aria-label="Keyword search"
                 type="text"
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
@@ -431,7 +444,7 @@ export function SearchCriteriaPanel({
           <div className="flex items-center gap-1 w-full md:w-auto whitespace-nowrap">
             <span className="text-xs font-bold text-[#555555]">SEARCH BY:</span>
             <Select value={searchType} onValueChange={(v) => handleSearchTypeChange(v as SearchType)}>
-              <SelectTrigger className="h-8 flex-1 md:w-[200px] bg-white border-[#A0C0E0] text-xs">
+              <SelectTrigger id={ids.searchType} name="searchType" aria-label="Search type" className="h-8 flex-1 md:w-[200px] bg-white border-[#A0C0E0] text-xs">
                 <SelectValue placeholder="Full-Text Search" />
               </SelectTrigger>
               <SelectContent>
@@ -449,6 +462,9 @@ export function SearchCriteriaPanel({
             <span className="text-xs font-bold text-[#555555]">BRAND/MFG:</span>
             <div className="relative flex-1 md:w-[250px]">
               <input
+                id={ids.brand}
+                name="brand"
+                aria-label="Brand or manufacturer"
                 type="text"
                 value={brandInput}
                 placeholder={brand ? brand : 'Please select'}
@@ -573,6 +589,9 @@ export function SearchCriteriaPanel({
           <div className="relative w-full md:flex-1">
             <Filter className="absolute left-2 top-2 w-4 h-4 text-black pointer-events-none" />
             <Input
+              id={ids.criteria}
+              name="criteriaSummary"
+              aria-label="Current search criteria"
               type="text"
               value={criteriaText}
               readOnly

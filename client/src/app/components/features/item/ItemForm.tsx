@@ -7,9 +7,10 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
-  Button, Input, Select, TextArea,
+  Button, Input, TextArea,
   SectionHeader, Badge, cn
 } from '../common/atoms';
+import { InlineSelect } from '../../common/InlineSelect';
 import {
   Table,
   TableBody,
@@ -26,10 +27,12 @@ import { lookupApi, LookupOption, ItemFormLookups } from '../../../services/look
 import { useAuth } from '../../../auth/AuthContext';
 import { clientLogger } from '../../../utils/logger';
 import { toast } from 'sonner';
+import { hasAllowedFileExtension } from '../../../utils/file';
 
 export interface ItemSaveAttachmentInput {
   category: string;
   fileName: string;
+  file: File;
 }
 
 export interface ItemFormSaveOptions {
@@ -59,6 +62,7 @@ interface AttachmentItem {
   updatedBy: string;
   updatedDate: string;
   isPending?: boolean;
+  file?: File | null;
 }
 
 const LONG_DESC_CHUNK_SIZE = 254;
@@ -67,6 +71,14 @@ const GENERATED_LONG_DESC_SUFFIX_REGEX = /(?:\r?\n)?P\/N:\s*[^\r\n]*\r?\nMFG:\s*
 const DEFAULT_ITEM_PREVIEW_IMAGE = `${import.meta.env.BASE_URL}items/qtec_image_500.jpg`;
 const NULL_LOOKUP_VALUE = '_Null';
 const NULL_LOOKUP_LABEL = 'Please Select';
+const ALLOWED_ITEM_IMAGE_EXTENSIONS = ['.jpg', '.png', '.gif'];
+const ITEM_ATTACHMENT_CATEGORIES = [
+  'Item-Certificate',
+  'MSDS',
+  'Picture',
+  'Spec.Sheet',
+  'Other',
+] as const;
 
 const splitLongDescToChunks = (text: string): [string, string, string, string] => {
   const clipped = text.slice(0, LONG_DESC_MAX_LENGTH);
@@ -189,8 +201,8 @@ export function ItemForm({
   const isView = mode === 'VIEW';
   const isEdit = mode === 'EDIT';
   const isReadOnly = readOnlyMode || isView;
-  const canManageItemImage = isEdit && !isReadOnly;
-  const canManageAttachments = isEdit && !isReadOnly;
+  const canManageItemImage = !isReadOnly;
+  const canManageAttachments = !isReadOnly;
   const currentDisplayName = String(user?.displayName || user?.username || '').trim();
   const currentFirstName = String(
     user?.firstname || currentDisplayName.split(/\s+/)[0] || user?.username || ''
@@ -409,6 +421,7 @@ export function ItemForm({
       id: `TMP-${now.getTime()}-${attachments.length + 1}`,
       category: attachCategory,
       fileName: attachFile.name,
+      file: attachFile,
       updatedBy: currentFirstName || currentDisplayName || String(getValues('updatedBy') || '').trim(),
       updatedDate: format(now, 'dd-MMM-yyyy HH:mm:ss'),
       isPending: true,
@@ -596,6 +609,11 @@ export function ItemForm({
     }
     const file = e.target.files?.[0];
     if (file) {
+      if (!hasAllowedFileExtension(file.name, ALLOWED_ITEM_IMAGE_EXTENSIONS)) {
+        toast.error('Allowed image types: JPG, PNG, GIF');
+        e.target.value = '';
+        return;
+      }
       setSelectedImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -611,14 +629,24 @@ export function ItemForm({
       return;
     }
     const [longDesc1, longDesc2, longDesc3, longDesc4] = buildLongDescWithSuffix(data);
-    const pendingAttachments = canManageAttachments
-      ? attachments
-        .filter((item) => item.isPending === true)
-        .map((item) => ({
-          category: String(item.category || '').trim(),
-          fileName: String(item.fileName || '').trim(),
-        }))
-        .filter((item) => item.category && item.fileName)
+    const pendingAttachments: ItemSaveAttachmentInput[] = canManageAttachments
+      ? attachments.flatMap((item) => {
+        if (item.isPending !== true || !(item.file instanceof File)) {
+          return [];
+        }
+
+        const category = String(item.category || '').trim();
+        const fileName = String(item.fileName || '').trim();
+        if (!category || !fileName) {
+          return [];
+        }
+
+        return [{
+          category,
+          fileName,
+          file: item.file,
+        }];
+      })
       : [];
 
     await onSave({
@@ -673,7 +701,9 @@ export function ItemForm({
 
 
   // Checkbox Row Component for consistency
-  const CheckboxRow = ({ label, name, isRed = false, isGray = false }: { label: string, name: keyof ItemData, isRed?: boolean, isGray?: boolean }) => (
+  const CheckboxRow = ({ label, name, isRed = false, isGray = false }: { label: string, name: keyof ItemData, isRed?: boolean, isGray?: boolean }) => {
+    const checkboxId = `item-${String(name)}`;
+    return (
     <div className="flex justify-end items-center gap-2 h-7">
       <span className={cn(
         "text-xs text-right",
@@ -685,10 +715,12 @@ export function ItemForm({
         control={control}
         render={({ field: { value, ...fieldProps } }) => (
           <input
+            id={checkboxId}
             type="checkbox"
             {...fieldProps}
             checked={!!value}
             disabled={isReadOnly}
+            aria-label={label}
             className={cn(
               "h-4 w-4 rounded border-gray-400",
               "accent-[#2264A0]"
@@ -698,9 +730,28 @@ export function ItemForm({
       />
     </div>
   );
+  };
 
   const currentCatalogNo = watch('catalogNo') || initialData?.catalogNo || '';
   const disableSave = isReadOnly || isSubmitting;
+  const itemIds = React.useMemo(() => ({
+    mfrBrand: 'item-mfrBrand',
+    longDescriptionInput: 'item-longDescriptionInput',
+    longDesc1: 'item-longDesc1',
+    longDesc2: 'item-longDesc2',
+    longDesc3: 'item-longDesc3',
+    longDesc4: 'item-longDesc4',
+    attachmentCategory: 'item-attachmentCategory',
+    attachmentFileName: 'item-attachmentFileName',
+    attachmentFile: 'item-attachmentFile',
+    permitType: 'item-permitType',
+    hsCode: 'item-hsCode',
+    generalSpec: 'item-generalSpec',
+    referenceUrl: 'item-referenceUrl',
+    imageUpload: 'item-imageUpload',
+    updatedBy: 'item-updatedBy',
+    updatedDate: 'item-updatedDate',
+  }), []);
 
   return (
     <div className="bg-white shadow-sm border border-gray-200 min-h-full pb-10 relative">
@@ -810,14 +861,32 @@ export function ItemForm({
 
               {/* Row 1: Item Group + Catalog No */}
               <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 2fr' }}>
-                <Select
-                  label="Item Group"
-                  required
-                  options={itemGroups}
-                  placeholder="Please select"
-                  disabled={isReadOnly}
-                  {...register('itemGroup', { required: 'Item Group is required' })}
-                />
+                <div className="mb-3 w-full">
+                  <label htmlFor="itemGroup" className="block text-xs font-bold text-gray-700 mb-1">
+                    Item Group
+                    <span className="text-[#C12B2B] ml-1">*</span>
+                  </label>
+                  <Controller
+                    name="itemGroup"
+                    control={control}
+                    rules={{ required: 'Item Group is required' }}
+                    render={({ field }) => (
+                      <InlineSelect
+                        id="itemGroup"
+                        value={field.value || ''}
+                        onValueChange={field.onChange}
+                        disabled={isReadOnly}
+                        placeholder="Please select"
+                        allowClear
+                        className="w-full h-9 border-gray-300 bg-white text-sm disabled:opacity-100 disabled:bg-[#F5F5F5] disabled:text-gray-500"
+                        options={itemGroups.map((option) => ({
+                          value: String(option.value || '').trim(),
+                          label: String(option.label || '').trim(),
+                        }))}
+                      />
+                    )}
+                  />
+                </div>
                 <Input
                   label="Catalog No"
                   fullWidth
@@ -838,7 +907,7 @@ export function ItemForm({
 
               {/* Row 3: Mfr Brand (Autocomplete) */}
               <div className="mb-3 w-full">
-                <label className="block text-xs font-bold text-gray-700 mb-1">
+                <label htmlFor={itemIds.mfrBrand} className="block text-xs font-bold text-gray-700 mb-1">
                   Mfr Brand
                   <span className="text-[#C12B2B] ml-1">*</span>
                 </label>
@@ -849,6 +918,8 @@ export function ItemForm({
                   render={({ field, fieldState: { error } }) => (
                     <div className="relative" ref={brandRef}>
                       <input
+                        id={itemIds.mfrBrand}
+                        name="mfrBrand"
                         type="text"
                         className={cn(
                           "w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-[#2264A0] focus:ring-1 focus:ring-[#2264A0]",
@@ -924,14 +995,29 @@ export function ItemForm({
               />
 
               {/* Row 6: Item Category */}
-              <Select
-                label="Item Category"
-                options={itemCategories}
-                placeholder="Please select"
-                showPlaceholderOption={false}
-                disabled={isReadOnly}
-                {...register('itemCategory')}
-              />
+              <div className="mb-3 w-full">
+                <label htmlFor="itemCategory" className="block text-xs font-bold text-gray-700 mb-1">
+                  Item Category
+                </label>
+                <Controller
+                  name="itemCategory"
+                  control={control}
+                  render={({ field }) => (
+                    <InlineSelect
+                      id="itemCategory"
+                      value={field.value || ''}
+                      onValueChange={field.onChange}
+                      disabled={isReadOnly}
+                      placeholder="Please select"
+                      className="w-full h-9 border-gray-300 bg-white text-sm disabled:opacity-100 disabled:bg-[#F5F5F5] disabled:text-gray-500"
+                      options={itemCategories.map((option) => ({
+                        value: String(option.value || '').trim(),
+                        label: String(option.label || '').trim(),
+                      }))}
+                    />
+                  )}
+                />
+              </div>
 
               {/* Row 7: Cust Stock Code */}
               <Input
@@ -943,24 +1029,57 @@ export function ItemForm({
               />
 
               {/* Row 8: Stock UOM */}
-              <Select
-                label="Stock UOM"
-                required
-                options={uoms}
-                placeholder="Please select"
-                disabled={isReadOnly}
-                {...register('stockUOM', { required: 'UOM is required' })}
-              />
+              <div className="mb-3 w-full">
+                <label htmlFor="stockUOM" className="block text-xs font-bold text-gray-700 mb-1">
+                  Stock UOM
+                  <span className="text-[#C12B2B] ml-1">*</span>
+                </label>
+                <Controller
+                  name="stockUOM"
+                  control={control}
+                  rules={{ required: 'UOM is required' }}
+                  render={({ field }) => (
+                    <InlineSelect
+                      id="stockUOM"
+                      value={field.value || ''}
+                      onValueChange={field.onChange}
+                      disabled={isReadOnly}
+                      placeholder="Please select"
+                      allowClear
+                      className="w-full h-9 border-gray-300 bg-white text-sm disabled:opacity-100 disabled:bg-[#F5F5F5] disabled:text-gray-500"
+                      options={uoms.map((option) => ({
+                        value: String(option.value || '').trim(),
+                        label: String(option.label || '').trim(),
+                      }))}
+                    />
+                  )}
+                />
+              </div>
 
               {/* Row 9: Country of Origin */}
-              <Select
-                label="Country of Origin"
-                options={countries}
-                placeholder="Please Select"
-                showPlaceholderOption={false}
-                disabled={isReadOnly}
-                {...register('countryOfOrigin')}
-              />
+              <div className="mb-3 w-full">
+                <label htmlFor="countryOfOrigin" className="block text-xs font-bold text-gray-700 mb-1">
+                  Country of Origin
+                </label>
+                <Controller
+                  name="countryOfOrigin"
+                  control={control}
+                  render={({ field }) => (
+                    <InlineSelect
+                      id="countryOfOrigin"
+                      value={field.value || ''}
+                      onValueChange={field.onChange}
+                      disabled={isReadOnly}
+                      placeholder="Please Select"
+                      className="w-full h-9 border-gray-300 bg-white text-sm disabled:opacity-100 disabled:bg-[#F5F5F5] disabled:text-gray-500"
+                      options={countries.map((option) => ({
+                        value: String(option.value || '').trim(),
+                        label: String(option.label || '').trim(),
+                      }))}
+                    />
+                  )}
+                />
+              </div>
 
               {/* Row 10-12: ECCN, UNSPSC, e-Procurement Code */}
               <Input label="ECCN" fullWidth maxLength={50} disabled={isReadOnly} {...register('eccn')} />
@@ -1004,13 +1123,13 @@ export function ItemForm({
                 <div className="flex justify-center">
                   <label className="cursor-pointer bg-[#2264A0] text-white px-3 py-1 text-sm rounded hover:bg-blue-800 flex items-center gap-2">
                     <Upload className="w-3 h-3" /> Upload Img
-                    <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                    <input id={itemIds.imageUpload} name="itemImageUpload" type="file" className="hidden" accept=".jpg,.png,.gif" onChange={handleImageUpload} />
                   </label>
                 </div>
               )}
               {isNew && (
                 <p className="mt-2 text-center text-xs text-gray-500">
-                  Image upload is available after creating item (Edit mode).
+                  Image will be uploaded after the item is created.
                 </p>
               )}
             </div>
@@ -1039,11 +1158,13 @@ export function ItemForm({
                   <div className="space-y-3">
                     {/* Input Area */}
                     <div>
-                      <label className="text-xs font-bold text-gray-700 mb-2 block">
+                      <label htmlFor={itemIds.longDescriptionInput} className="text-xs font-bold text-gray-700 mb-2 block">
                         ✏️ Long Description Input
                       </label>
                       <div className="relative">
                         <textarea
+                          id={itemIds.longDescriptionInput}
+                          name="longDescriptionInput"
                           className={cn(
                             "w-full border rounded px-2 py-1.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-[#2264A0]/30 resize-none",
                             isReadOnly
@@ -1093,8 +1214,10 @@ export function ItemForm({
                     {/* Result: 4 Read-Only Boxes */}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-gray-50 p-2 border rounded">
-                        <label className="text-[10px] text-gray-500 block mb-1">LongDesc1 (Max 254) — <span className="font-semibold">{fullDescriptionChunks[0].length}</span>/254</label>
+                        <label htmlFor={itemIds.longDesc1} className="text-[10px] text-gray-500 block mb-1">LongDesc1 (Max 254) — <span className="font-semibold">{fullDescriptionChunks[0].length}</span>/254</label>
                         <textarea
+                          id={itemIds.longDesc1}
+                          name="longDesc1Preview"
                           disabled
                           className="w-full text-xs border p-1 bg-[#F5F5F5] text-gray-600 resize-none" rows={8}
                           value={fullDescriptionChunks[0]}
@@ -1102,8 +1225,10 @@ export function ItemForm({
                         />
                       </div>
                       <div className="bg-gray-50 p-2 border rounded">
-                        <label className="text-[10px] text-gray-500 block mb-1">LongDesc2 (Max 254) — <span className="font-semibold">{fullDescriptionChunks[1].length}</span>/254</label>
+                        <label htmlFor={itemIds.longDesc2} className="text-[10px] text-gray-500 block mb-1">LongDesc2 (Max 254) — <span className="font-semibold">{fullDescriptionChunks[1].length}</span>/254</label>
                         <textarea
+                          id={itemIds.longDesc2}
+                          name="longDesc2Preview"
                           disabled
                           className="w-full text-xs border p-1 bg-[#F5F5F5] text-gray-600 resize-none" rows={8}
                           value={fullDescriptionChunks[1]}
@@ -1111,8 +1236,10 @@ export function ItemForm({
                         />
                       </div>
                       <div className="bg-gray-50 p-2 border rounded">
-                        <label className="text-[10px] text-gray-500 block mb-1">LongDesc3 (Max 254) — <span className="font-semibold">{fullDescriptionChunks[2].length}</span>/254</label>
+                        <label htmlFor={itemIds.longDesc3} className="text-[10px] text-gray-500 block mb-1">LongDesc3 (Max 254) — <span className="font-semibold">{fullDescriptionChunks[2].length}</span>/254</label>
                         <textarea
+                          id={itemIds.longDesc3}
+                          name="longDesc3Preview"
                           disabled
                           className="w-full text-xs border p-1 bg-[#F5F5F5] text-gray-600 resize-none" rows={8}
                           value={fullDescriptionChunks[2]}
@@ -1120,8 +1247,10 @@ export function ItemForm({
                         />
                       </div>
                       <div className="bg-gray-50 p-2 border rounded">
-                        <label className="text-[10px] text-gray-500 block mb-1">LongDesc4 (Max 254) — <span className="font-semibold">{fullDescriptionChunks[3].length}</span>/254</label>
+                        <label htmlFor={itemIds.longDesc4} className="text-[10px] text-gray-500 block mb-1">LongDesc4 (Max 254) — <span className="font-semibold">{fullDescriptionChunks[3].length}</span>/254</label>
                         <textarea
+                          id={itemIds.longDesc4}
+                          name="longDesc4Preview"
                           disabled
                           className="w-full text-xs border p-1 bg-[#F5F5F5] text-gray-600 resize-none" rows={8}
                           value={fullDescriptionChunks[3]}
@@ -1140,7 +1269,7 @@ export function ItemForm({
                   <div>
                     {isNew && (
                       <p className="mb-3 text-xs text-gray-500">
-                        Attachments are available after creating item (Edit mode).
+                        Attachments will be uploaded after the item is created.
                       </p>
                     )}
                     {/* Add File button */}
@@ -1229,25 +1358,29 @@ export function ItemForm({
                           <div className="p-5 space-y-4">
                             {/* Category Row */}
                             <div className="flex items-center gap-3">
-                              <label className="text-sm text-gray-700 w-16 text-right">Category</label>
-                              <select
-                                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm bg-white"
+                              <label htmlFor={itemIds.attachmentCategory} className="text-sm text-gray-700 w-16 text-right">Category</label>
+                              <InlineSelect
+                                id={itemIds.attachmentCategory}
+                                name="attachmentCategory"
                                 value={attachCategory}
-                                onChange={(e) => setAttachCategory(e.target.value)}
-                              >
-                                <option value="">- Select -</option>
-                                <option value="Item-Certificate">Item-Certificate</option>
-                                <option value="MSDS">MSDS</option>
-                                <option value="Picture">Picture</option>
-                                <option value="Spec.Sheet">Spec.Sheet</option>
-                                <option value="Other">Other</option>
-                              </select>
+                                onValueChange={(nextValue) => setAttachCategory(nextValue)}
+                                placeholder="- Select -"
+                                allowClear
+                                size="sm"
+                                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm bg-white"
+                                options={ITEM_ATTACHMENT_CATEGORIES.map((category) => ({
+                                  value: category,
+                                  label: category,
+                                }))}
+                              />
                             </div>
 
                             {/* Upload Row */}
                             <div className="flex items-center gap-3">
-                              <label className="text-sm text-gray-700 w-16 text-right">Upload</label>
+                              <label htmlFor={itemIds.attachmentFileName} className="text-sm text-gray-700 w-16 text-right">Upload</label>
                               <input
+                                id={itemIds.attachmentFileName}
+                                name="attachmentFileName"
                                 type="text"
                                 readOnly
                                 value={attachFile?.name || ''}
@@ -1256,6 +1389,8 @@ export function ItemForm({
                               />
                               <input
                                 ref={attachFileInputRef}
+                                id={itemIds.attachmentFile}
+                                name="attachmentFile"
                                 type="file"
                                 className="hidden"
                                 onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
@@ -1327,25 +1462,41 @@ export function ItemForm({
               {/* Bottom Inputs */}
               <div className="mt-4 space-y-3">
                 <div className="flex flex-col xl:flex-row xl:items-center justify-end gap-1 xl:gap-2">
-                  <label className="text-xs text-gray-500 text-left xl:text-right w-full xl:w-1/3">Permit Type</label>
+                  <label htmlFor={itemIds.permitType} className="text-xs text-gray-500 text-left xl:text-right w-full xl:w-1/3">Permit Type</label>
                   <div className="w-full xl:w-2/3">
-                    <select
-                      className={cn("w-full border border-gray-300 rounded px-2 py-1 text-sm h-8", !(isReadOnly || !permitRequired) && "bg-white")}
-                      disabled={isReadOnly || !permitRequired}
-                      {...register('permitType')}
-                    >
-                      <option value="">Please select</option>
-                      {permitTypes.map((t) => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
+                    <Controller
+                      name="permitType"
+                      control={control}
+                      render={({ field }) => (
+                        <InlineSelect
+                          id={itemIds.permitType}
+                          name="permitType"
+                          value={field.value || ''}
+                          onValueChange={field.onChange}
+                          disabled={isReadOnly || !permitRequired}
+                          placeholder="Please select"
+                          allowClear
+                          size="sm"
+                          className={cn(
+                            "w-full h-8 border-gray-300 rounded text-sm",
+                            !(isReadOnly || !permitRequired) && "bg-white",
+                            (isReadOnly || !permitRequired) && "disabled:opacity-100 disabled:bg-[#F5F5F5] disabled:text-gray-500"
+                          )}
+                          options={permitTypes.map((option) => ({
+                            value: String(option.value || '').trim(),
+                            label: String(option.label || '').trim(),
+                          }))}
+                        />
+                      )}
+                    />
                   </div>
                 </div>
 
                 <div className="flex flex-col xl:flex-row xl:items-center justify-end gap-1 xl:gap-2">
-                  <label className="text-xs text-gray-500 text-left xl:text-right w-full xl:w-1/3">Harmonized Code</label>
+                  <label htmlFor={itemIds.hsCode} className="text-xs text-gray-500 text-left xl:text-right w-full xl:w-1/3">Harmonized Code</label>
                   <div className="w-full xl:w-2/3">
                     <input
+                      id={itemIds.hsCode}
                       className={cn("w-full border border-gray-300 rounded px-2 py-1 text-sm h-8", !isReadOnly && "bg-white")}
                       maxLength={10}
                       disabled={isReadOnly}
@@ -1358,8 +1509,9 @@ export function ItemForm({
 
             {/* General Spec */}
             <div className="mt-4">
-              <label className="block text-xs font-bold text-gray-700 mb-1">General Spec.</label>
+              <label htmlFor={itemIds.generalSpec} className="block text-xs font-bold text-gray-700 mb-1">General Spec.</label>
               <textarea
+                id={itemIds.generalSpec}
                 className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-[#2264A0] focus:ring-1 focus:ring-[#2264A0] disabled:bg-[#F5F5F5] disabled:text-gray-500 resize-none h-[150px]"
                 maxLength={4000}
                 disabled={isReadOnly}
@@ -1369,9 +1521,10 @@ export function ItemForm({
 
             {/* Reference URL */}
             <div className="mt-3">
-              <label className="block text-xs font-bold text-gray-700 mb-1">Reference URL</label>
+              <label htmlFor={itemIds.referenceUrl} className="block text-xs font-bold text-gray-700 mb-1">Reference URL</label>
               <div className="flex gap-2 items-center">
                 <input
+                  id={itemIds.referenceUrl}
                   className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-[#2264A0] focus:ring-1 focus:ring-[#2264A0] disabled:bg-[#F5F5F5] disabled:text-gray-500"
                   maxLength={2000}
                   disabled={isReadOnly}
@@ -1392,21 +1545,27 @@ export function ItemForm({
             {/* Being updated by */}
             <div className="mt-4 pt-3 border-t border-gray-200">
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500 whitespace-nowrap">
+                <p className="text-xs text-gray-500 whitespace-nowrap">
                   {mode === 'NEW' ? 'Being updated by:' : 'Last updated by:'}
-                </label>
+                </p>
                 <div className="flex flex-col gap-2 w-full min-w-0">
                   <input
+                    id={itemIds.updatedBy}
+                    name="updatedByDisplay"
                     type="text"
                     readOnly
                     value={updatedByValue}
+                    aria-label={mode === 'NEW' ? 'Being updated by' : 'Last updated by'}
                     title={updatedByValue}
                     className="border border-gray-300 rounded px-2 py-1 text-sm bg-[#F5F5F5] text-gray-600 w-full min-w-0"
                   />
                   <input
+                    id={itemIds.updatedDate}
+                    name="updatedDateDisplay"
                     type="text"
                     readOnly
                     value={formatDateTimeDisplay(updatedDateValue)}
+                    aria-label={mode === 'NEW' ? 'Being updated date' : 'Last updated date'}
                     className="border border-gray-300 rounded px-2 py-1 text-xs sm:text-sm bg-[#F5F5F5] text-gray-600 w-full min-w-0 tabular-nums"
                   />
                 </div>

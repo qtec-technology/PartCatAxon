@@ -110,16 +110,22 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, required, fullWidth, className, ...props }, ref) => {
+    const generatedId = React.useId();
+    const fieldId = String(props.id || generatedId);
+    const fieldName = String(props.name || fieldId);
+
     return (
       <div className={cn('mb-3', fullWidth ? 'w-full' : '')}>
         {label && (
-          <label className="block text-xs font-bold text-gray-700 mb-1">
+          <label htmlFor={fieldId} className="block text-xs font-bold text-gray-700 mb-1">
             {label}
             {required && <span className="text-[#C12B2B] ml-1">*</span>}
           </label>
         )}
         <input
           ref={ref}
+          id={fieldId}
+          name={fieldName}
           className={cn(
             'border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-[#2264A0] focus:ring-1 focus:ring-[#2264A0] disabled:bg-[#F5F5F5] disabled:text-gray-500',
             fullWidth ? 'w-full' : '',
@@ -146,16 +152,22 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, required, options, placeholder, showPlaceholderOption = true, className, onMouseDownCapture, onTouchStartCapture, ...props }, ref) => {
+    const generatedId = React.useId();
+    const fieldId = String(props.id || generatedId);
+    const fieldName = String(props.name || fieldId);
+
     return (
       <div className="mb-3 w-full">
         {label && (
-          <label className="block text-xs font-bold text-gray-700 mb-1">
+          <label htmlFor={fieldId} className="block text-xs font-bold text-gray-700 mb-1">
             {label}
             {required && <span className="text-[#C12B2B] ml-1">*</span>}
           </label>
         )}
         <select
           ref={ref}
+          id={fieldId}
+          name={fieldName}
           className={cn(
             'w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-[#2264A0] focus:ring-1 focus:ring-[#2264A0] disabled:bg-[#F5F5F5] disabled:text-gray-500',
             error ? 'border-[#C12B2B]' : '',
@@ -201,16 +213,22 @@ interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
 
 export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
   ({ label, error, required, className, ...props }, ref) => {
+    const generatedId = React.useId();
+    const fieldId = String(props.id || generatedId);
+    const fieldName = String(props.name || fieldId);
+
     return (
       <div className="mb-3 w-full">
         {label && (
-          <label className="block text-xs font-bold text-gray-700 mb-1">
+          <label htmlFor={fieldId} className="block text-xs font-bold text-gray-700 mb-1">
             {label}
             {required && <span className="text-[#C12B2B] ml-1">*</span>}
           </label>
         )}
         <textarea
           ref={ref}
+          id={fieldId}
+          name={fieldName}
           className={cn(
             'w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-[#2264A0] focus:ring-1 focus:ring-[#2264A0] disabled:bg-[#F5F5F5] disabled:text-gray-500',
             error ? 'border-[#C12B2B]' : '',
@@ -231,10 +249,15 @@ interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   ({ label, className, ...props }, ref) => {
+    const generatedId = React.useId();
+    const fieldId = String(props.id || generatedId);
+    const fieldName = String(props.name || fieldId);
     return (
-      <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-700 mb-1">
+      <label htmlFor={fieldId} className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-700 mb-1">
         <input
           ref={ref}
+          id={fieldId}
+          name={fieldName}
           type="checkbox"
           className={cn(
             'rounded border-gray-300 text-[#5AA02A] focus:ring-[#5AA02A] h-4 w-4',

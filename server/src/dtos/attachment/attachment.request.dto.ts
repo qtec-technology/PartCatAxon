@@ -10,6 +10,7 @@ export interface CreateAttachmentBodyDTO {
     fileName: string;
     filePath: string;
     fileType: string;
+    contentBase64: string;
 }
 
 export interface AttachmentIdParamDTO {
@@ -29,6 +30,7 @@ export function toCreateAttachmentBodyDTO(body: unknown): CreateAttachmentBodyDT
         fileName: parseString(b.fileName, ''),
         filePath: parseString(b.filePath, ''),
         fileType: parseString(b.fileType, ''),
+        contentBase64: parseString(b.contentBase64, ''),
     };
 }
 

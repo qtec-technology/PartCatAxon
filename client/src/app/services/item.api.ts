@@ -2,6 +2,7 @@ import { ItemData } from '../types/item_types';
 import { PartItem, SearchType } from '../types/partcatalog_types';
 import { requestJson } from './http';
 import { clientLogger } from '../utils/logger';
+import { readFileAsDataUrl } from '../utils/file';
 
 export interface PaginatedResponse<T> {
     items: T[];
@@ -178,20 +179,6 @@ const buildQuery = (params: Record<string, string | number | boolean | undefined
     return query.toString();
 };
 
-const fileToDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-        const result = reader.result;
-        if (typeof result === 'string' && result.length > 0) {
-            resolve(result);
-            return;
-        }
-        reject(new Error('Failed to read image file'));
-    };
-    reader.onerror = () => reject(new Error('Failed to read image file'));
-    reader.readAsDataURL(file);
-});
-
 let brandCache: { data: BrandLookupOption[] | null; promise: Promise<BrandLookupOption[]> | null } = {
     data: null,
     promise: null,
@@ -337,7 +324,7 @@ export const itemApi = {
             throw new Error('Image file is required');
         }
 
-        const contentBase64 = await fileToDataUrl(file);
+        const contentBase64 = await readFileAsDataUrl(file);
         await requestJson<null>(`/api/items/${itemId}/image`, {
             method: 'POST',
             body: {

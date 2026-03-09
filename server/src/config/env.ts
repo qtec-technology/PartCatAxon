@@ -7,6 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const SERVER_ROOT_DIR = path.resolve(__dirname, '../..');
 const DEFAULT_ITEM_IMAGE_DIR = path.resolve(SERVER_ROOT_DIR, 'storage', 'item-images');
+const DEFAULT_ATTACHMENT_DIR = path.resolve(SERVER_ROOT_DIR, 'storage', 'attachments');
 
 function isAbsoluteWindowsPath(value: string): boolean {
     return /^([a-zA-Z]:\\|\\\\)/.test(value);
@@ -88,6 +89,7 @@ export const env = {
     DB_USER: getRequiredEnv('DB_USER'),
     DB_PASSWORD: getRequiredEnv('DB_PASSWORD'),
     ITEM_IMAGE_DIR: normalizeWindowsDirPath(process.env.ITEM_IMAGE_DIR, DEFAULT_ITEM_IMAGE_DIR),
+    ATTACHMENT_DIR: normalizeWindowsDirPath(process.env.ATTACHMENT_DIR, DEFAULT_ATTACHMENT_DIR),
     USER_PICTURE_DIR: normalizeWindowsDirPath(process.env.USER_PICTURE_DIR, ''),
 
     // CORS

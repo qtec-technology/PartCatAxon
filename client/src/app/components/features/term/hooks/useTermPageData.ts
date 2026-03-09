@@ -14,7 +14,8 @@ import type {
 } from '../../../../types/term_form.types';
 import { defaultTermCalcResults, defaultTermFormData } from '../../../../types/term_form.types';
 import {
-    mapContactsToNames,
+    mapContactsToOptions,
+    mapSalesPersonsToOptions,
     mapTermAttachments,
     mapTermRecordToFormData,
     mapVendorsToSuppliers,
@@ -44,9 +45,17 @@ const parsePositiveInt = (value: unknown): number | null => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
-const ensureIncluded = (list: string[], value: string): string[] => {
-    if (!value) return list;
-    return list.includes(value) ? list : [value, ...list];
+const ensureContactIncluded = (
+    list: TermPageDataState['contacts'],
+    code: string,
+    name: string,
+): TermPageDataState['contacts'] => {
+    const normalizedCode = String(code || '').trim();
+    const normalizedName = String(name || '').trim();
+    if (!normalizedCode) return list;
+    return list.some((row) => row.code === normalizedCode)
+        ? list
+        : [{ code: normalizedCode, name: normalizedName || normalizedCode, active: 'Y' }, ...list];
 };
 
 const isAbortError = (error: unknown): boolean =>
@@ -70,8 +79,8 @@ export function useTermPageData({
     const [contacts, setContacts] = useState<TermPageDataState['contacts']>([]);
     const [orderTerms, setOrderTerms] = useState<TermPageDataState['orderTerms']>([]);
     const [locations, setLocations] = useState<TermPageDataState['locations']>([]);
-    const [allSubLocations, setAllSubLocations] = useState<TermPageDataState['subLocations']>([]);
-    const [subLocations, setSubLocations] = useState<TermPageDataState['subLocations']>([]);
+    const [purchaseSubLocations, setPurchaseSubLocations] = useState<TermPageDataState['purchaseSubLocations']>([]);
+    const [salesSubLocations, setSalesSubLocations] = useState<TermPageDataState['salesSubLocations']>([]);
     const [currencies, setCurrencies] = useState<TermPageDataState['currencies']>([]);
     const [freightTypes, setFreightTypes] = useState<TermPageDataState['freightTypes']>([]);
     const [salesPersons, setSalesPersons] = useState<TermPageDataState['salesPersons']>([]);
@@ -81,8 +90,7 @@ export function useTermPageData({
     const parsedSourceItemId = useMemo(() => parsePositiveInt(sourceItemId), [sourceItemId]);
     const isNewMode = mode === 'new';
 
-    const contactsBySupplierRef = useRef<Map<string, string[]>>(new Map());
-    const subLocationsByCountryRef = useRef<Map<string, string[]>>(new Map());
+    const contactsBySupplierRef = useRef<Map<string, TermPageDataState['contacts']>>(new Map());
     const cWeightAbortRef = useRef<AbortController | null>(null);
 
     const supplierByCode = useMemo(() => {
@@ -92,17 +100,6 @@ export function useTermPageData({
         }
         return map;
     }, [suppliers]);
-
-    const locationCountryByName = useMemo(() => {
-        const map = new Map<string, string>();
-        for (const row of locations) {
-            const name = String(row.name || '').trim();
-            const code = String(row.code || '').trim();
-            if (!name || !code || map.has(name)) continue;
-            map.set(name, code);
-        }
-        return map;
-    }, [locations]);
 
     const refreshAttachments = useCallback(async () => {
         if (!parsedTermId) {
@@ -127,27 +124,32 @@ export function useTermPageData({
         const fetchLookups = async () => {
             setIsLookupLoading(true);
             try {
-                const [data, critical] = await Promise.all([
+                const [data, critical, purchaseSubLocationRows, salesSubLocationRows] = await Promise.all([
                     lookupApi.getTermFormLookups({
                         signal: controller.signal,
                     }),
                     lookupApi.getTermCriticalLookups({
                         signal: controller.signal,
                     }),
+                    lookupApi.getSubLocations('AP', undefined, {
+                        signal: controller.signal,
+                    }),
+                    lookupApi.getSubLocations('AR', undefined, {
+                        signal: controller.signal,
+                    }),
                 ]);
                 if (cancelled) return;
 
                 contactsBySupplierRef.current.clear();
-                subLocationsByCountryRef.current.clear();
 
                 setSuppliers(mapVendorsToSuppliers(data.vendors));
                 setOrderTerms(data.orderTerms);
                 setLocations(critical.locations);
-                setAllSubLocations(data.subLocations);
-                setSubLocations(data.subLocations);
+                setPurchaseSubLocations(uniqueStrings(purchaseSubLocationRows.map((row) => String(row.name || '').trim())));
+                setSalesSubLocations(uniqueStrings(salesSubLocationRows.map((row) => String(row.name || '').trim())));
                 setCurrencies(critical.currencies);
                 setFreightTypes(critical.freightTypes);
-                setSalesPersons(data.salesPersons);
+                setSalesPersons(mapSalesPersonsToOptions(data.salesPersons));
                 setUomOptions(data.uoms);
             } catch (error) {
                 if (isAbortError(error)) return;
@@ -156,8 +158,8 @@ export function useTermPageData({
                 setSuppliers([]);
                 setOrderTerms([]);
                 setLocations([]);
-                setAllSubLocations([]);
-                setSubLocations([]);
+                setPurchaseSubLocations([]);
+                setSalesSubLocations([]);
                 setCurrencies([]);
                 setFreightTypes([]);
                 setSalesPersons([]);
@@ -228,10 +230,10 @@ export function useTermPageData({
                 }
             }
 
-            const locationName = String(prev.purchaseTermLocation || '').trim();
-            if (locationName) {
+            const locationCode = String(prev.purchaseTermLocation || '').trim();
+            if (locationCode) {
                 const matchedLocation = locations.find(
-                    (row) => String(row.name || '').trim().toLowerCase() === locationName.toLowerCase()
+                    (row) => String(row.code || '').trim().toLowerCase() === locationCode.toLowerCase()
                 );
                 if (matchedLocation) {
                     const nextZoneRate = Number(matchedLocation.zoneRate || 0);
@@ -239,6 +241,12 @@ export function useTermPageData({
                         next = next === prev
                             ? { ...prev, zoneRate: nextZoneRate }
                             : { ...next, zoneRate: nextZoneRate };
+                    }
+                    const nextLocationName = String(matchedLocation.name || '').trim();
+                    if (nextLocationName && prev.purchaseTermLocationName !== nextLocationName) {
+                        next = next === prev
+                            ? { ...prev, purchaseTermLocationName: nextLocationName }
+                            : { ...next, purchaseTermLocationName: nextLocationName };
                     }
                 }
             }
@@ -265,68 +273,13 @@ export function useTermPageData({
     useEffect(() => {
         let cancelled = false;
         const controller = new AbortController();
-        const selectedLocationName = String(formData.purchaseTermLocation || '').trim();
-
-        const setDefaultSubLocations = () => {
-            if (!cancelled) {
-                setSubLocations(allSubLocations);
-            }
-        };
-
-        const loadSubLocationsByCountry = async () => {
-            if (!selectedLocationName) {
-                setDefaultSubLocations();
-                return;
-            }
-
-            const countryCode = String(locationCountryByName.get(selectedLocationName) || '').trim();
-            if (!countryCode) {
-                setDefaultSubLocations();
-                return;
-            }
-
-            const cached = subLocationsByCountryRef.current.get(countryCode);
-            if (cached) {
-                if (!cancelled) {
-                    setSubLocations(cached);
-                }
-                return;
-            }
-
-            try {
-                const rows = await lookupApi.getSubLocations(undefined, countryCode, {
-                    signal: controller.signal,
-                });
-                if (cancelled) return;
-
-                const filtered = uniqueStrings(rows.map((row) => String(row.name || '').trim()));
-                const nextSubLocations = filtered.length > 0 ? filtered : allSubLocations;
-                subLocationsByCountryRef.current.set(countryCode, nextSubLocations);
-                setSubLocations(nextSubLocations);
-            } catch (error) {
-                if (isAbortError(error)) return;
-                clientLogger.error('Failed to load sub-locations by country', error);
-                setDefaultSubLocations();
-            }
-        };
-
-        void loadSubLocationsByCountry();
-
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [allSubLocations, formData.purchaseTermLocation, locationCountryByName]);
-
-    useEffect(() => {
-        let cancelled = false;
-        const controller = new AbortController();
         const supplierCode = String(formData.supplier || '').trim();
-        const currentContact = String(formData.contactPerson || '').trim();
+        const currentContactCode = String(formData.contactPerson || '').trim();
+        const currentContactName = String(formData.contactPersonName || '').trim();
 
         const setFallbackContacts = () => {
             if (!cancelled) {
-                setContacts(currentContact ? [currentContact] : []);
+                setContacts(ensureContactIncluded([], currentContactCode, currentContactName));
             }
         };
 
@@ -339,7 +292,7 @@ export function useTermPageData({
             const cached = contactsBySupplierRef.current.get(supplierCode);
             if (cached) {
                 if (!cancelled) {
-                    setContacts(ensureIncluded(cached, currentContact));
+                    setContacts(ensureContactIncluded(cached, currentContactCode, currentContactName));
                 }
                 return;
             }
@@ -350,9 +303,9 @@ export function useTermPageData({
                 });
                 if (cancelled) return;
 
-                const contactNames = mapContactsToNames(contactRows);
-                contactsBySupplierRef.current.set(supplierCode, contactNames);
-                setContacts(ensureIncluded(contactNames, currentContact));
+                const contactOptions = mapContactsToOptions(contactRows);
+                contactsBySupplierRef.current.set(supplierCode, contactOptions);
+                setContacts(ensureContactIncluded(contactOptions, currentContactCode, currentContactName));
             } catch (error) {
                 if (isAbortError(error)) return;
                 clientLogger.error('Failed to load contacts', error);
@@ -366,7 +319,7 @@ export function useTermPageData({
             cancelled = true;
             controller.abort();
         };
-    }, [formData.contactPerson, formData.supplier, mode, readOnlyMode]);
+    }, [formData.contactPerson, formData.contactPersonName, formData.supplier, mode, readOnlyMode]);
 
     useEffect(() => {
         let cancelled = false;
@@ -559,6 +512,7 @@ export function useTermPageData({
                 ...prev,
                 supplierName: selectedSupplierName,
                 contactPerson: '',
+                contactPersonName: '',
             };
         });
     }, [supplierByCode]);
@@ -574,6 +528,7 @@ export function useTermPageData({
             fileName: input.fileName,
             filePath: input.filePath || '',
             fileType: input.category,
+            file: input.file,
         });
 
         await refreshAttachments();
@@ -606,7 +561,8 @@ export function useTermPageData({
         contacts,
         orderTerms,
         locations,
-        subLocations,
+        purchaseSubLocations,
+        salesSubLocations,
         currencies,
         freightTypes,
         salesPersons,

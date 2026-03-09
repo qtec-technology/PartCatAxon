@@ -31,7 +31,8 @@ BEGIN TRY
           AND ParentID = @ParentID
     )
     BEGIN
-        THROW 50011, 'Attachment not found for the specified owner', 1;
+        RAISERROR ('Attachment not found for the specified owner', 16, 1);
+        RETURN;
     END
 
     DECLARE @returnRowAffected INT = 0;
@@ -42,7 +43,8 @@ BEGIN TRY
 
     IF ISNULL(@returnRowAffected, 0) <= 0
     BEGIN
-        THROW 50012, 'SPIT_DeleteAttachFile reported no affected rows', 1;
+        RAISERROR ('SPIT_DeleteAttachFile reported no affected rows', 16, 1);
+        RETURN;
     END
 
     COMMIT TRANSACTION;
@@ -50,10 +52,11 @@ BEGIN TRY
     SELECT @returnRowAffected AS RowsAffected;
 END TRY
 BEGIN CATCH
+    DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
     IF @@TRANCOUNT > 0
     BEGIN
         ROLLBACK TRANSACTION;
     END
-    THROW;
+    RAISERROR (@ErrorMessage, 16, 1);
 END CATCH;
 `;

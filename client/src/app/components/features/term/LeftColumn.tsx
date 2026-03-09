@@ -119,6 +119,8 @@ export const LeftColumn = memo(function LeftColumn({
       prodCost: `${idBase}-prodCost`,
       pkh: `${idBase}-pkh`,
       soc: `${idBase}-soc`,
+      op1Pcs: `${idBase}-op1Pcs`,
+      op1Thb: `${idBase}-op1Thb`,
       exRate: `${idBase}-exRate`,
       length: `${idBase}-length`,
       width: `${idBase}-width`,
@@ -128,9 +130,13 @@ export const LeftColumn = memo(function LeftColumn({
       cWeight: `${idBase}-cWeight`,
       shipWeight: `${idBase}-shipWeight`,
       frQtec: `${idBase}-frQtec`,
+      freightType: `${idBase}-freightType`,
       wireTT: `${idBase}-wireTT`,
       customClear: `${idBase}-customClear`,
       scc: `${idBase}-scc`,
+      preQlc: `${idBase}-preQlc`,
+      stockFeePercent: `${idBase}-stockFeePercent`,
+      stockFeeAmount: `${idBase}-stockFeeAmount`,
       remark: `${idBase}-remark`,
     }),
     [idBase]
@@ -216,9 +222,11 @@ export const LeftColumn = memo(function LeftColumn({
           <FieldRow label="Supplier Outb Cost (SOC)" labelClass="sm:text-left sm:w-[160px]" htmlFor={ids.soc}>
             <NumberInput id={ids.soc} value={formData.soc} onChange={(v) => updateFormData('soc', v)} disabled={isReadOnly} className={`${inputCls} text-right`} />
           </FieldRow>
-          <FieldRow label="Order Price (OP1) (PCS)" labelClass="sm:text-left sm:w-[160px]">
+          <FieldRow label="Order Price (OP1) (PCS)" labelClass="sm:text-left sm:w-[160px]" htmlFor={ids.op1Pcs}>
             <div className="flex min-w-0 w-full items-center gap-1.5 flex-nowrap">
               <input
+                id={ids.op1Pcs}
+                name="op1Pcs"
                 type="text"
                 value={fmt(calcResults.OP1)}
                 readOnly
@@ -268,8 +276,10 @@ export const LeftColumn = memo(function LeftColumn({
           <FieldRow label="Exchange Rates (Ex. Rate)" labelClass="sm:text-left sm:w-[160px]" htmlFor={ids.exRate}>
             <NumberInput id={ids.exRate} value={formData.exRate} onChange={(v) => updateFormData('exRate', v)} disabled={isReadOnly} className={readCls} />
           </FieldRow>
-          <FieldRow label="Order Price (OP1) (THB)" labelClass="sm:text-left sm:w-[160px]">
+          <FieldRow label="Order Price (OP1) (THB)" labelClass="sm:text-left sm:w-[160px]" htmlFor={ids.op1Thb}>
             <input
+              id={ids.op1Thb}
+              name="op1Thb"
               type="text"
               value={fmt(calcResults.OP1_THB)}
               readOnly
@@ -377,7 +387,7 @@ export const LeftColumn = memo(function LeftColumn({
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-            <label className={`${frLabelBaseCls} text-gray-600 w-full sm:w-[160px]`}>Freight/Courier Rate</label>
+            <label htmlFor={ids.freightType} className={`${frLabelBaseCls} text-gray-600 w-full sm:w-[160px]`}>Freight/Courier Rate</label>
             <div className="flex min-w-0 w-full sm:w-[300px] items-center gap-1.5">
               <div className="min-w-0 flex-1">
                 <Select
@@ -389,7 +399,7 @@ export const LeftColumn = memo(function LeftColumn({
                   }}
                   disabled={isReadOnly}
                 >
-                  <SelectTrigger className={`w-full min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs bg-white ${f} disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`}>
+                  <SelectTrigger id={ids.freightType} name="freightType" className={`w-full min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs bg-white ${f} disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`}>
                     <SelectValue placeholder="- Please Select -" />
                   </SelectTrigger>
                   <SelectContent side="bottom" avoidCollisions={false}>
@@ -470,9 +480,9 @@ export const LeftColumn = memo(function LeftColumn({
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-            <label className="text-xs text-left sm:text-left text-gray-700 whitespace-nowrap w-full sm:w-[160px]">Pre-QLC (THB)</label>
+            <label htmlFor={ids.preQlc} className="text-xs text-left sm:text-left text-gray-700 whitespace-nowrap w-full sm:w-[160px]">Pre-QLC (THB)</label>
             <div className="w-full sm:w-[160px]">
-              <input type="text" value={fmt(calcResults.PRE_QLC)} readOnly className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-200 font-mono text-gray-900 text-right" />
+              <input id={ids.preQlc} name="preQlc" type="text" value={fmt(calcResults.PRE_QLC)} readOnly className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-200 font-mono text-gray-900 text-right" />
             </div>
           </div>
 
@@ -484,7 +494,7 @@ export const LeftColumn = memo(function LeftColumn({
 
           <div className="border-t border-gray-100 pt-2 space-y-1.5">
             <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2 mb-2">
-              <label className="text-xs text-left sm:text-left text-gray-700 whitespace-nowrap w-full sm:w-[160px] sm:pt-1">Stock Fee</label>
+              <p className="text-xs text-left sm:text-left text-gray-700 whitespace-nowrap w-full sm:w-[160px] sm:pt-1">Stock Fee</p>
               <div className="w-full sm:w-[160px] grid grid-cols-4 sm:grid-cols-4 gap-1.5">
                 {STOCK_FEE_OPTIONS.map((v) => (
                   <button
@@ -507,15 +517,19 @@ export const LeftColumn = memo(function LeftColumn({
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-              <label className="text-xs text-left sm:text-left text-gray-700 whitespace-nowrap w-full sm:w-[160px]">Stock Fee (SF) (%)</label>
+              <label htmlFor={ids.stockFeePercent} className="text-xs text-left sm:text-left text-gray-700 whitespace-nowrap w-full sm:w-[160px]">Stock Fee (SF) (%)</label>
               <div className="flex items-center gap-2 w-full sm:w-[230px] justify-start">
                 <input
+                  id={ids.stockFeePercent}
+                  name="stockFeePercentDisplay"
                   type="text"
                   value={`${Number(formData.stockFeePercent || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
                   readOnly
                   className="w-[60px] flex-none px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-200 font-mono text-gray-900 text-right"
                 />
                 <input
+                  id={ids.stockFeeAmount}
+                  name="stockFeeAmountDisplay"
                   type="text"
                   value={fmt(calcResults.STK)}
                   readOnly

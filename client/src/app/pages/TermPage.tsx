@@ -17,6 +17,11 @@ interface TermFormPageProps {
     mode: 'new' | 'view' | 'edit';
 }
 
+const parseNullableInt = (value: unknown): number | null => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+
 /**
  * Map frontend TermFormData → API payload (matching CreateTermDTO on server).
  */
@@ -61,16 +66,16 @@ function mapFormDataToApiPayload(formData: TermFormData, itemId?: number): Recor
         U_MOQ: formData.moq || '',
         LeadTime: formData.leadTime || '',
         U_VendorBPA: formData.vendorBPA ? 'Y' : '',
-        CntctCode: formData.contactPerson ? Number(formData.contactPerson) || null : null,
-        SlpCode: formData.salesPerson ? Number(formData.salesPerson) || null : null,
-        SlpSprtCode: null,
+        CntctCode: parseNullableInt(formData.contactPerson),
+        SlpCode: parseNullableInt(formData.salesPerson),
+        SlpSprtCode: parseNullableInt(formData.sourcedBy),
         U_ValidFrom: formData.validFrom || null,
         U_ValidTo: formData.validTo || null,
         U_SalesTerm: formData.salesTerm || '',
         U_Remark: formData.remark || '',
         SaleSubLocation: formData.salesSubLocation || '',
         Active: formData.active !== false,
-        ContractNo: '',  // Not editable on form yet
+        ContractNo: formData.contractNo || '',
     };
 }
 
@@ -113,7 +118,8 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
         contacts,
         orderTerms,
         locations,
-        subLocations,
+        purchaseSubLocations,
+        salesSubLocations,
         currencies,
         freightTypes,
         salesPersons,
@@ -167,7 +173,7 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
                 const payload = mapFormDataToApiPayload(formData, parsedItemId);
                 const result = await termApi.createTerm(payload);
                 toast.success(`Term created (ID: ${result.TermID})`);
-                navigate(`/term/${result.TermID}`);
+                navigate(`/term/${result.TermID}`, { replace: true });
             } else if (effectiveMode === 'edit' && id) {
                 const payload = mapFormDataToApiPayload(formData);
                 await termApi.updateTerm(id, payload);
@@ -293,7 +299,8 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
                 contacts={contacts}
                 orderTerms={orderTerms}
                 locations={locations}
-                subLocations={subLocations}
+                purchaseSubLocations={purchaseSubLocations}
+                salesSubLocations={salesSubLocations}
                 onSuppOrderCodeCommit={refreshCWeightBySuppOrderCode}
                 onSupplierChange={handleSupplierChange}
             />

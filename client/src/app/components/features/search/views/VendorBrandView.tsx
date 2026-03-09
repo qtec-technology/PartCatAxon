@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, useId } from 'react';
 import { format } from 'date-fns';
 import {
   useReactTable,
@@ -40,6 +40,7 @@ const measureTextWidth = (text: string, font: string) => {
 };
 
 export function VendorBrandView() {
+  const vendorInputId = useId();
   const [selectedSupplierName, setSelectedSupplierName] = useState<string>(() => readStoredFilterValue(VENDOR_BRAND_FILTER_KEY));
   const [vendorInput, setVendorInput] = useState(() => readStoredFilterValue(VENDOR_BRAND_FILTER_KEY));
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
@@ -277,9 +278,12 @@ export function VendorBrandView() {
       {/* Filter Section */}
       <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <label className="text-base font-semibold text-gray-700 whitespace-nowrap">Vendor Search:</label>
+          <label htmlFor={vendorInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">Vendor Search:</label>
           <div className="relative w-full sm:w-[360px] max-w-full" ref={vendorRef}>
             <input
+              id={vendorInputId}
+              name="vendorSearch"
+              aria-label="Vendor search"
               type="text"
               value={vendorInput}
               placeholder="Please select vendor"

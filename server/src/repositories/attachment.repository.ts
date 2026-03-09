@@ -1,21 +1,19 @@
-import { execSP, queryOne, sql } from '#src/config/database.js';
+import { queryOne } from '#src/config/database.js';
 import { dbObjects } from '#src/config/db-objects.js';
-import {
-    buildDeleteAttachmentViaSpSql,
-} from '#src/queries/domains/attachment/attachment.write.js';
-import { SP_CREATE_ATTACH_FILE } from '#src/queries/domains/attachment/attachment.sp.js';
+import type { AttachmentRecord } from '#src/types/lookup.types.js';
 
-// ใช้สำหรับคืนชื่อตารางไฟล์แนบในฐาน SAP
 function resolveAttachmentTableName(): string {
     return dbObjects.tables.sap.attachment;
 }
 
-// ใช้สำหรับประกอบชื่อ Stored Procedure ลบไฟล์แนบแบบ fully-qualified
+function resolveCreateAttachmentSpName(): string {
+    return dbObjects.qualifiedProcedures.createAttachFile;
+}
+
 function resolveDeleteAttachmentSpName(): string {
     return dbObjects.qualifiedProcedures.deleteAttachFile;
 }
 
-// ใช้สำหรับแปลง relatedType ให้เป็น CatID (I/T) ที่ใช้ในตาราง
 function toCatId(relatedType: string): 'I' | 'T' {
     const normalized = String(relatedType || '').trim().toUpperCase();
     if (normalized === 'ITEM') return 'I';
@@ -23,20 +21,169 @@ function toCatId(relatedType: string): 'I' | 'T' {
     throw new Error('relatedType must be ITEM or TERM');
 }
 
-/**
- * Create an attachment record.
- * Calls the configured create-attachment stored procedure.
- */
-// ใช้สำหรับสร้างข้อมูลไฟล์แนบผ่าน SPIT_CreateAttachFile
+function resolveParentTarget(relatedType: string): {
+    tableName: string;
+    idColumn: 'ItemID' | 'TermID';
+} {
+    const normalized = String(relatedType || '').trim().toUpperCase();
+    if (normalized === 'ITEM') {
+        return {
+            tableName: dbObjects.tables.sap.poitm,
+            idColumn: 'ItemID',
+        };
+    }
+
+    if (normalized === 'TERM') {
+        return {
+            tableName: dbObjects.tables.sap.pitm1,
+            idColumn: 'TermID',
+        };
+    }
+
+    throw new Error('relatedType must be ITEM or TERM');
+}
+
+function buildFindAttachmentSql(attachmentTableName: string): string {
+    return `
+        SELECT TOP 1
+            AttachmentID,
+            CatID COLLATE DATABASE_DEFAULT AS CatID,
+            ParentID,
+            Category COLLATE DATABASE_DEFAULT AS Category,
+            Attachement COLLATE DATABASE_DEFAULT AS Attachement,
+            Updatedby COLLATE DATABASE_DEFAULT AS Updatedby,
+            UpdatedDate
+        FROM ${attachmentTableName}
+        WHERE AttachmentID = @AttachmentID
+          AND CatID = @CatID
+          AND ParentID = @ParentID
+    `;
+}
+
+function buildCreateAttachmentViaSpAndTouchSql(
+    createAttachmentSpName: string,
+    parentTableName: string,
+    parentIdColumn: 'ItemID' | 'TermID'
+): string {
+    return `
+SET XACT_ABORT ON;
+
+BEGIN TRANSACTION;
+BEGIN TRY
+    DECLARE @returnAttachmentID INT = 0;
+
+    EXEC ${createAttachmentSpName}
+        @ParentID = @ParentID,
+        @CatID = @CatID,
+        @Category = @Category,
+        @Attachment = @Attachment,
+        @UpdatedBy = @UpdatedBy,
+        @returnAttachmentID = @returnAttachmentID OUTPUT;
+
+    IF ISNULL(@returnAttachmentID, 0) <= 0
+    BEGIN
+        RAISERROR ('SPIT_CreateAttachFile failed to create attachment', 16, 1);
+        RETURN;
+    END
+
+    UPDATE ${parentTableName}
+    SET Updatedby = @UpdatedBy,
+        UpdatedDate = GETDATE()
+    WHERE ${parentIdColumn} = @ParentID;
+
+    IF @@ROWCOUNT <> 1
+    BEGIN
+        RAISERROR ('Parent record not found for attachment owner', 16, 1);
+        RETURN;
+    END
+
+    COMMIT TRANSACTION;
+
+    SELECT @returnAttachmentID AS AttachmentID;
+END TRY
+BEGIN CATCH
+    DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+    IF @@TRANCOUNT > 0
+    BEGIN
+        ROLLBACK TRANSACTION;
+    END
+    RAISERROR (@ErrorMessage, 16, 1);
+END CATCH;
+`;
+}
+
+function buildDeleteAttachmentViaSpAndTouchParentSql(
+    attachmentTableName: string,
+    deleteAttachmentSpName: string,
+    parentTableName: string,
+    parentIdColumn: 'ItemID' | 'TermID'
+): string {
+    return `
+SET XACT_ABORT ON;
+
+BEGIN TRANSACTION;
+BEGIN TRY
+    IF NOT EXISTS (
+        SELECT 1
+        FROM ${attachmentTableName} WITH (UPDLOCK, HOLDLOCK)
+        WHERE AttachmentID = @AttachmentID
+          AND CatID = @CatID
+          AND ParentID = @ParentID
+    )
+    BEGIN
+        RAISERROR ('Attachment not found for the specified owner', 16, 1);
+        RETURN;
+    END
+
+    DECLARE @returnRowAffected INT = 0;
+
+    EXEC ${deleteAttachmentSpName}
+        @AttachmentID = @AttachmentID,
+        @returnRowAffected = @returnRowAffected OUTPUT;
+
+    IF ISNULL(@returnRowAffected, 0) <= 0
+    BEGIN
+        RAISERROR ('SPIT_DeleteAttachFile reported no affected rows', 16, 1);
+        RETURN;
+    END
+
+    UPDATE ${parentTableName}
+    SET Updatedby = @UpdatedBy,
+        UpdatedDate = GETDATE()
+    WHERE ${parentIdColumn} = @ParentID;
+
+    IF @@ROWCOUNT <> 1
+    BEGIN
+        RAISERROR ('Parent record not found for attachment owner', 16, 1);
+        RETURN;
+    END
+
+    COMMIT TRANSACTION;
+
+    SELECT @returnRowAffected AS RowsAffected;
+END TRY
+BEGIN CATCH
+    DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+    IF @@TRANCOUNT > 0
+    BEGIN
+        ROLLBACK TRANSACTION;
+    END
+    RAISERROR (@ErrorMessage, 16, 1);
+END CATCH;
+`;
+}
+
 export async function createAttachment(
     relatedId: number,
-    relatedType: string,  // 'ITEM' or 'TERM'
+    relatedType: string,
     fileName: string,
     filePath: string,
     fileType: string,
     createdBy: string
 ): Promise<number> {
     const catId = toCatId(relatedType);
+    const createAttachmentSpName = resolveCreateAttachmentSpName();
+    const { tableName: parentTableName, idColumn: parentIdColumn } = resolveParentTarget(relatedType);
     const attachmentValue = String(fileName || '').trim() || String(filePath || '').trim();
     const categoryValue = String(fileType || '').trim();
     const updatedByValue = String(createdBy || '').trim() || 'System';
@@ -45,21 +192,18 @@ export async function createAttachment(
         throw new Error('fileName or filePath is required');
     }
 
-    const result = await execSP(
-        SP_CREATE_ATTACH_FILE,
+    const row = await queryOne<{ AttachmentID: number }>(
+        buildCreateAttachmentViaSpAndTouchSql(createAttachmentSpName, parentTableName, parentIdColumn),
         {
-            ParentID: { type: sql.Int, value: relatedId },
-            CatID: { type: sql.VarChar(1), value: catId },
-            Category: { type: sql.VarChar(20), value: categoryValue },
-            Attachment: { type: sql.VarChar(100), value: attachmentValue },
-            UpdatedBy: { type: sql.VarChar(50), value: updatedByValue },
-        },
-        {
-            returnAttachmentID: { type: sql.Int },
+            ParentID: relatedId,
+            CatID: catId,
+            Category: categoryValue,
+            Attachment: attachmentValue,
+            UpdatedBy: updatedByValue,
         }
     );
 
-    const attachmentId = Number(result.output?.returnAttachmentID || 0);
+    const attachmentId = Number(row?.AttachmentID ?? 0);
     if (!Number.isFinite(attachmentId) || attachmentId <= 0) {
         throw new Error('SPIT_CreateAttachFile failed to create attachment');
     }
@@ -67,26 +211,48 @@ export async function createAttachment(
     return attachmentId;
 }
 
-/**
- * Delete an attachment record.
- * Deletes from the configured attachment table with owner validation.
- */
-// ใช้สำหรับลบไฟล์แนบตามเจ้าของ (owner) โดยตรวจ CatID และ ParentID
-export async function deleteAttachment(
+export async function getAttachmentForOwner(
     attachmentId: number,
     relatedType: string,
     relatedId: number
-): Promise<void> {
+): Promise<AttachmentRecord | null> {
     const attachmentTableName = resolveAttachmentTableName();
-    const deleteAttachmentSpName = resolveDeleteAttachmentSpName();
     const catId = toCatId(relatedType);
 
-    const row = await queryOne<{ RowsAffected: number }>(
-        buildDeleteAttachmentViaSpSql(attachmentTableName, deleteAttachmentSpName),
+    return await queryOne<AttachmentRecord>(
+        buildFindAttachmentSql(attachmentTableName),
         {
             AttachmentID: attachmentId,
             CatID: catId,
             ParentID: relatedId,
+        }
+    );
+}
+
+export async function deleteAttachment(
+    attachmentId: number,
+    relatedType: string,
+    relatedId: number,
+    updatedBy: string
+): Promise<void> {
+    const attachmentTableName = resolveAttachmentTableName();
+    const deleteAttachmentSpName = resolveDeleteAttachmentSpName();
+    const catId = toCatId(relatedType);
+    const updatedByValue = String(updatedBy || '').trim() || 'System';
+    const { tableName: parentTableName, idColumn: parentIdColumn } = resolveParentTarget(relatedType);
+
+    const row = await queryOne<{ RowsAffected: number }>(
+        buildDeleteAttachmentViaSpAndTouchParentSql(
+            attachmentTableName,
+            deleteAttachmentSpName,
+            parentTableName,
+            parentIdColumn
+        ),
+        {
+            AttachmentID: attachmentId,
+            CatID: catId,
+            ParentID: relatedId,
+            UpdatedBy: updatedByValue,
         }
     );
 
