@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     buildLegacyAttachmentFileName,
     canDeleteAttachmentByActor,
+    canDeleteOwnedRecordByActor,
     normalizeItemImageExt,
     sanitizeLegacyFileSegment,
 } from '#src/services/attachment-legacy.service.js';
@@ -58,5 +59,29 @@ describe('attachment-legacy.service', () => {
             isManager: false,
             isSupervisor: false,
         })).toBe(false);
+    });
+
+    it('reuses the same owner rule for item and term records', () => {
+        expect(canDeleteOwnedRecordByActor('alice', {
+            username: 'alice',
+            firstname: 'Alice',
+            lastname: 'Smith',
+            displayName: 'Alice Smith',
+            email: '',
+            domain: '',
+            isManager: false,
+            isSupervisor: false,
+        })).toBe(true);
+
+        expect(canDeleteOwnedRecordByActor('owner-name', {
+            username: 'dave',
+            firstname: 'Dave',
+            lastname: 'Chan',
+            displayName: 'Dave Chan',
+            email: '',
+            domain: '',
+            isManager: true,
+            isSupervisor: false,
+        })).toBe(true);
     });
 });

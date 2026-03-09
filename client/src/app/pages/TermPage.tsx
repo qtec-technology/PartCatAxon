@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useAuth } from '../auth/AuthContext';
 import { termApi } from '../services/term.api';
 import { TermHeader } from '../components/features/term/TermHeader';
 import { TermInfoRow } from '../components/features/term/TermInfoRow';
@@ -12,6 +13,7 @@ import { deriveStageStatusFromUiResults } from '../components/features/term/mapp
 import { featureFlags } from '../config/feature-flags';
 import type { TermCalcResults, TermFormData, TermStageStatus } from '../types/term_form.types';
 import { defaultTermCalcResults, defaultTermStageStatus } from '../types/term_form.types';
+import { canDeleteOwnedRecord } from '../utils/delete-permission';
 
 interface TermFormPageProps {
     mode: 'new' | 'view' | 'edit';
@@ -81,6 +83,7 @@ function mapFormDataToApiPayload(formData: TermFormData, itemId?: number): Recor
 
 export default function TermPage({ mode: initialMode }: TermFormPageProps) {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const { id } = useParams<{ id: string }>();
     const [searchParams] = useSearchParams();
     const readOnlyMode = featureFlags.readOnlyMode;
@@ -240,6 +243,8 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
         window.print();
     };
 
+    const canDeleteTermRecord = canDeleteOwnedRecord(formData.updatedBy, user);
+
     const handleSendRfq = async () => {
         if (!id) return;
         setIsSendingRfq(true);
@@ -286,7 +291,7 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
                 isSendingRfq={isSendingRfq}
                 disableMutations={readOnlyMode}
                 disableEdit={false}
-                disableDelete={isDeleting || isSaving}
+                disableDelete={isDeleting || isSaving || !canDeleteTermRecord}
                 disableSave={isSaving}
             />
             <TermInfoRow

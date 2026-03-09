@@ -23,6 +23,7 @@ import { writeAuditLog, AuditAction, AuditEntity } from '#src/services/audit.ser
 import { env } from '#src/config/env.js';
 import { logger } from '#src/utils/logger.js';
 import { normalizeItemImageExt } from '#src/services/attachment-legacy.service.js';
+import { canDeleteOwnedRecordByActor } from '#src/services/attachment-legacy.service.js';
 
 const ITEM_IMAGE_EXTENSIONS = ['.jpg', '.png', '.gif'] as const;
 
@@ -274,6 +275,17 @@ export async function deleteItem(req: Request, res: Response, next: NextFunction
         }
         if (confirmItemId === null || confirmItemId !== itemId) {
             res.status(400).json(error('confirmItemId must match route ItemID'));
+            return;
+        }
+
+        const item = await itemRepo.getFullItemById(itemId);
+        if (!item) {
+            res.status(404).json(error('Item not found'));
+            return;
+        }
+
+        if (!canDeleteOwnedRecordByActor(String(item.Updatedby || ''), req.authUser)) {
+            res.status(403).json(error('You are not authorized to delete this item. Only owner, supervisor, or manager can delete it.'));
             return;
         }
 

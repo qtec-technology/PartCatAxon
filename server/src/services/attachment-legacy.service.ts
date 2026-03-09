@@ -146,3 +146,5 @@ export function canDeleteAttachmentByActor(updatedBy: string, authUser?: AuthUse
 
     return getActorIdentityCandidates(authUser).includes(normalizedOwner);
 }
+
+export const canDeleteOwnedRecordByActor = canDeleteAttachmentByActor;

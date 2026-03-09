@@ -28,6 +28,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import { clientLogger } from '../../../utils/logger';
 import { toast } from 'sonner';
 import { hasAllowedFileExtension } from '../../../utils/file';
+import { canDeleteOwnedRecord } from '../../../utils/delete-permission';
 
 export interface ItemSaveAttachmentInput {
   category: string;
@@ -681,6 +682,7 @@ export function ItemForm({
   const hasReferenceUrl = referenceUrlRaw.length > 0;
   const permitRequired = Boolean(watch('permitRequired'));
   const updatedByValue = String(watch('updatedBy') || '');
+  const canDeleteItemRecord = canDeleteOwnedRecord(updatedByValue, user);
   const updatedDateValue = String(watch('updatedDate') || '');
 
   const handleOpenReferenceUrl = () => {
@@ -800,8 +802,14 @@ export function ItemForm({
                   variant="danger"
                   className="whitespace-nowrap"
                   onClick={() => { void handleDeleteItem(); }}
-                  disabled={readOnlyMode || isDeletingItem}
-                  title={readOnlyMode ? 'Read-only phase' : 'Delete item'}
+                  disabled={readOnlyMode || isDeletingItem || !canDeleteItemRecord}
+                  title={
+                    readOnlyMode
+                      ? 'Read-only phase'
+                      : !canDeleteItemRecord
+                        ? 'Only owner, supervisor, or manager can delete this item'
+                        : 'Delete item'
+                  }
                 >
                   <Trash2 className="w-4 h-4" /> {isDeletingItem ? 'DELETING...' : 'DELETE'}
                 </Button>

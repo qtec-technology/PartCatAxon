@@ -4,6 +4,8 @@ import { clientLogger } from '../utils/logger';
 interface User {
     username: string;
     isAdmin: boolean;
+    isManager: boolean;
+    isSupervisor: boolean;
     displayName: string;
     firstname: string;
     lastname: string;
@@ -43,6 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const data = payload?.data || payload;
                 const username = String(data.username || 'Guest').trim();
                 const adminStatus = data.isAdmin === true || data.isAdmin === 'true';
+                const managerStatus = data.isManager === true || data.isManager === 'true';
+                const supervisorStatus = data.isSupervisor === true || data.isSupervisor === 'true';
                 const displayName = String(data.displayName || username).trim();
                 const firstname = String(
                     data.firstname || displayName.split(/\s+/)[0] || username
@@ -56,6 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser({
                     username,
                     isAdmin: adminStatus,
+                    isManager: managerStatus,
+                    isSupervisor: supervisorStatus,
                     displayName,
                     firstname,
                     lastname,

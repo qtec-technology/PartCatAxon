@@ -19,6 +19,7 @@ import { toCalcInput } from '#src/services/calc-input.mapper.js';
 import { writeAuditLog, AuditAction, AuditEntity } from '#src/services/audit.service.js';
 import { env } from '#src/config/env.js';
 import { success, error } from '#src/utils/response.js';
+import { canDeleteOwnedRecordByActor } from '#src/services/attachment-legacy.service.js';
 
 // ─── Term Controller ────────────────────────────────────────────────────────
 
@@ -139,6 +140,17 @@ export async function deleteTerm(req: Request, res: Response, next: NextFunction
         }
         if (confirmTermId === null || confirmTermId !== termId) {
             res.status(400).json(error('confirmTermId must match route TermID'));
+            return;
+        }
+
+        const term = await termRepo.getTermById(termId);
+        if (!term) {
+            res.status(404).json(error('Term not found'));
+            return;
+        }
+
+        if (!canDeleteOwnedRecordByActor(String(term.Updatedby || ''), req.authUser)) {
+            res.status(403).json(error('You are not authorized to delete this term. Only owner, supervisor, or manager can delete it.'));
             return;
         }
 
