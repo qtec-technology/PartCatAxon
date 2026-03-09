@@ -34,6 +34,7 @@ interface UseTermPageDataResult extends TermPageDataState {
     isInitialLoading: boolean;
     storedCalcResults: TermCalcResults;
     updateFormData: UpdateTermFormData;
+    reloadRecord: () => Promise<void>;
     refreshCWeightBySuppOrderCode: () => Promise<void>;
     handleSupplierChange: (supplierCode: string) => void;
     createTermAttachment: (input: CreateTermAttachmentInput) => Promise<void>;
@@ -447,6 +448,67 @@ export function useTermPageData({
         };
     }, [isNewMode, parsedSourceItemId, parsedTermId, refreshAttachments]);
 
+    const reloadRecord = useCallback(async () => {
+        if (isNewMode) return;
+
+        setIsRecordLoading(true);
+        try {
+            if (!parsedTermId) {
+                setItemCode('');
+                setItemDesc('');
+                setAttachments([]);
+                setFormData(defaultTermFormData);
+                setStoredCalcResults(defaultTermCalcResults);
+                return;
+            }
+
+            const [termResult, attachmentResult] = await Promise.allSettled([
+                termApi.getTermById(parsedTermId),
+                refreshAttachments(),
+            ]);
+
+            if (termResult.status === 'fulfilled' && termResult.value) {
+                const raw = termResult.value as Record<string, unknown>;
+                setFormData((prev) => mapTermRecordToFormData(raw, prev));
+                setStoredCalcResults(mapStoredTermRecordToUiCalcResults(raw));
+                setItemCode(String(raw.ItemCode || ''));
+                setItemDesc(String(raw.ItemDescription || ''));
+
+                const itemId = parsePositiveInt(raw.ItemID);
+                if (itemId) {
+                    const shouldLoadFallbackItem = String(raw.ItemCode || '').trim().length === 0;
+                    const [uomResult, itemResult] = await Promise.allSettled([
+                        itemApi.getItemUOM(itemId),
+                        shouldLoadFallbackItem ? itemApi.getItemById(itemId) : Promise.resolve(null),
+                    ]);
+
+                    if (uomResult.status === 'fulfilled') {
+                        const uom = String(uomResult.value || '').trim();
+                        if (uom) {
+                            setFormData((prev) => (prev.stockUOM === uom ? prev : { ...prev, stockUOM: uom }));
+                        }
+                    }
+
+                    if (shouldLoadFallbackItem && itemResult.status === 'fulfilled' && itemResult.value) {
+                        setItemCode(String(itemResult.value.catalogNo || ''));
+                        setItemDesc(String(itemResult.value.itemDescription || ''));
+                    }
+                }
+            } else if (termResult.status === 'rejected') {
+                throw termResult.reason;
+            }
+
+            if (attachmentResult.status === 'rejected') {
+                setAttachments([]);
+            }
+        } catch (error) {
+            clientLogger.error('Failed to reload term record', error);
+            throw error;
+        } finally {
+            setIsRecordLoading(false);
+        }
+    }, [isNewMode, parsedTermId, refreshAttachments]);
+
     const updateFormData = useCallback<UpdateTermFormData>((field, value) => {
         setFormData((prev) => {
             const fieldUnchanged = Object.is(prev[field], value);
@@ -568,6 +630,7 @@ export function useTermPageData({
         salesPersons,
         uomOptions,
         updateFormData,
+        reloadRecord,
         refreshCWeightBySuppOrderCode,
         handleSupplierChange,
         createTermAttachment,

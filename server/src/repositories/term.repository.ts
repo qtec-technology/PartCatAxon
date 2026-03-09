@@ -122,6 +122,7 @@ function buildTermParams(
         U_CC: data.U_CC ?? 0,
         U_ASP: data.U_ASP ?? 0,
         U_STK_Percent: data.U_STK_Percent ?? 0,
+        U_MK_Percent: data.U_MK_Percent ?? 0,
         U_SPK: data.U_SPK ?? 0,
         U_QOC: data.U_QOC ?? 0,
         BuyUnitMsr: normalizeTermText('BuyUnitMsr', data.BuyUnitMsr, 20),
@@ -141,9 +142,11 @@ function buildTermParams(
         SaleSubLocation: normalizeTermText('SaleSubLocation', data.SaleSubLocation, 50),
         Active: data.Active !== false,
         ContractNo: normalizeTermText('ContractNo', data.ContractNo, 50),
+        U_CWeight: data.U_CWeight ?? 0,
 
         // Server-calculated fields (from calculation engine)
         U_OP: calculatedFields.U_OP ?? 0,
+        U_OP_SUM: calculatedFields.U_OP_SUM ?? 0,
         U_OP_THB: calculatedFields.U_OP_THB ?? 0,
         U_INS: calculatedFields.U_INS ?? 0,
         U_FRZONE: calculatedFields.U_FRZONE ?? 0,
@@ -162,6 +165,8 @@ function buildTermParams(
         U_QLC: calculatedFields.U_QLC ?? 0,
         U_QLC2: calculatedFields.U_QLC2 ?? 0,
         U_QLC3: calculatedFields.U_QLC3 ?? 0,
+        U_MK_THB: calculatedFields.U_MK_THB ?? 0,
+        U_SalesPrice: calculatedFields.U_SalesPrice ?? 0,
 
         // Audit
         Updatedby: normalizeTermText('Updatedby', updatedBy, 50, 'truncate'),

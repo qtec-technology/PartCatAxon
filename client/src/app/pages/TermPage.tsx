@@ -78,6 +78,7 @@ function mapFormDataToApiPayload(formData: TermFormData, itemId?: number): Recor
         SaleSubLocation: formData.salesSubLocation || '',
         Active: formData.active !== false,
         ContractNo: formData.contractNo || '',
+        U_CWeight: Number(formData.cWeight) || 0,
     };
 }
 
@@ -128,6 +129,7 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
         salesPersons,
         uomOptions,
         updateFormData,
+        reloadRecord,
         refreshCWeightBySuppOrderCode,
         handleSupplierChange,
         createTermAttachment,
@@ -180,6 +182,7 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
             } else if (effectiveMode === 'edit' && id) {
                 const payload = mapFormDataToApiPayload(formData);
                 await termApi.updateTerm(id, payload);
+                await reloadRecord();
                 toast.success('Term updated successfully');
                 setMode('view');
             }
@@ -188,7 +191,7 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
         } finally {
             setIsSaving(false);
         }
-    }, [effectiveMode, formData, id, isSaving, navigate, readOnlyMode, sourceItemId]);
+    }, [effectiveMode, formData, id, isSaving, navigate, readOnlyMode, reloadRecord, sourceItemId]);
 
     const handleExit = () => {
         navigate('/');

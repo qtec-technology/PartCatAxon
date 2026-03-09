@@ -23,6 +23,7 @@ export interface Term {
 
     // Order Price
     U_OP: number | null;
+    U_OP_SUM: number | null;
     U_OP_THB: number | null;
 
     // Insurance & Freight
@@ -77,6 +78,10 @@ export interface Term {
     U_QLC: number | null;
     U_QLC2: number | null;      // QLC per Stock UOM
     U_QLC3: number | null;      // QLC per Sales UOM
+    U_TotalPrice: number | null;
+    U_MK_Percent: number | null;
+    U_MK_THB: number | null;
+    U_SalesPrice: number | null;
 
     // Validity
     U_ValidFrom: Date | null;
@@ -102,6 +107,7 @@ export interface Term {
     SaleSubLocation: string | null;
     Active: boolean | null;
     ContractNo: string | null;
+    U_CWeight: number | null;
     LastAwardedSO: number | null;
 }
 
@@ -154,6 +160,8 @@ export interface CreateTermDTO {
     U_CC?: number;
     U_ASP?: number;             // Special Custom Clearance
     U_STK_Percent?: number;
+    U_MK_Percent?: number;
     U_SPK?: number;             // Special Packing
     U_QOC?: number;
+    U_CWeight?: number;
 }

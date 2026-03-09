@@ -30,7 +30,7 @@ const TERM_COLUMNS = [
     'U_OrderTerm', 'U_TermLocation', 'SubLocation',
     'U_ProdCost', 'U_PurCurr', 'U_PurRate',
     'U_PKH', 'U_SOC',
-    'U_OP', 'U_OP_THB',
+    'U_OP', 'U_OP_SUM', 'U_OP_THB',
     'U_INS', 'INS_Percent',
     'U_FR', 'U_FRZONE', 'U_ZoneRate',
     'U_CIF', 'U_CIFZONE',
@@ -44,13 +44,14 @@ const TERM_COLUMNS = [
     'U_STK_Percent', 'U_STK', 'U_preQLC',
     'U_SPK', 'U_QOC',
     'U_QLC', 'U_QLC2', 'U_QLC3',
+    'U_MK_Percent', 'U_MK_THB', 'U_SalesPrice',
     'U_ValidFrom', 'U_ValidTo',
     'BuyUnitMsr', 'NumInBuy', 'SalUnitMsr', 'NumInSale',
     'U_MOQ', 'LeadTime', 'U_VendorBPA',
     'CntctCode', 'SlpCode', 'SlpSprtCode',
     'Updatedby', 'UpdatedDate',
     'U_SalesTerm', 'U_Remark', 'SaleSubLocation',
-    'Active', 'ContractNo',
+    'Active', 'ContractNo', 'U_CWeight',
 ] as const;
 
 /**
