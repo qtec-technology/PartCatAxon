@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { startTransition, useDeferredValue, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import {
@@ -22,6 +22,7 @@ import {
 import {
   ItemData, FormMode
 } from '../../../types/item_types';
+import { PartItem } from '../../../types/partcatalog_types';
 import { itemApi } from '../../../services/item.api';
 import { lookupApi, LookupOption, ItemFormLookups } from '../../../services/lookup.api';
 import { useAuth } from '../../../auth/AuthContext';
@@ -73,6 +74,7 @@ const DEFAULT_ITEM_PREVIEW_IMAGE = `${import.meta.env.BASE_URL}items/qtec_image_
 const NULL_LOOKUP_VALUE = '_Null';
 const NULL_LOOKUP_LABEL = 'Please Select';
 const ALLOWED_ITEM_IMAGE_EXTENSIONS = ['.jpg', '.png', '.gif'];
+const SEARCH_BEFORE_CREATE_PAGE_SIZE = 5;
 const ITEM_ATTACHMENT_CATEGORIES = [
   'Item-Certificate',
   'MSDS',
@@ -80,6 +82,22 @@ const ITEM_ATTACHMENT_CATEGORIES = [
   'Spec.Sheet',
   'Other',
 ] as const;
+
+type SearchBeforeCreateStatus =
+  | 'idle'
+  | 'searching'
+  | 'exact-match'
+  | 'possible-match'
+  | 'no-match'
+  | 'error';
+
+interface SearchBeforeCreateState {
+  status: SearchBeforeCreateStatus;
+  items: PartItem[];
+  exactMatches: PartItem[];
+  searchedKey: string;
+  errorMessage: string;
+}
 
 const splitLongDescToChunks = (text: string): [string, string, string, string] => {
   const clipped = text.slice(0, LONG_DESC_MAX_LENGTH);
@@ -90,6 +108,37 @@ const splitLongDescToChunks = (text: string): [string, string, string, string] =
     clipped.slice(LONG_DESC_CHUNK_SIZE * 3, LONG_DESC_CHUNK_SIZE * 4),
   ];
 };
+
+const normalizeIdentityValue = (value: string): string =>
+  String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+
+const buildItemIdentityKey = (mfrBrand: string, mfrCatalogNo: string): string => {
+  const normalizedBrand = normalizeIdentityValue(mfrBrand);
+  const normalizedCatalogNo = normalizeIdentityValue(mfrCatalogNo);
+  if (!normalizedBrand || !normalizedCatalogNo) {
+    return '';
+  }
+  return `${normalizedBrand}::${normalizedCatalogNo}`;
+};
+
+const dedupePartItems = (items: PartItem[]): PartItem[] => {
+  const seen = new Set<number>();
+  return items.filter((item) => {
+    const itemId = Number(item.ItemID);
+    if (!Number.isFinite(itemId) || seen.has(itemId)) {
+      return false;
+    }
+    seen.add(itemId);
+    return true;
+  });
+};
+
+const isExactItemIdentityMatch = (item: PartItem, mfrBrand: string, mfrCatalogNo: string): boolean =>
+  normalizeIdentityValue(item.U_Brand) === normalizeIdentityValue(mfrBrand)
+  && normalizeIdentityValue(item.U_Calalogno) === normalizeIdentityValue(mfrCatalogNo);
 
 const buildLongDescFooter = (mfrCatalogNo: string, mfrBrand: string): string => {
   const pn = String(mfrCatalogNo || '').trim();
@@ -252,6 +301,15 @@ export function ItemForm({
   const [attachCategory, setAttachCategory] = useState('');
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const attachFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [searchRefreshTick, setSearchRefreshTick] = useState(0);
+  const [reviewedSearchKey, setReviewedSearchKey] = useState('');
+  const [searchBeforeCreate, setSearchBeforeCreate] = useState<SearchBeforeCreateState>({
+    status: 'idle',
+    items: [],
+    exactMatches: [],
+    searchedKey: '',
+    errorMessage: '',
+  });
 
   const [brands, setBrands] = useState<LookupOption[]>(prefetchedLookups?.brands || []);
   const [brandInput, setBrandInput] = useState('');
@@ -397,6 +455,13 @@ export function ItemForm({
 
   // Also watch for form reset/updates
   const currentBrand = watch('mfrBrand');
+  const currentMfrCatalogNo = String(watch('mfrCatalogNo') || '').trim();
+  const deferredBrand = useDeferredValue(currentBrand);
+  const deferredMfrCatalogNo = useDeferredValue(currentMfrCatalogNo);
+  const currentIdentityKey = React.useMemo(
+    () => buildItemIdentityKey(currentBrand, currentMfrCatalogNo),
+    [currentBrand, currentMfrCatalogNo]
+  );
   useEffect(() => {
     if (currentBrand && currentBrand !== brandInput) {
       // Only update if significantly different to avoid fighting with user typing
@@ -407,6 +472,91 @@ export function ItemForm({
       }
     }
   }, [currentBrand, showBrandDropdown, brandInput, normalizedBrands]);
+
+  useEffect(() => {
+    if (!isNew) return;
+    setReviewedSearchKey('');
+  }, [currentIdentityKey, isNew]);
+
+  useEffect(() => {
+    if (!isNew) return;
+
+    const nextIdentityKey = buildItemIdentityKey(deferredBrand, deferredMfrCatalogNo);
+    if (!nextIdentityKey) {
+      setSearchBeforeCreate({
+        status: 'idle',
+        items: [],
+        exactMatches: [],
+        searchedKey: '',
+        errorMessage: '',
+      });
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      setSearchBeforeCreate((prev) => ({
+        ...prev,
+        status: 'searching',
+        searchedKey: nextIdentityKey,
+        errorMessage: '',
+      }));
+
+      try {
+        const [exactResponse, candidateResponse] = await Promise.all([
+          itemApi.getItems(1, SEARCH_BEFORE_CREATE_PAGE_SIZE, {
+            keyword: deferredMfrCatalogNo,
+            brand: deferredBrand,
+            searchType: 'CATNO',
+            exactMatch: true,
+          }),
+          itemApi.getItems(1, SEARCH_BEFORE_CREATE_PAGE_SIZE, {
+            keyword: deferredMfrCatalogNo,
+            brand: deferredBrand,
+            searchType: 'CATNO',
+            exactMatch: false,
+          }),
+        ]);
+
+        if (cancelled) return;
+
+        const exactMatches = exactResponse.items.filter((item) =>
+          isExactItemIdentityMatch(item, deferredBrand, deferredMfrCatalogNo)
+        );
+        const mergedItems = dedupePartItems([...exactMatches, ...candidateResponse.items]);
+        const nextStatus: SearchBeforeCreateStatus = exactMatches.length > 0
+          ? 'exact-match'
+          : mergedItems.length > 0
+            ? 'possible-match'
+            : 'no-match';
+
+        startTransition(() => {
+          setSearchBeforeCreate({
+            status: nextStatus,
+            items: mergedItems,
+            exactMatches,
+            searchedKey: nextIdentityKey,
+            errorMessage: '',
+          });
+        });
+      } catch (error) {
+        if (cancelled) return;
+        clientLogger.error('Failed to check existing items before create', error);
+        setSearchBeforeCreate({
+          status: 'error',
+          items: [],
+          exactMatches: [],
+          searchedKey: nextIdentityKey,
+          errorMessage: 'Unable to check existing items right now. Please try again.',
+        });
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [deferredBrand, deferredMfrCatalogNo, isNew, searchRefreshTick]);
 
   const handleAddAttachment = () => {
     if (!canManageAttachments) {
@@ -521,7 +671,6 @@ export function ItemForm({
   };
 
   // Watch for description parts to combine for preview
-  const currentMfrCatalogNo = String(watch('mfrCatalogNo') || '').trim();
   const currentMfrBrand = String(currentBrand || '').trim();
   const descParts = watch(['longDesc1', 'longDesc2', 'longDesc3', 'longDesc4']);
   const rawLongDescription = descParts.join('');
@@ -629,6 +778,34 @@ export function ItemForm({
       toast.info('Read-only phase: save is disabled');
       return;
     }
+
+    if (isNew && currentIdentityKey) {
+      if (searchBeforeCreate.status === 'searching') {
+        toast.info('Checking existing items. Please wait a moment.');
+        return;
+      }
+
+      if (searchBeforeCreate.status === 'error') {
+        toast.error('Please re-check existing items before saving.');
+        return;
+      }
+
+      if (searchBeforeCreate.searchedKey !== currentIdentityKey || searchBeforeCreate.status === 'idle') {
+        toast.warning('Please review the existing-item check before saving.');
+        return;
+      }
+
+      if (searchBeforeCreate.exactMatches.length > 0) {
+        toast.error('Existing item already found. Please use the matched item instead of creating a duplicate.');
+        return;
+      }
+
+      if (reviewedSearchKey !== currentIdentityKey) {
+        toast.warning('Please confirm the search-before-create result before saving.');
+        return;
+      }
+    }
+
     const [longDesc1, longDesc2, longDesc3, longDesc4] = buildLongDescWithSuffix(data);
     const pendingAttachments: ItemSaveAttachmentInput[] = canManageAttachments
       ? attachments.flatMap((item) => {
@@ -700,6 +877,33 @@ export function ItemForm({
     }
   };
 
+  const hasIdentityInput = currentIdentityKey.length > 0;
+  const hasSearchReview = reviewedSearchKey === currentIdentityKey && currentIdentityKey.length > 0;
+  const needsSearchReviewBeforeSave = isNew
+    && hasIdentityInput
+    && searchBeforeCreate.exactMatches.length === 0
+    && searchBeforeCreate.status !== 'searching'
+    && searchBeforeCreate.status !== 'error'
+    && searchBeforeCreate.searchedKey === currentIdentityKey
+    && !hasSearchReview;
+
+  const handleAcknowledgeNewItemCandidate = () => {
+    if (!currentIdentityKey) return;
+    setReviewedSearchKey(currentIdentityKey);
+    toast.success('New item candidate confirmed. You can continue filling the draft item.');
+  };
+
+  const handleRecheckExistingItems = () => {
+    if (!currentIdentityKey) return;
+    setReviewedSearchKey('');
+    setSearchRefreshTick((value) => value + 1);
+  };
+
+  const handleOpenExistingItem = (itemId: number) => {
+    if (!Number.isFinite(itemId) || itemId <= 0) return;
+    navigate(`/item/${itemId}`);
+  };
+
 
 
   // Checkbox Row Component for consistency
@@ -735,7 +939,33 @@ export function ItemForm({
   };
 
   const currentCatalogNo = watch('catalogNo') || initialData?.catalogNo || '';
-  const disableSave = isReadOnly || isSubmitting;
+  const searchStatusLabel = searchBeforeCreate.status === 'searching'
+    ? 'Checking existing items...'
+    : searchBeforeCreate.status === 'exact-match'
+      ? 'Existing item found'
+      : searchBeforeCreate.status === 'possible-match'
+        ? 'Possible duplicate'
+        : searchBeforeCreate.status === 'no-match'
+          ? 'Ready for draft item'
+          : searchBeforeCreate.status === 'error'
+            ? 'Search unavailable'
+            : 'Waiting for identity input';
+  const searchStatusClass = searchBeforeCreate.status === 'exact-match'
+    ? 'bg-red-100 text-red-700'
+    : searchBeforeCreate.status === 'possible-match'
+      ? 'bg-amber-100 text-amber-700'
+      : searchBeforeCreate.status === 'no-match'
+        ? 'bg-green-100 text-green-700'
+        : searchBeforeCreate.status === 'error'
+          ? 'bg-red-50 text-red-600'
+          : searchBeforeCreate.status === 'searching'
+            ? 'bg-blue-100 text-blue-700'
+            : 'bg-gray-100 text-gray-600';
+  const disableSave = isReadOnly
+    || isSubmitting
+    || (isNew && searchBeforeCreate.status === 'searching')
+    || (isNew && searchBeforeCreate.exactMatches.length > 0)
+    || needsSearchReviewBeforeSave;
   const itemIds = React.useMemo(() => ({
     mfrBrand: 'item-mfrBrand',
     longDescriptionInput: 'item-longDescriptionInput',
@@ -859,6 +1089,150 @@ export function ItemForm({
       </div>
 
       <form className="w-full px-5 py-6 mx-auto">
+        {isNew && (
+          <div className="mb-6">
+            <SectionHeader title="Search Before Create" />
+            <div className="rounded-b-md border border-t-0 border-gray-200 bg-[#F8FBFF] p-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-700">
+                    Start with <span className="font-semibold">Mfr Brand</span> and <span className="font-semibold">Mfr Catalog No</span>.
+                    The system will check existing items first and only let you continue when the result is reviewed.
+                  </p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-white px-3 py-1 text-gray-600 shadow-sm ring-1 ring-gray-200">
+                      Mfr Brand: <span className="font-semibold text-gray-800">{currentBrand || '-'}</span>
+                    </span>
+                    <span className="rounded-full bg-white px-3 py-1 text-gray-600 shadow-sm ring-1 ring-gray-200">
+                      Mfr Catalog No: <span className="font-semibold text-gray-800">{currentMfrCatalogNo || '-'}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={cn('rounded-full px-3 py-1 text-xs font-semibold', searchStatusClass)}>
+                    {searchStatusLabel}
+                  </span>
+                  {hasIdentityInput && (
+                    <Button
+                      type="button"
+                      variant="neutral"
+                      size="sm"
+                      onClick={handleRecheckExistingItems}
+                      disabled={searchBeforeCreate.status === 'searching'}
+                    >
+                      Recheck
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {!hasIdentityInput && (
+                <div className="mt-4 rounded-md border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-500">
+                  Fill in both identity fields first. Search-before-create will start automatically once both fields are available.
+                </div>
+              )}
+
+              {searchBeforeCreate.status === 'error' && (
+                <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {searchBeforeCreate.errorMessage}
+                </div>
+              )}
+
+              {(searchBeforeCreate.status === 'exact-match' || searchBeforeCreate.status === 'possible-match') && (
+                <div className="mt-4 space-y-3">
+                  <div className={cn(
+                    'rounded-md border px-4 py-3 text-sm',
+                    searchBeforeCreate.status === 'exact-match'
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : 'border-amber-200 bg-amber-50 text-amber-700'
+                  )}>
+                    {searchBeforeCreate.status === 'exact-match'
+                      ? 'An existing item already matches this identity. Use the existing item instead of creating a duplicate.'
+                      : 'The system found similar items. Review them first, then confirm if this should continue as a new draft item.'}
+                  </div>
+
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    {searchBeforeCreate.items.map((item) => (
+                      <div key={item.ItemID} className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-gray-900">{item.ItemCode || `Item #${item.ItemID}`}</p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {item.U_Brand || '-'} / {item.U_Calalogno || '-'}
+                            </p>
+                          </div>
+                          {isExactItemIdentityMatch(item, currentBrand, currentMfrCatalogNo) && (
+                            <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700">
+                              Exact
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-3 line-clamp-2 text-sm text-gray-700">{item.ItemDescription || '-'}</p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
+                          <span>UOM: {item.InvntryUom || '-'}</span>
+                          <span>Updated By: {item.Updatedby || '-'}</span>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleOpenExistingItem(Number(item.ItemID))}
+                          >
+                            Open Item
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {searchBeforeCreate.status === 'possible-match' && (
+                    <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-white px-4 py-3">
+                      <p className="text-sm text-gray-700">
+                        If none of the candidates are the same item, confirm to continue with a draft item.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="warning"
+                        size="sm"
+                        onClick={handleAcknowledgeNewItemCandidate}
+                      >
+                        Continue With Draft Item
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {searchBeforeCreate.status === 'no-match' && (
+                <div className="mt-4 flex flex-col gap-3 rounded-md border border-green-200 bg-green-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-green-800">No existing item found for this identity.</p>
+                    <p className="mt-1 text-sm text-green-700">
+                      You can continue as a new draft item after confirming this search result.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="success"
+                    size="sm"
+                    onClick={handleAcknowledgeNewItemCandidate}
+                  >
+                    Confirm New Item Candidate
+                  </Button>
+                </div>
+              )}
+
+              {hasSearchReview && (searchBeforeCreate.status === 'no-match' || searchBeforeCreate.status === 'possible-match') && (
+                <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  Search result reviewed. You can continue filling the draft item form and save when ready.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* MAIN 3-COLUMN LAYOUT */}
         <div className="grid grid-cols-12 gap-6 items-stretch">
 
