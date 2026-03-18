@@ -89,6 +89,7 @@ function buildTermParams(
 ): Record<string, unknown> {
     const modeNo = Number(data.U_ShipModeNo ?? calculatedFields.U_ShipModeNo ?? -1);
     const unitNo = Number(data.U_DimUnitNo ?? calculatedFields.U_DimUnitNo ?? 1);
+    const persistedTotalPrice = calculatedFields.U_TotalPrice ?? calculatedFields.U_QLC3 ?? 0;
 
     return {
         // User-input fields
@@ -164,7 +165,7 @@ function buildTermParams(
         U_STK: calculatedFields.U_STK ?? 0,
         U_QLC: calculatedFields.U_QLC ?? 0,
         U_QLC2: calculatedFields.U_QLC2 ?? 0,
-        U_QLC3: calculatedFields.U_QLC3 ?? 0,
+        U_QLC3: persistedTotalPrice,
         U_MK_THB: calculatedFields.U_MK_THB ?? 0,
         U_SalesPrice: calculatedFields.U_SalesPrice ?? 0,
 

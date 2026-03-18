@@ -49,6 +49,7 @@ export function buildTermCalculationPayload(formData: TermFormData): TermCalcula
 export function mapCalculationResponseToUi(calculated: TermCalculationResponse): TermCalcResults {
     const cif = toNumber(calculated?.U_CIF, 0);
     const cifZone = toNumber(calculated?.U_CIFZONE, 0);
+    const totalPrice = toNumber(calculated?.U_QLC3, toNumber(calculated?.U_TotalPrice, 0));
 
     return {
         OP1: toNumber(calculated?.U_OP, 0),
@@ -69,8 +70,8 @@ export function mapCalculationResponseToUi(calculated: TermCalculationResponse):
         STK: toNumber(calculated?.U_STK, 0),
         QLC: toNumber(calculated?.U_QLC, 0),
         QLC2: toNumber(calculated?.U_QLC2, 0),
-        QLC3: toNumber(calculated?.U_QLC3, 0),
-        TOTAL_PRICE: toNumber(calculated?.U_TotalPrice, 0),
+        QLC3: totalPrice,
+        TOTAL_PRICE: totalPrice,
         MK_THB: toNumber(calculated?.U_MK_THB, 0),
         SALES_PRICE: toNumber(calculated?.U_SalesPrice, 0),
     };
@@ -79,6 +80,7 @@ export function mapCalculationResponseToUi(calculated: TermCalculationResponse):
 export function mapStoredTermRecordToUiCalcResults(raw: Record<string, unknown>): TermCalcResults {
     const cif = toNumber(raw?.U_CIF, 0);
     const cifZone = toNumber(raw?.U_CIFZONE, 0);
+    const totalPrice = toNumber(raw?.U_QLC3, toNumber(raw?.U_TotalPrice, 0));
 
     return {
         OP1: toNumber(raw?.U_OP, 0),
@@ -99,8 +101,8 @@ export function mapStoredTermRecordToUiCalcResults(raw: Record<string, unknown>)
         STK: toNumber(raw?.U_STK, 0),
         QLC: toNumber(raw?.U_QLC, 0),
         QLC2: toNumber(raw?.U_QLC2, 0),
-        QLC3: toNumber(raw?.U_QLC3, 0),
-        TOTAL_PRICE: toNumber(raw?.U_TotalPrice, 0),
+        QLC3: totalPrice,
+        TOTAL_PRICE: totalPrice,
         MK_THB: toNumber(raw?.U_MK_THB, 0),
         SALES_PRICE: toNumber(raw?.U_SalesPrice, 0),
     };

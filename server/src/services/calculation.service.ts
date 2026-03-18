@@ -79,8 +79,8 @@ export interface CalcResult {
     U_STK: number;                  // Stock Fee Amount
     U_QLC: number;                  // QTEC Landed Cost
     U_QLC2: number;                 // QLC ต่อ Stock UOM
-    U_QLC3: number;                 // QLC ต่อ Sales UOM
-    U_TotalPrice: number;           // Total Cost รวม SPK + QOC
+    U_QLC3: number;                 // Legacy persisted Total Price (SPK + QOC)
+    U_TotalPrice: number;           // Compatibility alias ของ Total Price
     U_MK_THB: number;               // Markup เป็นเงินบาท
     U_SalesPrice: number;           // ราคาขายสุดท้าย
 }
@@ -149,13 +149,14 @@ export function calculate(input: CalcInput): CalcResult {
 
     // ─── Sales Calculation ──────────────────────────────────────────────────
     // QLC2 = QLC / numInBuy
-    // QLC3 = QLC2 * numInSale
-    // Total = QLC3 + SPK + QOC
+    // qlc3Base = QLC2 * numInSale (intermediate only)
+    // Total = qlc3Base + SPK + QOC
+    // Legacy business rule: persist Total ลง U_QLC3
     // MK_THB = (Total/(1-Markup%)) - Total
     // SalesPrice = Total/(1-Markup%)
     const qlc2 = calcQLCPerStockUOM(qlc, numInBuy);
-    const qlc3 = calcQLCPerSalesUOM(qlc2, numInSale);
-    const totalPrice = calcTotalPrice(qlc3, sspk, qoc);
+    const qlc3Base = calcQLCPerSalesUOM(qlc2, numInSale);
+    const totalPrice = calcTotalPrice(qlc3Base, sspk, qoc);
     const mkTHB = calcMarkupTHB(totalPrice, markupPercent);
     const salesPrice = calcSalesPrice(totalPrice, markupPercent);
 
@@ -181,7 +182,7 @@ export function calculate(input: CalcInput): CalcResult {
         U_STK: round6(stk),
         U_QLC: round6(qlc),
         U_QLC2: round6(qlc2),
-        U_QLC3: round6(qlc3),
+        U_QLC3: round6(totalPrice),
         U_TotalPrice: round6(totalPrice),
         U_MK_THB: round6(mkTHB),
         U_SalesPrice: round6(salesPrice),
@@ -359,7 +360,7 @@ function calcQLCPerStockUOM(qlc: number, numInBuy: number): number {
 }
 
 // ─── 4.2.15.2 QLC ต่อ Sales UOM ───────────────────────────────────────────
-// สูตร: QLC3 = QLC2 * numInSale
+// สูตร: qlc3Base = QLC2 * numInSale
 // ถ้า numInSale ไม่ใช่เลข หรือ <= 0 => คืน 0
 function calcQLCPerSalesUOM(qlcPerStockUOM: number, numInSale: number): number {
     if (!Number.isFinite(numInSale) || numInSale <= 0) return 0;
@@ -367,9 +368,9 @@ function calcQLCPerSalesUOM(qlcPerStockUOM: number, numInSale: number): number {
 }
 
 // ─── 4.2.15.3 Total Price ──────────────────────────────────────────────────
-// สูตร: TotalPrice = QLC3 + SPK + QOC
-function calcTotalPrice(qlcPerSalesUOM: number, spk: number, qoc: number): number {
-    return qlcPerSalesUOM + spk + qoc;
+// สูตร: TotalPrice = qlc3Base + SPK + QOC
+function calcTotalPrice(qlc3Base: number, spk: number, qoc: number): number {
+    return qlc3Base + spk + qoc;
 }
 
 // ─── 4.2.15.4 Markup THB ───────────────────────────────────────────────────

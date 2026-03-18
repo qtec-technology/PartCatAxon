@@ -130,7 +130,6 @@ export const RightColumn = memo(function RightColumn({
       spk: `${idBase}-spk`,
       qoc: `${idBase}-qoc`,
       salesCostPerUnit: `${idBase}-salesCostPerUnit`,
-      totalPrice: `${idBase}-totalPrice`,
       markup: `${idBase}-markup`,
       markupAmount: `${idBase}-markupAmount`,
       attachmentCategory: `${idBase}-attachmentCategory`,
@@ -272,12 +271,12 @@ export const RightColumn = memo(function RightColumn({
         </div>
         <div className="p-3 space-y-2.5 bg-white">
           <div className="flex items-center justify-between">
-            <label htmlFor={ids.salesCostPerUnit} className="text-sm text-gray-700">ต้นทุนสินค้าต่อ 1 หน่วยขาย</label>
+            <label htmlFor={ids.salesCostPerUnit} className="text-sm text-gray-700">ต้นทุนรวม SPK และ QOC</label>
             <input
               id={ids.salesCostPerUnit}
               name="salesCostPerUnit"
               type="text"
-              value={fmt(calcResults.QLC3)}
+              value={fmt(calcResults.TOTAL_PRICE)}
               readOnly
               className={`${salesOutputCls} border-gray-300 bg-gray-200 text-gray-900`}
             />
@@ -302,17 +301,6 @@ export const RightColumn = memo(function RightColumn({
                 placeholder="QOC"
               />
             </div>
-          </div>
-          <div className="flex items-center justify-between">
-            <label htmlFor={ids.totalPrice} className="text-sm text-gray-700">ต้นทุนรวม SPK และ QOC</label>
-            <input
-              id={ids.totalPrice}
-              name="totalPrice"
-              type="text"
-              value={fmt(calcResults.TOTAL_PRICE)}
-              readOnly
-              className={`${salesOutputCls} border-term-red bg-red-50 font-bold text-gray-900`}
-            />
           </div>
           <div className="space-y-1.5 pt-2 border-t border-gray-100">
             <div className="flex items-center justify-between">

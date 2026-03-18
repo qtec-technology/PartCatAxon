@@ -154,21 +154,24 @@ describe('Calculation Engine — calculate()', () => {
     // 5. UOM Conversion Edge Cases
     // ────────────────────────────────────────────────────────────────────────
 
-    it('QLC2 = QLC / numInBuy, QLC3 = QLC2 * numInSale', () => {
-        const result = calculate(makeInput({ numInBuy: 10, numInSale: 5 }));
+    it('U_QLC3 stores Total Price = (QLC2 * numInSale) + SPK + QOC', () => {
+        const result = calculate(makeInput({ numInBuy: 10, numInSale: 5, sspk: 2, qoc: 3 }));
         expect(result.U_QLC2).toBeCloseTo(result.U_QLC / 10, 4);
-        expect(result.U_QLC3).toBeCloseTo(result.U_QLC2 * 5, 4);
+        expect(result.U_QLC3).toBeCloseTo((result.U_QLC2 * 5) + 2 + 3, 4);
+        expect(result.U_TotalPrice).toBeCloseTo(result.U_QLC3, 4);
     });
 
     it('QLC2 should be 0 when numInBuy = 0', () => {
-        const result = calculate(makeInput({ numInBuy: 0 }));
+        const result = calculate(makeInput({ numInBuy: 0, sspk: 4, qoc: 6 }));
         expect(result.U_QLC2).toBe(0);
-        expect(result.U_QLC3).toBe(0);
+        expect(result.U_QLC3).toBe(10);
+        expect(result.U_TotalPrice).toBe(10);
     });
 
-    it('QLC3 should be 0 when numInSale = 0', () => {
-        const result = calculate(makeInput({ numInBuy: 10, numInSale: 0 }));
-        expect(result.U_QLC3).toBe(0);
+    it('U_QLC3 should fall back to SPK + QOC when numInSale = 0', () => {
+        const result = calculate(makeInput({ numInBuy: 10, numInSale: 0, sspk: 4, qoc: 6 }));
+        expect(result.U_QLC3).toBe(10);
+        expect(result.U_TotalPrice).toBe(10);
     });
 
     // ────────────────────────────────────────────────────────────────────────

@@ -77,8 +77,8 @@ export interface Term {
     U_QOC: number | null;
     U_QLC: number | null;
     U_QLC2: number | null;      // QLC per Stock UOM
-    U_QLC3: number | null;      // QLC per Sales UOM
-    U_TotalPrice: number | null;
+    U_QLC3: number | null;      // Legacy persisted Total Price (SPK + QOC)
+    U_TotalPrice: number | null; // Compatibility alias of Total Price
     U_MK_Percent: number | null;
     U_MK_THB: number | null;
     U_SalesPrice: number | null;
