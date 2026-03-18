@@ -98,6 +98,10 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
+        setMode(initialMode);
+    }, [id, initialMode, sourceItemId]);
+
+    useEffect(() => {
         if (readOnlyMode && initialMode !== 'view') {
             toast.info('Read-only phase: edit/create is disabled');
             if (initialMode === 'edit' && id) {
