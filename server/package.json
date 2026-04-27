@@ -12,6 +12,7 @@
     "scripts": {
         "dev": "tsx watch --conditions=development src/index.ts",
         "check:imports": "node scripts/check-import-alias.mjs",
+        "check:schema": "tsx --conditions=development scripts/check-item-schema.ts",
         "prebuild": "npm run check:imports",
         "build": "tsc",
         "prestart": "npm run check:imports",
@@ -23,7 +24,7 @@
         "cors": "^2.8.5",
         "dotenv": "^16.4.7",
         "express": "^4.21.2",
-        "express-rate-limit": "^8.2.1",
+        "express-rate-limit": "^8.4.0",
         "helmet": "^8.0.0",
         "morgan": "^1.10.0",
         "msnodesqlv8": "^5.1.5",
@@ -39,5 +40,8 @@
         "tsx": "^4.19.3",
         "typescript": "^5.7.3",
         "vitest": "^4.0.18"
+    },
+    "overrides": {
+        "uuid": "14.0.0"
     }
 }

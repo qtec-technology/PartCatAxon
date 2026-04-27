@@ -15,6 +15,11 @@ type SearchCacheEntry<T> = {
     expiresAt: number;
 };
 
+export type SearchPage<T> = {
+    items: T[];
+    total: number;
+};
+
 const ftsSearchCache = new Map<string, SearchCacheEntry<unknown>>();
 const FTS_CACHE_MAX_ENTRIES = 2000;
 
@@ -85,6 +90,29 @@ export async function searchFTS(keyword: string, brand: string = '_Null'): Promi
     });
 }
 
+export async function searchFTSPaged(
+    keyword: string,
+    brand: string = '_Null',
+    page: number = 1,
+    pageSize: number = 50,
+    updatedBy?: string
+): Promise<SearchPage<FTSResult>> {
+    const rawResults = await searchFTS(keyword, brand);
+    const normalizedUpdatedBy = String(updatedBy || '').trim().toLowerCase();
+    const filtered = normalizedUpdatedBy
+        ? rawResults.filter((row) => String(row.Updatedby || '').trim().toLowerCase() === normalizedUpdatedBy)
+        : rawResults;
+    const safePageSize = Math.min(400, Math.max(1, Math.floor(pageSize)));
+    const totalPages = Math.max(1, Math.ceil(filtered.length / safePageSize));
+    const safePage = Math.max(1, Math.min(Math.floor(page), totalPages));
+    const start = (safePage - 1) * safePageSize;
+
+    return {
+        items: filtered.slice(start, start + safePageSize),
+        total: filtered.length,
+    };
+}
+
 /**
  * Get Brand list from FTS results.
  */
@@ -128,15 +156,25 @@ export async function searchStandard(
     keyword: string,
     brand: string | null,
     exactMatch: boolean,
-    updatedBy?: string
-): Promise<Item[]> {
+    updatedBy: string | undefined,
+    page: number = 1,
+    pageSize: number = 50
+): Promise<SearchPage<Item>> {
     const column = STANDARD_SEARCH_COLUMN_MAP[field];
     if (!column) {
         throw new Error(`Invalid search field: ${field}`);
     }
 
-    const { sqlText, params } = buildStandardSearchQuery(column, keyword, exactMatch, brand, updatedBy);
-    return await query<Item>(sqlText, params);
+    type PagedSearchRow = Item & { __TotalRows?: number | string };
+    const { sqlText, params } = buildStandardSearchQuery(column, keyword, exactMatch, brand, updatedBy, page, pageSize);
+    const rows = await query<PagedSearchRow>(sqlText, params);
+    const total = rows.length > 0 ? Number(rows[0].__TotalRows || 0) : 0;
+    const items = rows.map(({ __TotalRows: _totalRows, ...item }) => item as Item);
+
+    return {
+        items,
+        total: Number.isFinite(total) ? total : 0,
+    };
 }
 
 /**

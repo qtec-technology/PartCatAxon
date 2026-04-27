@@ -22,14 +22,20 @@ export const STANDARD_SEARCH_COLUMN_MAP: Record<string, string> = {
     sapB1ItemNo: 'B1ItemNo',
 };
 
-export const STANDARD_SEARCH_BASE_SELECT_SQL = `
-    SELECT
-      t.ItemID, t.ItemCode, t.ItemGroup, t.B1ItemNo, t.BPStockItemNo,
-      t.U_Calalogno, t.U_Brand, t.ItemDescription,
-      t.InvntryUom, t.LongDesc1, t.LongDesc2, t.LongDesc3, t.LongDesc4,
-      t.Updatedby, t.UpdatedDate, t.Active, t.MasterFG, t.LastAwardedSO,
-      t.U_Punchout, t.U_VMI, t.U_CustBPA, t.U_IsQTECSTock
-    FROM ${dbObjects.views.sap.poitm} AS t
+const STANDARD_SEARCH_COLUMNS_SQL = `
+        t.ItemID, t.ItemCode, t.ItemGroup, t.B1ItemNo, t.BPStockItemNo,
+        t.U_Calalogno, t.U_Brand, t.ItemDescription,
+        t.InvntryUom, t.LongDesc1, t.LongDesc2, t.LongDesc3, t.LongDesc4,
+        t.Updatedby, t.UpdatedDate, t.Active, t.MasterFG, t.LastAwardedSO,
+        t.U_Punchout, t.U_VMI, t.U_CustBPA, t.U_IsQTECSTock
+`;
+
+const STANDARD_SEARCH_RESULT_COLUMNS_SQL = `
+        ItemID, ItemCode, ItemGroup, B1ItemNo, BPStockItemNo,
+        U_Calalogno, U_Brand, ItemDescription,
+        InvntryUom, LongDesc1, LongDesc2, LongDesc3, LongDesc4,
+        Updatedby, UpdatedDate, Active, MasterFG, LastAwardedSO,
+        U_Punchout, U_VMI, U_CustBPA, U_IsQTECSTock
 `;
 
 export const PART_NO_AUTOCOMPLETE_SQL = `
@@ -53,7 +59,9 @@ export function buildStandardSearchQuery(
     keyword: string,
     exactMatch: boolean,
     brand: string | null,
-    updatedBy?: string
+    updatedBy: string | undefined,
+    page: number,
+    pageSize: number
 ): QueryConfig {
     // Defense-in-depth: reject unknown columns even though caller should whitelist
     if (!ALLOWED_SEARCH_COLUMNS.has(column)) {
@@ -61,27 +69,52 @@ export function buildStandardSearchQuery(
     }
     const safeColumn = toSqlIdentifier(column);
 
-    let sqlText = `${STANDARD_SEARCH_BASE_SELECT_SQL}\nWHERE `;
+    const whereParts: string[] = [];
     const params: Record<string, any> = {};
 
     if (exactMatch) {
-        sqlText += `t.${safeColumn} = @keyword`;
+        whereParts.push(`t.${safeColumn} = @keyword`);
         params.keyword = keyword;
     } else {
-        sqlText += `t.${safeColumn} LIKE @keyword ESCAPE '\\'`;
+        whereParts.push(`t.${safeColumn} LIKE @keyword ESCAPE '\\'`);
         params.keyword = `%${escapeLikePattern(keyword)}%`;
     }
 
     if (brand && brand !== '_Null') {
-        sqlText += ' AND t.[U_Brand] = @brand';
+        whereParts.push('t.[U_Brand] = @brand');
         params.brand = brand;
     }
 
     if (updatedBy && updatedBy.trim().length > 0) {
-        sqlText += ' AND t.[Updatedby] = @updatedBy';
+        whereParts.push('t.[Updatedby] = @updatedBy');
         params.updatedBy = updatedBy.trim();
     }
 
-    sqlText += ' ORDER BY t.UpdatedDate DESC';
+    const safePage = Math.max(1, Math.floor(page));
+    const safePageSize = Math.min(400, Math.max(1, Math.floor(pageSize)));
+    params.startRow = ((safePage - 1) * safePageSize) + 1;
+    params.endRow = safePage * safePageSize;
+
+    const sqlText = `
+        WITH Filtered AS (
+            SELECT
+${STANDARD_SEARCH_COLUMNS_SQL}
+            FROM ${dbObjects.views.sap.poitm} AS t
+            WHERE ${whereParts.join(' AND ')}
+        ),
+        Numbered AS (
+            SELECT
+                COUNT(1) OVER() AS __TotalRows,
+                ROW_NUMBER() OVER (ORDER BY UpdatedDate DESC, ItemID DESC) AS __RowNum,
+${STANDARD_SEARCH_RESULT_COLUMNS_SQL}
+            FROM Filtered
+        )
+        SELECT
+            __TotalRows,
+${STANDARD_SEARCH_RESULT_COLUMNS_SQL}
+        FROM Numbered
+        WHERE __RowNum BETWEEN @startRow AND @endRow
+        ORDER BY __RowNum
+    `;
     return { sqlText, params };
 }

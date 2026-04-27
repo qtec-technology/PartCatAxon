@@ -96,6 +96,7 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
     const [isSendingRfq, setIsSendingRfq] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const currentTermId = parseNullableInt(id);
 
     useEffect(() => {
         setMode(initialMode);
@@ -331,6 +332,7 @@ export default function TermPage({ mode: initialMode }: TermFormPageProps) {
                 uoms={uomOptions}
                 onAddAttachment={!readOnlyMode && effectiveMode === 'edit' ? createTermAttachment : undefined}
                 onDeleteAttachment={!readOnlyMode && effectiveMode === 'edit' ? deleteTermAttachment : undefined}
+                attachmentOwner={currentTermId ? { relatedType: 'TERM', relatedId: currentTermId } : null}
             />
         </div>
     );

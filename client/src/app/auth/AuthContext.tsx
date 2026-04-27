@@ -4,6 +4,7 @@ import { clientLogger } from '../utils/logger';
 interface User {
     username: string;
     isAdmin: boolean;
+    isUser: boolean;
     isManager: boolean;
     isSupervisor: boolean;
     displayName: string;
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const data = payload?.data || payload;
                 const username = String(data.username || 'Guest').trim();
                 const adminStatus = data.isAdmin === true || data.isAdmin === 'true';
+                const userStatus = data.isUser === true || data.isUser === 'true';
                 const managerStatus = data.isManager === true || data.isManager === 'true';
                 const supervisorStatus = data.isSupervisor === true || data.isSupervisor === 'true';
                 const displayName = String(data.displayName || username).trim();
@@ -60,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser({
                     username,
                     isAdmin: adminStatus,
+                    isUser: userStatus,
                     isManager: managerStatus,
                     isSupervisor: supervisorStatus,
                     displayName,
@@ -67,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     lastname,
                 });
                 setIsAdmin(adminStatus);
-                setHasAccess(data.hasAccess === true);
+                setHasAccess(data.hasAccess === true || data.hasAccess === 'true');
             } catch (err) {
                 if (controller.signal.aborted || !mounted) return;
                 clientLogger.warn('Auth check failed', {

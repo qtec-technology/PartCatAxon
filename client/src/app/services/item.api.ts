@@ -107,7 +107,7 @@ const mapFormToApiBody = (data: ItemData): Record<string, unknown> => {
         LongDesc3: toStringOrEmpty(data.longDesc3),
         LongDesc4: toStringOrEmpty(data.longDesc4),
 
-        U_Punchout: toYN(data.punchOut),
+        U_Punchout: toYN(data.shelfLifeRequired),
         U_VMI: toYN(data.vmi),
         U_CustBPA: toYN(data.customerBPA),
         U_IsQTECSTock: toYN(data.isQTECStock),
@@ -144,7 +144,7 @@ const mapItemToForm = (raw: Record<string, unknown>): ItemData => ({
     remark: toStringOrEmpty(raw.U_Remark ?? raw.remark),
     active: toBool(raw.Active),
     masterFG: toBool(raw.MasterFG),
-    shelfLifeRequired: toBool(raw.U_ShelfLife ?? raw.shelfLifeRequired),
+    shelfLifeRequired: toBool(raw.U_Punchout ?? raw.shelfLifeRequired),
     punchOut: toBool(raw.U_Punchout ?? raw.punchOut),
     vmi: toBool(raw.U_VMI ?? raw.vmi),
     customerBPA: toBool(raw.U_CustBPA ?? raw.customerBPA),
@@ -182,23 +182,6 @@ const buildQuery = (params: Record<string, string | number | boolean | undefined
 let brandCache: { data: BrandLookupOption[] | null; promise: Promise<BrandLookupOption[]> | null } = {
     data: null,
     promise: null,
-};
-
-const paginate = <T>(items: T[], page: number, pageSize: number): PaginatedResponse<T> => {
-    const total = items.length;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    const safePage = Math.max(1, Math.min(page, totalPages));
-    const start = (safePage - 1) * pageSize;
-    const end = start + pageSize;
-    return {
-        items: items.slice(start, end),
-        meta: {
-            page: safePage,
-            pageSize,
-            total,
-            totalPages,
-        },
-    };
 };
 
 export const itemApi = {
@@ -246,9 +229,21 @@ export const itemApi = {
                 keyword,
                 brand: brand || undefined,
                 myItems: criteria.myItems ? true : undefined,
+                page,
+                pageSize,
             });
             const payload = await requestJson<PartItem[]>(`/api/search/fts?${query}`);
             resultItems = (payload.data || []).map(normalizePartItem);
+            const meta = payload.meta as ApiMeta | undefined;
+            return {
+                items: resultItems,
+                meta: {
+                    page: meta?.page ?? page,
+                    pageSize: meta?.pageSize ?? pageSize,
+                    total: meta?.total ?? resultItems.length,
+                    totalPages: meta?.totalPages ?? Math.max(1, Math.ceil((meta?.total ?? resultItems.length) / pageSize)),
+                },
+            };
         } else {
             const field = STANDARD_FIELD_MAP[searchType];
             const query = buildQuery({
@@ -257,12 +252,22 @@ export const itemApi = {
                 brand: brand || undefined,
                 exactMatch,
                 myItems: criteria.myItems ? true : undefined,
+                page,
+                pageSize,
             });
             const payload = await requestJson<PartItem[]>(`/api/search/standard?${query}`);
             resultItems = (payload.data || []).map(normalizePartItem);
+            const meta = payload.meta as ApiMeta | undefined;
+            return {
+                items: resultItems,
+                meta: {
+                    page: meta?.page ?? page,
+                    pageSize: meta?.pageSize ?? pageSize,
+                    total: meta?.total ?? resultItems.length,
+                    totalPages: meta?.totalPages ?? Math.max(1, Math.ceil((meta?.total ?? resultItems.length) / pageSize)),
+                },
+            };
         }
-
-        return paginate(resultItems, page, pageSize);
     },
 
     getItemById: async (id: number | string): Promise<ItemData> => {

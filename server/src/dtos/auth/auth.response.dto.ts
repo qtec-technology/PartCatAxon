@@ -7,6 +7,7 @@ export interface WhoAmIResponseDTO {
     domain: string;
     isAdmin: boolean;
     hasAccess: boolean;
+    isUser: boolean;
     isManager: boolean;
     isSupervisor: boolean;
 }

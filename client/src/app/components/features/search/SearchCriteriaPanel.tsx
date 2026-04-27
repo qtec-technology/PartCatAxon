@@ -14,7 +14,6 @@ import { Label } from '../../ui/label';
 import { SearchType } from '../../../types/partcatalog_types';
 import { itemApi, type FtsAutocompleteOption } from '../../../services/item.api';
 import { clientLogger } from '../../../utils/logger';
-// import { mockBrands } from '../../../data/mock-data';
 
 interface SearchCriteriaPanelProps {
   criteria?: {

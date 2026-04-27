@@ -24,6 +24,7 @@ import {
 } from '../../../types/item_types';
 import { PartItem } from '../../../types/partcatalog_types';
 import { itemApi } from '../../../services/item.api';
+import { attachmentApi } from '../../../services/attachment.api';
 import { lookupApi, LookupOption, ItemFormLookups } from '../../../services/lookup.api';
 import { useAuth } from '../../../auth/AuthContext';
 import { clientLogger } from '../../../utils/logger';
@@ -257,6 +258,12 @@ export function ItemForm({
   const currentFirstName = String(
     user?.firstname || currentDisplayName.split(/\s+/)[0] || user?.username || ''
   ).trim();
+  const itemIdForAttachmentDownload = Number(initialData?.id || 0);
+  const buildAttachmentDownloadUrl = (attachmentId: string): string => (
+    itemIdForAttachmentDownload > 0 && attachmentId
+      ? attachmentApi.getDownloadUrl(attachmentId, { relatedType: 'ITEM', relatedId: itemIdForAttachmentDownload })
+      : ''
+  );
 
   const {
     register,
@@ -334,9 +341,13 @@ export function ItemForm({
   }, [brands]);
 
   const filteredBrands = React.useMemo(() => {
-    if (!brandInput) return normalizedBrands;
-    const q = String(brandInput ?? '').toUpperCase();
-    return normalizedBrands.filter((b) => String(b.label ?? '').toUpperCase().includes(q));
+    const q = String(brandInput ?? '').trim().toUpperCase();
+    if (!q) return normalizedBrands;
+    return normalizedBrands.filter((b) => {
+      const label = String(b.label ?? '').trim().toUpperCase();
+      const value = String(b.value ?? '').trim().toUpperCase();
+      return label.startsWith(q) || value.startsWith(q);
+    });
   }, [brandInput, normalizedBrands]);
 
   // Click outside to close dropdown (We'll relying on onBlur or a wrapper ref approach)
@@ -779,33 +790,6 @@ export function ItemForm({
       return;
     }
 
-    if (isNew && currentIdentityKey) {
-      if (searchBeforeCreate.status === 'searching') {
-        toast.info('Checking existing items. Please wait a moment.');
-        return;
-      }
-
-      if (searchBeforeCreate.status === 'error') {
-        toast.error('Please re-check existing items before saving.');
-        return;
-      }
-
-      if (searchBeforeCreate.searchedKey !== currentIdentityKey || searchBeforeCreate.status === 'idle') {
-        toast.warning('Please review the existing-item check before saving.');
-        return;
-      }
-
-      if (searchBeforeCreate.exactMatches.length > 0) {
-        toast.error('Existing item already found. Please use the matched item instead of creating a duplicate.');
-        return;
-      }
-
-      if (reviewedSearchKey !== currentIdentityKey) {
-        toast.warning('Please confirm the search-before-create result before saving.');
-        return;
-      }
-    }
-
     const [longDesc1, longDesc2, longDesc3, longDesc4] = buildLongDescWithSuffix(data);
     const pendingAttachments: ItemSaveAttachmentInput[] = canManageAttachments
       ? attachments.flatMap((item) => {
@@ -879,13 +863,6 @@ export function ItemForm({
 
   const hasIdentityInput = currentIdentityKey.length > 0;
   const hasSearchReview = reviewedSearchKey === currentIdentityKey && currentIdentityKey.length > 0;
-  const needsSearchReviewBeforeSave = isNew
-    && hasIdentityInput
-    && searchBeforeCreate.exactMatches.length === 0
-    && searchBeforeCreate.status !== 'searching'
-    && searchBeforeCreate.status !== 'error'
-    && searchBeforeCreate.searchedKey === currentIdentityKey
-    && !hasSearchReview;
 
   const handleAcknowledgeNewItemCandidate = () => {
     if (!currentIdentityKey) return;
@@ -942,16 +919,16 @@ export function ItemForm({
   const searchStatusLabel = searchBeforeCreate.status === 'searching'
     ? 'Checking existing items...'
     : searchBeforeCreate.status === 'exact-match'
-      ? 'Existing item found'
-      : searchBeforeCreate.status === 'possible-match'
-        ? 'Possible duplicate'
+      ? 'Existing item available'
+    : searchBeforeCreate.status === 'possible-match'
+        ? 'Similar items found'
         : searchBeforeCreate.status === 'no-match'
           ? 'Ready for draft item'
           : searchBeforeCreate.status === 'error'
             ? 'Search unavailable'
             : 'Waiting for identity input';
   const searchStatusClass = searchBeforeCreate.status === 'exact-match'
-    ? 'bg-red-100 text-red-700'
+    ? 'bg-blue-100 text-blue-700'
     : searchBeforeCreate.status === 'possible-match'
       ? 'bg-amber-100 text-amber-700'
       : searchBeforeCreate.status === 'no-match'
@@ -962,10 +939,7 @@ export function ItemForm({
             ? 'bg-blue-100 text-blue-700'
             : 'bg-gray-100 text-gray-600';
   const disableSave = isReadOnly
-    || isSubmitting
-    || (isNew && searchBeforeCreate.status === 'searching')
-    || (isNew && searchBeforeCreate.exactMatches.length > 0)
-    || needsSearchReviewBeforeSave;
+    || isSubmitting;
   const itemIds = React.useMemo(() => ({
     mfrBrand: 'item-mfrBrand',
     longDescriptionInput: 'item-longDescriptionInput',
@@ -1097,7 +1071,7 @@ export function ItemForm({
                 <div className="space-y-2">
                   <p className="text-sm text-gray-700">
                     Start with <span className="font-semibold">Mfr Brand</span> and <span className="font-semibold">Mfr Catalog No</span>.
-                    The system will check existing items first and only let you continue when the result is reviewed.
+                    The system will suggest existing items you can reuse, but this check does not block saving a new item.
                   </p>
                   <div className="flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full bg-white px-3 py-1 text-gray-600 shadow-sm ring-1 ring-gray-200">
@@ -1144,12 +1118,12 @@ export function ItemForm({
                   <div className={cn(
                     'rounded-md border px-4 py-3 text-sm',
                     searchBeforeCreate.status === 'exact-match'
-                      ? 'border-red-200 bg-red-50 text-red-700'
+                      ? 'border-blue-200 bg-blue-50 text-blue-700'
                       : 'border-amber-200 bg-amber-50 text-amber-700'
                   )}>
                     {searchBeforeCreate.status === 'exact-match'
-                      ? 'An existing item already matches this identity. Use the existing item instead of creating a duplicate.'
-                      : 'The system found similar items. Review them first, then confirm if this should continue as a new draft item.'}
+                      ? 'An existing item already matches this identity. You can open and use that item, or continue saving this new item if it is intentionally different.'
+                      : 'The system found similar items. Review them as suggestions, or continue saving this new item if none of them are the same item.'}
                   </div>
 
                   <div className="grid gap-3 lg:grid-cols-2">
@@ -1163,7 +1137,7 @@ export function ItemForm({
                             </p>
                           </div>
                           {isExactItemIdentityMatch(item, currentBrand, currentMfrCatalogNo) && (
-                            <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700">
+                            <span className="rounded-full bg-blue-100 px-2 py-1 text-[11px] font-semibold text-blue-700">
                               Exact
                             </span>
                           )}
@@ -1190,7 +1164,7 @@ export function ItemForm({
                   {searchBeforeCreate.status === 'possible-match' && (
                     <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-white px-4 py-3">
                       <p className="text-sm text-gray-700">
-                        If none of the candidates are the same item, confirm to continue with a draft item.
+                        If none of the candidates are the same item, you can keep this as a new draft item.
                       </p>
                       <Button
                         type="button"
@@ -1198,7 +1172,7 @@ export function ItemForm({
                         size="sm"
                         onClick={handleAcknowledgeNewItemCandidate}
                       >
-                        Continue With Draft Item
+                        Mark Reviewed
                       </Button>
                     </div>
                   )}
@@ -1210,7 +1184,7 @@ export function ItemForm({
                   <div>
                     <p className="text-sm font-semibold text-green-800">No existing item found for this identity.</p>
                     <p className="mt-1 text-sm text-green-700">
-                      You can continue as a new draft item after confirming this search result.
+                      You can continue as a new draft item.
                     </p>
                   </div>
                   <Button
@@ -1219,14 +1193,14 @@ export function ItemForm({
                     size="sm"
                     onClick={handleAcknowledgeNewItemCandidate}
                   >
-                    Confirm New Item Candidate
+                    Mark Reviewed
                   </Button>
                 </div>
               )}
 
               {hasSearchReview && (searchBeforeCreate.status === 'no-match' || searchBeforeCreate.status === 'possible-match') && (
                 <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                  Search result reviewed. You can continue filling the draft item form and save when ready.
+                  Search result marked reviewed. You can continue filling the draft item form and save when ready.
                 </div>
               )}
             </div>
@@ -1260,7 +1234,7 @@ export function ItemForm({
                         disabled={isReadOnly}
                         placeholder="Please select"
                         allowClear
-                        className="w-full h-9 border-gray-300 bg-white text-sm disabled:opacity-100 disabled:bg-[#F5F5F5] disabled:text-gray-500"
+                        className="w-full !h-[30px] !px-2 !py-1 border-gray-300 bg-white text-sm disabled:opacity-100 disabled:bg-[#F5F5F5] disabled:text-gray-500"
                         options={itemGroups.map((option) => ({
                           value: String(option.value || '').trim(),
                           label: String(option.label || '').trim(),
@@ -1691,10 +1665,22 @@ export function ItemForm({
                               </TableCell>
                             </TableRow>
                           ) : (
-                            attachments.map((att) => (
+                            attachments.map((att) => {
+                              const attachmentId = String(att.id || '').trim();
+                              const downloadUrl = att.isPending ? '' : buildAttachmentDownloadUrl(attachmentId);
+
+                              return (
                               <TableRow key={att.id} className="hover:bg-[#E8F0F8] text-gray-700 h-10">
                                 <TableCell className="px-3 py-2 border-r border-[#DDDDDD] last:border-r-0">{att.category}</TableCell>
-                                <TableCell className="px-3 py-2 border-r border-[#DDDDDD] last:border-r-0 text-[#2264A0] cursor-pointer hover:underline">{att.fileName}</TableCell>
+                                <TableCell className="px-3 py-2 border-r border-[#DDDDDD] last:border-r-0 text-[#2264A0]">
+                                  {downloadUrl ? (
+                                    <a href={downloadUrl} target="_blank" rel="noreferrer" className="hover:underline">
+                                      {att.fileName}
+                                    </a>
+                                  ) : (
+                                    <span>{att.fileName}</span>
+                                  )}
+                                </TableCell>
                                 <TableCell className="px-3 py-2 border-r border-[#DDDDDD] last:border-r-0">{att.updatedBy}</TableCell>
                                 <TableCell className="px-3 py-2 border-r border-[#DDDDDD] last:border-r-0">{formatDateTimeDisplay(att.updatedDate)}</TableCell>
                                 <TableCell className="px-3 py-2 border-r border-[#DDDDDD] last:border-r-0 font-mono">{att.id}</TableCell>
@@ -1715,7 +1701,8 @@ export function ItemForm({
                                   </TableCell>
                                 )}
                               </TableRow>
-                            ))
+                              );
+                            })
                           )}
                         </TableBody>
                       </Table>

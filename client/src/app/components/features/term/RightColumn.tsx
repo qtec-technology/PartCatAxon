@@ -13,6 +13,8 @@ import {
   DialogTitle,
 } from '../../ui/dialog';
 import { clientLogger } from '../../../utils/logger';
+import { attachmentApi } from '../../../services/attachment.api';
+import { referenceFileApi } from '../../../services/reference-files.api';
 import type {
   CreateTermAttachmentInput,
   TermAttachmentItem,
@@ -30,6 +32,7 @@ interface RightColumnProps {
   uomOptions: Array<{ value: string; label: string }>;
   onAddAttachment?: (input: CreateTermAttachmentInput) => Promise<void>;
   onDeleteAttachment?: (attachmentId: string) => Promise<void>;
+  attachmentOwner?: { relatedType: 'TERM'; relatedId: number } | null;
 }
 
 type RightColumnFormData = Pick<
@@ -53,6 +56,12 @@ const ATTACHMENT_CATEGORIES = [
   'Term-Certificate',
   'Vendor Quotation',
   'Others',
+] as const;
+
+const REFERENCE_LINKS = [
+  { key: 'uom-manual', label: 'UOM Manual (PPT)' },
+  { key: 'standard-custom-cost-table', label: 'Standard Custom Cost Table' },
+  { key: 'domestic-agent-price-table', label: 'Domestic Agent Price Table' },
 ] as const;
 
 const ensureUomOptions = (
@@ -81,6 +90,7 @@ export const RightColumn = memo(function RightColumn({
   uomOptions,
   onAddAttachment,
   onDeleteAttachment,
+  attachmentOwner,
 }: RightColumnProps) {
   const idBase = useId();
   const fmt = (v: number) => moneyFormatter.format(v);
@@ -111,6 +121,11 @@ export const RightColumn = memo(function RightColumn({
   );
 
   const attachments = attachmentsProp || [];
+  const buildAttachmentDownloadUrl = (attachmentId: string): string => (
+    attachmentOwner && attachmentId
+      ? attachmentApi.getDownloadUrl(attachmentId, attachmentOwner)
+      : ''
+  );
   const canAddAttachment = typeof onAddAttachment === 'function';
   const canDeleteAttachment = typeof onDeleteAttachment === 'function';
   const [showAddFileDialog, setShowAddFileDialog] = useState(false);
@@ -345,22 +360,17 @@ export const RightColumn = memo(function RightColumn({
 
       <section className="bg-white border border-gray-200 rounded-md p-3 shadow-sm space-y-1.5" aria-labelledby={`${idBase}-links-heading`}>
         <h2 id={`${idBase}-links-heading`} className="text-xs font-bold text-gray-700 block mb-2">Reference Links</h2>
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          className="text-xs text-gray-400 flex items-center gap-1.5 cursor-not-allowed"
-        >
-          <ExternalLink className="w-3.5 h-3.5" /> Standard Custom Cost Table (coming soon)
-        </button>
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          className="text-xs text-gray-400 flex items-center gap-1.5 cursor-not-allowed"
-        >
-          <ExternalLink className="w-3.5 h-3.5" /> Domestic Agent Price Table (coming soon)
-        </button>
+        {REFERENCE_LINKS.map((link) => (
+          <a
+            key={link.key}
+            href={referenceFileApi.getUrl(link.key)}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-term-green hover:text-[#1D6F16] hover:underline flex items-center gap-1.5"
+          >
+            <ExternalLink className="w-3.5 h-3.5" /> {link.label}
+          </a>
+        ))}
       </section>
 
       <section className="border border-term-green rounded-md overflow-hidden shadow-sm flex-1 min-h-0 flex flex-col" aria-labelledby={`${idBase}-attachments-heading`}>
@@ -423,13 +433,20 @@ export const RightColumn = memo(function RightColumn({
                   ) : (
                     attachments.map((att, idx) => {
                       const updatedDateDisplay = formatDateTime(att.updatedDate);
+                      const downloadUrl = buildAttachmentDownloadUrl(att.id);
                       return (
                         <tr key={att.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/70'}>
                           <td className="px-3 py-2 border border-gray-200 align-middle">
                             <span className="block truncate" title={att.category}>{att.category}</span>
                           </td>
                           <td className="px-3 py-2 border border-gray-200 align-middle text-term-green font-medium">
-                            <span className="block truncate" title={att.fileName}>{att.fileName}</span>
+                            {downloadUrl ? (
+                              <a href={downloadUrl} target="_blank" rel="noreferrer" className="block truncate hover:underline" title={att.fileName}>
+                                {att.fileName}
+                              </a>
+                            ) : (
+                              <span className="block truncate" title={att.fileName}>{att.fileName}</span>
+                            )}
                           </td>
                           <td className="px-3 py-2 border border-gray-200 align-middle">
                             <span className="block truncate" title={att.updatedBy}>{att.updatedBy}</span>

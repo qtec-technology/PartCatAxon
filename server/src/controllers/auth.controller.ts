@@ -6,14 +6,9 @@ import { success } from '#src/utils/response.js';
 import { env } from '#src/config/env.js';
 import { logger } from '#src/utils/logger.js';
 
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-/** Network share path for user profile pictures (from .env) */
 const USER_PICTURE_BASE = env.USER_PICTURE_DIR;
 
-// ─── Auth Controller ────────────────────────────────────────────────────────
-
-/** GET /api/auth/whoami — Return current authenticated user */
+/** GET /api/auth/whoami - return current authenticated user and role flags. */
 export function whoami(req: Request, res: Response) {
     const user = req.authUser;
     const payload: WhoAmIResponseDTO = {
@@ -24,14 +19,15 @@ export function whoami(req: Request, res: Response) {
         email: user?.email || '',
         domain: user?.domain || '',
         isAdmin: user?.isManager || false,
-        hasAccess: !!(user?.isManager || user?.isSupervisor),
+        hasAccess: !!(user?.isUser || user?.isManager || user?.isSupervisor),
+        isUser: user?.isUser || false,
         isManager: user?.isManager || false,
         isSupervisor: user?.isSupervisor || false,
     };
     res.json(success(payload));
 }
 
-/** GET /api/auth/user-picture — Serve current user's profile picture */
+/** GET /api/auth/user-picture - serve current user's profile picture. */
 export async function getUserPicture(req: Request, res: Response) {
     try {
         if (!USER_PICTURE_BASE) {
@@ -45,7 +41,6 @@ export async function getUserPicture(req: Request, res: Response) {
             return;
         }
 
-        // Path traversal protection: strip any path separators from username
         const safeUsername = username.replace(/[\\/:*?"<>|.]/g, '');
         if (!safeUsername) {
             res.status(400).json({ success: false, error: 'Invalid username' });
@@ -53,8 +48,6 @@ export async function getUserPicture(req: Request, res: Response) {
         }
 
         const filePath = path.join(USER_PICTURE_BASE, `${safeUsername}.JPG`);
-
-        // Verify the resolved path is still inside the base directory
         const resolvedBase = path.resolve(USER_PICTURE_BASE);
         const resolvedFile = path.resolve(filePath);
         if (!resolvedFile.startsWith(resolvedBase)) {
@@ -62,7 +55,6 @@ export async function getUserPicture(req: Request, res: Response) {
             return;
         }
 
-        // Check file exists
         try {
             await fs.access(filePath);
         } catch {
@@ -70,12 +62,11 @@ export async function getUserPicture(req: Request, res: Response) {
             return;
         }
 
-        // Read and send as JPEG
         const imageBuffer = await fs.readFile(filePath);
         res.set({
             'Content-Type': 'image/jpeg',
             'Content-Length': String(imageBuffer.length),
-            'Cache-Control': 'private, max-age=86400', // Cache 1 day
+            'Cache-Control': 'private, max-age=86400',
         });
         res.send(imageBuffer);
     } catch (err) {

@@ -78,6 +78,7 @@ Desktop.ini
 # ------------------------------
 .agents/
 .codex/
+skills-lock.json
 
 # ------------------------------
 # Local planning docs

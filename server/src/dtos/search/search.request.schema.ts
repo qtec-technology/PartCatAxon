@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
     zQueryBooleanLikeOptional,
     zQueryNonEmptyString,
+    zQueryOptionalIntString,
     zQueryOptionalString,
 } from '#src/dtos/common/zod-helpers.js';
 
@@ -9,6 +10,8 @@ export const searchFTSQuerySchema = z.object({
     keyword: zQueryNonEmptyString,
     brand: zQueryOptionalString,
     myItems: zQueryBooleanLikeOptional,
+    page: zQueryOptionalIntString,
+    pageSize: zQueryOptionalIntString,
 }).passthrough();
 
 export const searchFTSBrandsQuerySchema = z.object({
@@ -25,6 +28,8 @@ export const searchStandardQuerySchema = z.object({
     brand: zQueryOptionalString,
     exactMatch: zQueryBooleanLikeOptional,
     myItems: zQueryBooleanLikeOptional,
+    page: zQueryOptionalIntString,
+    pageSize: zQueryOptionalIntString,
 }).passthrough();
 
 export const searchPartNoQuerySchema = z.object({

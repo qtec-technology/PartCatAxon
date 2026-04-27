@@ -22,7 +22,7 @@ import { success, error } from '#src/utils/response.js';
 /** GET /api/search/fts?keyword=X — Full-Text Search */
 export async function searchFTS(req: Request, res: Response, next: NextFunction) {
     try {
-        const { keyword: rawKeyword, brand, myItems } = toSearchFTSQueryDTO(req.query);
+        const { keyword: rawKeyword, brand, myItems, page, pageSize } = toSearchFTSQueryDTO(req.query);
         const keyword = sanitizeSearchInput(rawKeyword);
         const username = (req.authUser?.username || '').trim();
 
@@ -31,11 +31,14 @@ export async function searchFTS(req: Request, res: Response, next: NextFunction)
             return;
         }
 
-        const rawResults = await searchRepo.searchFTS(keyword, brand);
-        const results: SearchFTSResponseDTO = myItems
-            ? rawResults.filter((row) => (row.Updatedby || '').toLowerCase() === username.toLowerCase())
-            : rawResults;
-        res.json(success(results, undefined, { total: results.length }));
+        const { items, total } = await searchRepo.searchFTSPaged(keyword, brand, page, pageSize, myItems ? username : undefined);
+        const results: SearchFTSResponseDTO = items;
+        res.json(success(results, undefined, {
+            page,
+            pageSize,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        }));
     } catch (err) {
         next(err);
     }
@@ -78,7 +81,7 @@ export async function searchFTSAutocomplete(req: Request, res: Response, next: N
 /** GET /api/search/standard?field=X&keyword=X&brand=X&exactMatch=true */
 export async function searchStandard(req: Request, res: Response, next: NextFunction) {
     try {
-        const { field, keyword, brand, exactMatch, myItems } = toSearchStandardQueryDTO(req.query);
+        const { field, keyword, brand, exactMatch, myItems, page, pageSize } = toSearchStandardQueryDTO(req.query);
         const updatedBy = myItems ? (req.authUser?.username || '').trim() : undefined;
 
         if (!field || !keyword) {
@@ -91,8 +94,14 @@ export async function searchStandard(req: Request, res: Response, next: NextFunc
             return;
         }
 
-        const results: SearchStandardResponseDTO = await searchRepo.searchStandard(field, keyword, brand, exactMatch, updatedBy);
-        res.json(success(results, undefined, { total: results.length }));
+        const { items, total } = await searchRepo.searchStandard(field, keyword, brand, exactMatch, updatedBy, page, pageSize);
+        const results: SearchStandardResponseDTO = items;
+        res.json(success(results, undefined, {
+            page,
+            pageSize,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        }));
     } catch (err) {
         next(err);
     }

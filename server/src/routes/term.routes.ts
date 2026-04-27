@@ -22,7 +22,7 @@ router.get('/:id', validate(termIdParamSchema, 'params'), ctrl.getTermById);
 router.post('/', requireAuth, validate(createTermBodySchema, 'body'), ctrl.createTerm);
 router.put('/:id', requireAuth, validate(termIdParamSchema, 'params'), validate(updateTermBodySchema, 'body'), ctrl.updateTerm);
 router.delete('/:id', requireAuth, validate(termIdParamSchema, 'params'), validate(termDeleteBodySchema, 'body'), ctrl.deleteTerm);
-router.post('/calculate', validate(previewCalculationBodySchema, 'body'), ctrl.previewCalculation);
+router.post('/calculate', requireAuth, validate(previewCalculationBodySchema, 'body'), ctrl.previewCalculation);
 router.get('/:id/vendor-email', validate(termIdParamSchema, 'params'), ctrl.getVendorEmail);
 router.get('/:id/item-detail', validate(termIdParamSchema, 'params'), ctrl.getItemDetailByTerm);
 

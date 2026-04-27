@@ -29,6 +29,7 @@ export interface AuthUser {
     displayName: string;
     email: string;
     domain: string;
+    isUser: boolean;        // Part Catalog User / authenticated domain user
     isManager: boolean;     // PCAT-Manager
     isSupervisor: boolean;  // PCAT-SuperVisor
 }

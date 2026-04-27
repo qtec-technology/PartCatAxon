@@ -57,4 +57,12 @@ export const attachmentApi = {
             method: 'DELETE',
         });
     },
+
+    getDownloadUrl: (attachmentId: number | string, owner: DeleteAttachmentOwner): string => {
+        const query = buildQuery({
+            relatedType: owner.relatedType,
+            relatedId: owner.relatedId,
+        });
+        return `/api/attachments/${attachmentId}/download?${query}`;
+    },
 };

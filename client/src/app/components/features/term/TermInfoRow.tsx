@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { DatePicker } from '../../ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { InlineSelect } from '../../common/InlineSelect';
+import { referenceFileApi } from '../../../services/reference-files.api';
 import type {
   TermContactOption,
   TermFormData,
@@ -502,18 +504,25 @@ export function TermInfoRow({
                 </div>
 
                 <div className="mt-2 flex items-center justify-between gap-2 border-t border-blue-100 pt-2">
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-term-blue" title={formData.incoterm || 'Incoterms 2020'}>
-                    {formData.incoterm || 'Incoterms 2020'}
-                  </span>
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="shrink-0 rounded border border-term-blue bg-white px-2 py-0.5 text-[10px] text-term-blue opacity-60 cursor-not-allowed"
-                    title="Incoterm chart is not available yet"
+                  <a
+                    href={referenceFileApi.getUrl('incoterms-2020-pdf')}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-0 flex-1 truncate text-xs font-medium text-term-blue hover:underline inline-flex items-center gap-1"
+                    title="Incoterms 2020 (PDF)"
+                  >
+                    <ExternalLink className="h-3 w-3 shrink-0" />
+                    {formData.incoterm || 'Incoterms 2020 (PDF)'}
+                  </a>
+                  <a
+                    href={referenceFileApi.getUrl('incoterms-chart')}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 rounded border border-term-blue bg-white px-2 py-0.5 text-[10px] text-term-blue hover:bg-blue-50"
+                    title="CHART"
                   >
                     CHART
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>

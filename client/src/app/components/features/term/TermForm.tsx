@@ -26,6 +26,7 @@ interface TermFormProps {
   uoms: Array<{ value: string; label: string }>;
   onAddAttachment?: (input: CreateTermAttachmentInput) => Promise<void>;
   onDeleteAttachment?: (attachmentId: string) => Promise<void>;
+  attachmentOwner?: { relatedType: 'TERM'; relatedId: number } | null;
 }
 
 export function TermForm({
@@ -42,6 +43,7 @@ export function TermForm({
   uoms,
   onAddAttachment,
   onDeleteAttachment,
+  attachmentOwner,
 }: TermFormProps) {
   const isReadOnly = mode === 'view';
   const leftColumnFormData = useMemo(
@@ -184,6 +186,7 @@ export function TermForm({
         uomOptions={uoms}
         onAddAttachment={onAddAttachment}
         onDeleteAttachment={onDeleteAttachment}
+        attachmentOwner={attachmentOwner}
       />
     </div>
   );

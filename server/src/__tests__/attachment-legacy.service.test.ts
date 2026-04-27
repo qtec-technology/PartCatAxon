@@ -34,6 +34,7 @@ describe('attachment-legacy.service', () => {
             displayName: 'Alice Smith',
             email: '',
             domain: '',
+            isUser: true,
             isManager: false,
             isSupervisor: false,
         })).toBe(true);
@@ -45,6 +46,7 @@ describe('attachment-legacy.service', () => {
             displayName: 'Bob Jones',
             email: '',
             domain: '',
+            isUser: true,
             isManager: false,
             isSupervisor: true,
         })).toBe(true);
@@ -56,6 +58,7 @@ describe('attachment-legacy.service', () => {
             displayName: 'Carol Ng',
             email: '',
             domain: '',
+            isUser: true,
             isManager: false,
             isSupervisor: false,
         })).toBe(false);
@@ -69,6 +72,7 @@ describe('attachment-legacy.service', () => {
             displayName: 'Alice Smith',
             email: '',
             domain: '',
+            isUser: true,
             isManager: false,
             isSupervisor: false,
         })).toBe(true);
@@ -80,6 +84,7 @@ describe('attachment-legacy.service', () => {
             displayName: 'Dave Chan',
             email: '',
             domain: '',
+            isUser: true,
             isManager: true,
             isSupervisor: false,
         })).toBe(true);

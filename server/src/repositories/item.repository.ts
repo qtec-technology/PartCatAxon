@@ -81,6 +81,10 @@ function hasOwn(data: Partial<CreateItemDTO>, key: keyof CreateItemDTO): boolean
     return Object.prototype.hasOwnProperty.call(data, key);
 }
 
+function getPunchOutValue(data: Partial<CreateItemDTO>): unknown {
+    return data.U_Punchout;
+}
+
 // ใช้สำหรับดึงรายการ Item ล่าสุดจากแคช หรือโหลดใหม่จาก DB เมื่อแคชหมดอายุ
 async function getCachedTopItems(): Promise<Item[]> {
     const now = Date.now();
@@ -213,6 +217,7 @@ export async function createItem(
         InvntryUom: toDbText(data.InvntryUom),
         U_CountryOrg: countryOfOrigin,
         BPStockItemNo: toDbText(data.BPStockItemNo),
+        B1ItemNo: toDbText(data.B1ItemNo),
         SAPB1Desc: toDbText(data.SAPB1Desc),
         VatGroupPu: vatGroupPu,
         VatGourpSa: vatGourpSa,
@@ -231,7 +236,7 @@ export async function createItem(
         LongDesc2: toDbText(data.LongDesc2),
         LongDesc3: toDbText(data.LongDesc3),
         LongDesc4: toDbText(data.LongDesc4),
-        U_Punchout: toDbText(data.U_Punchout),
+        U_Punchout: toDbText(getPunchOutValue(data)),
         U_VMI: toDbText(data.U_VMI),
         U_CustBPA: toDbText(data.U_CustBPA),
         U_IsQTECSTock: toDbText(data.U_IsQTECSTock),
@@ -333,6 +338,7 @@ export async function updateItem(
         fieldsToUpdate.U_CountryOrg = toDbText(data.U_CountryOrg).trim() || DEFAULT_NULL_LOOKUP_VALUE;
     }
     if (hasOwn(data, 'BPStockItemNo')) fieldsToUpdate.BPStockItemNo = toDbText(data.BPStockItemNo);
+    if (hasOwn(data, 'B1ItemNo')) fieldsToUpdate.B1ItemNo = toDbText(data.B1ItemNo);
     if (hasOwn(data, 'SAPB1Desc')) fieldsToUpdate.SAPB1Desc = toDbText(data.SAPB1Desc);
     if (hasOwn(data, 'VatGroupPu')) {
         fieldsToUpdate.VatGroupPu = toDbText(data.VatGroupPu).trim() || DEFAULT_VAT_GROUP_PU;
@@ -359,7 +365,9 @@ export async function updateItem(
     if (hasOwn(data, 'LongDesc2')) fieldsToUpdate.LongDesc2 = toDbText(data.LongDesc2);
     if (hasOwn(data, 'LongDesc3')) fieldsToUpdate.LongDesc3 = toDbText(data.LongDesc3);
     if (hasOwn(data, 'LongDesc4')) fieldsToUpdate.LongDesc4 = toDbText(data.LongDesc4);
-    if (hasOwn(data, 'U_Punchout')) fieldsToUpdate.U_Punchout = toDbText(data.U_Punchout);
+    if (hasOwn(data, 'U_Punchout')) {
+        fieldsToUpdate.U_Punchout = toDbText(getPunchOutValue(data));
+    }
     if (hasOwn(data, 'U_VMI')) fieldsToUpdate.U_VMI = toDbText(data.U_VMI);
     if (hasOwn(data, 'U_CustBPA')) fieldsToUpdate.U_CustBPA = toDbText(data.U_CustBPA);
     if (hasOwn(data, 'U_IsQTECSTock')) fieldsToUpdate.U_IsQTECSTock = toDbText(data.U_IsQTECSTock);

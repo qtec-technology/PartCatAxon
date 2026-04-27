@@ -46,6 +46,11 @@ function normalizeOptionalWindowsDirPath(input: string | undefined, fallback: st
     return normalizeWindowsDirPath(raw);
 }
 
+function normalizeOptionalWindowsPath(input: string | undefined, fallback: string): string {
+    const raw = String(input || '').trim() || fallback;
+    return normalizeWindowsDirPath(raw);
+}
+
 function getRequiredEnv(name: string): string {
     const value = String(process.env[name] || '').trim();
     if (!value) {
@@ -63,6 +68,26 @@ function parseNumberEnv(name: string, fallback: number): number {
         throw new Error(`Invalid numeric environment variable: ${name}`);
     }
     return parsed;
+}
+
+function parseBooleanEnv(name: string, fallback: boolean): boolean {
+    const rawValue = String(process.env[name] || '').trim().toLowerCase();
+    if (!rawValue) return fallback;
+
+    if (['true', '1', 'yes', 'y', 'on'].includes(rawValue)) return true;
+    if (['false', '0', 'no', 'n', 'off'].includes(rawValue)) return false;
+
+    throw new Error(`Invalid boolean environment variable: ${name}`);
+}
+
+function parseListEnv(name: string, fallback: string[] = []): string[] {
+    const rawValue = String(process.env[name] || '').trim();
+    const source = rawValue || fallback.join(',');
+
+    return source
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
 }
 
 function parseOriginsFromEnv(): string[] {
@@ -95,9 +120,21 @@ export const env = {
     DB_NAME_SAP: getRequiredEnv('DB_NAME_SAP'),
     DB_USER: getRequiredEnv('DB_USER'),
     DB_PASSWORD: getRequiredEnv('DB_PASSWORD'),
+    DB_POOL_MAX: parseNumberEnv('DB_POOL_MAX', 30),
+    DB_POOL_MIN: parseNumberEnv('DB_POOL_MIN', 2),
+    DB_REQUEST_TIMEOUT_MS: parseNumberEnv('DB_REQUEST_TIMEOUT_MS', 30000),
+    DB_ENCRYPT: parseBooleanEnv('DB_ENCRYPT', false),
+    DB_TRUST_SERVER_CERTIFICATE: parseBooleanEnv('DB_TRUST_SERVER_CERTIFICATE', true),
     ITEM_IMAGE_DIR: normalizeWindowsDirPath(getRequiredEnv('ITEM_IMAGE_DIR')),
     ATTACHMENT_DIR: normalizeWindowsDirPath(getRequiredEnv('ATTACHMENT_DIR')),
     USER_PICTURE_DIR: normalizeOptionalWindowsDirPath(process.env.USER_PICTURE_DIR, ''),
+
+    // Term page reference files (paths must be set in .env)
+    REF_FILE_INCOTERMS_2020_PDF: normalizeWindowsDirPath(getRequiredEnv('REF_FILE_INCOTERMS_2020_PDF')),
+    REF_FILE_INCOTERMS_CHART: normalizeWindowsDirPath(getRequiredEnv('REF_FILE_INCOTERMS_CHART')),
+    REF_FILE_UOM_MANUAL: normalizeWindowsDirPath(getRequiredEnv('REF_FILE_UOM_MANUAL')),
+    REF_FILE_STANDARD_CUSTOM_COST_TABLE: normalizeWindowsDirPath(getRequiredEnv('REF_FILE_STANDARD_CUSTOM_COST_TABLE')),
+    REF_FILE_DOMESTIC_AGENT_PRICE_TABLE: normalizeWindowsDirPath(getRequiredEnv('REF_FILE_DOMESTIC_AGENT_PRICE_TABLE')),
 
     // CORS
     CORS_ALLOWED_ORIGINS: corsAllowedOrigins,
@@ -106,6 +143,13 @@ export const env = {
     // RFQ email defaults
     RFQ_MAILTO_CC: String(process.env.RFQ_MAILTO_CC || '').trim(),
     RFQ_MAILTO_SUBJECT: String(process.env.RFQ_MAILTO_SUBJECT || '').trim(),
+
+    // Auth and deployment controls
+    AUTH_ALLOW_DOMAIN_USERS: parseBooleanEnv('AUTH_ALLOW_DOMAIN_USERS', true),
+    AUTH_MANAGER_GROUPS: parseListEnv('AUTH_MANAGER_GROUPS', ['PCAT-Manager']),
+    AUTH_SUPERVISOR_GROUPS: parseListEnv('AUTH_SUPERVISOR_GROUPS', ['PCAT-SuperVisor']),
+    AUTH_USER_GROUPS: parseListEnv('AUTH_USER_GROUPS', ['Part Catalog User', 'Domain Users']),
+    SERVER_READ_ONLY: parseBooleanEnv('SERVER_READ_ONLY', false),
 
     get isDev() {
         return this.NODE_ENV === 'development';

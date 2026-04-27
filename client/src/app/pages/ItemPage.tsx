@@ -43,6 +43,10 @@ export default function ItemPage({ mode: initialMode }: ItemFormPageProps) {
     const [prefetchedLookups, setPrefetchedLookups] = useState<ItemFormLookups | null>(null);
     const [loading, setLoading] = useState(false);
 
+    useEffect(() => {
+        setMode(initialMode);
+    }, [initialMode, id]);
+
     const syncItemArtifacts = async (itemId: number, options: ItemFormSaveOptions) => {
         const pendingAttachments = options?.pendingAttachments || [];
         const imageFile = options?.imageFile || null;

@@ -3,7 +3,7 @@ import { toSqlIdentifier } from '#src/utils/sql.js';
 /** Whitelist of columns allowed in UPDATE SET clause. */
 const ALLOWED_UPDATE_COLUMNS = new Set([
     'ItemGroup', 'U_Brand', 'U_Calalogno', 'ItemDescription', 'InvntryUom', 'U_CountryOrg',
-    'BPStockItemNo', 'SAPB1Desc', 'VatGroupPu', 'VatGourpSa',
+    'BPStockItemNo', 'B1ItemNo', 'SAPB1Desc', 'VatGroupPu', 'VatGourpSa',
     'U_ECCN', 'U_UNSPSC', 'U_EpoCode', 'U_HScode', 'U_Remark', 'LeadTime', 'SaleSubLocation',
     'ItemCategory', 'SpecialRequirement', 'GeneralSpec', 'GeneralSpecUrl',
     'LongDesc1', 'LongDesc2', 'LongDesc3', 'LongDesc4',
@@ -15,7 +15,7 @@ const ALLOWED_UPDATE_COLUMNS = new Set([
 export const buildCreateItemInsertSql = (writeTableName: string): string => `
     INSERT INTO ${writeTableName} (
         ItemGroup, U_Brand, U_Calalogno, ItemDescription, InvntryUom, U_CountryOrg,
-        BPStockItemNo, SAPB1Desc, VatGroupPu, VatGourpSa,
+        BPStockItemNo, B1ItemNo, SAPB1Desc, VatGroupPu, VatGourpSa,
         U_ECCN, U_UNSPSC, U_EpoCode, U_HScode, U_Remark, LeadTime, SaleSubLocation,
         ItemCategory, SpecialRequirement, GeneralSpec, GeneralSpecUrl,
         LongDesc1, LongDesc2, LongDesc3, LongDesc4,
@@ -26,7 +26,7 @@ export const buildCreateItemInsertSql = (writeTableName: string): string => `
     OUTPUT INSERTED.ItemID
     VALUES (
         @ItemGroup, @U_Brand, @U_Calalogno, @ItemDescription, @InvntryUom, @U_CountryOrg,
-        @BPStockItemNo, @SAPB1Desc, @VatGroupPu, @VatGourpSa,
+        @BPStockItemNo, @B1ItemNo, @SAPB1Desc, @VatGroupPu, @VatGourpSa,
         @U_ECCN, @U_UNSPSC, @U_EpoCode, @U_HScode, @U_Remark, @LeadTime, @SaleSubLocation,
         @ItemCategory, @SpecialRequirement, @GeneralSpec, @GeneralSpecUrl,
         @LongDesc1, @LongDesc2, @LongDesc3, @LongDesc4,

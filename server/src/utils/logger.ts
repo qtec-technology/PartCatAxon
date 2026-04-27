@@ -1,5 +1,3 @@
-import { env } from '#src/config/env.js';
-
 type LogLevel = 'info' | 'warn' | 'error';
 
 type ErrorLike = {
@@ -25,10 +23,6 @@ const normalizeContext = (context?: LogContext): Record<string, unknown> | undef
 };
 
 const write = (level: LogLevel, message: string, context?: LogContext): void => {
-    if (level === 'info' && env.isProd) {
-        return;
-    }
-
     const normalizedContext = normalizeContext(context);
 
     const entry = {

@@ -22,8 +22,6 @@ function resolveStoredProcedureName(spName: string): string {
     return `${toSqlIdentifier(spDatabase)}.[dbo].${toSqlIdentifier(trimmedSpName)}`;
 }
 
-// ─── การตั้งค่าการเชื่อมต่อ SQL Server (Connection Config) ───────────────
-// เทียบเท่ากับ Connection String ใน Web.config หรือ App.config ของ .NET
 const sqlConfig: sql.config = {
     server: env.DB_HOST,
     port: env.DB_PORT,
@@ -31,28 +29,23 @@ const sqlConfig: sql.config = {
     user: env.DB_USER,
     password: env.DB_PASSWORD,
     options: {
-        encrypt: false,                // Internal network — no TLS needed
-        trustServerCertificate: true,  // Skip cert validation for dev
+        encrypt: env.DB_ENCRYPT,
+        trustServerCertificate: env.DB_TRUST_SERVER_CERTIFICATE,
         enableArithAbort: true,
-        // Legacy app stores/display SQL datetime as local business time.
-        // Prevent driver from interpreting DATETIME as UTC (which shifts +7h in TH).
+        // Legacy app stores SQL datetime values in local business time.
+        // Prevent the driver from interpreting DATETIME as UTC.
         useUTC: false,
     },
     pool: {
-        max: 10,
-        min: 2,
+        max: env.DB_POOL_MAX,
+        min: env.DB_POOL_MIN,
         idleTimeoutMillis: 30000,
     },
-    requestTimeout: 30000,          // 30 seconds for large queries
+    requestTimeout: env.DB_REQUEST_TIMEOUT_MS,
 };
 
-// ─── Singleton Pool (ใช้ Connection Pool เดียวทั้งแอป) ───────────────────
 let pool: sql.ConnectionPool | null = null;
 
-/**
- * 🇹🇭 สร้างหรือดึง Connection Pool ที่มีอยู่แล้ว
- * (เหมือนกับการใช้ Singleton Pattern เพื่อไม่ให้เปิด Connection ซ้ำซ้อน)
- */
 export async function getPool(): Promise<sql.ConnectionPool> {
     if (pool && pool.connected) {
         return pool;
@@ -71,12 +64,6 @@ export async function getPool(): Promise<sql.ConnectionPool> {
     }
 }
 
-/**
- * 🇹🇭 ดึงข้อมูลหลายรายการ (SELECT * FROM ...)
- * @param sqlText - คำสั่ง SQL (เช่น "SELECT * FROM Users WHERE ID = @id")
- * @param params - พารามิเตอร์ (เช่น { id: 1 })
- * @returns Array ของข้อมูล (T[])
- */
 export async function query<T = any>(
     sqlText: string,
     params?: Record<string, any>
@@ -94,12 +81,6 @@ export async function query<T = any>(
     return result.recordset ?? [];
 }
 
-/**
- * 🇹🇭 ดึงข้อมูลรายการเดียว (SELECT TOP 1 ...)
- * @param sqlText - คำสั่ง SQL
- * @param params - พารามิเตอร์
- * @returns ข้อมูลตัวแรก (T) หรือ null ถ้าไม่พบ (เหมือน .FirstOrDefault() ใน .NET)
- */
 export async function queryOne<T = any>(
     sqlText: string,
     params?: Record<string, any>
@@ -108,12 +89,6 @@ export async function queryOne<T = any>(
     return rows.length > 0 ? rows[0] : null;
 }
 
-/**
- * 🇹🇭 สั่งทำงาน SQL ที่ไม่มีการคืนค่า (INSERT, UPDATE, DELETE)
- * @param sqlText - คำสั่ง SQL
- * @param params - พารามิเตอร์
- * @returns จำนวน Rows ที่ได้รับผลกระทบ (RowsAffected)
- */
 export async function execute(
     sqlText: string,
     params?: Record<string, any>
@@ -131,12 +106,6 @@ export async function execute(
     return result.rowsAffected[0];
 }
 
-/**
- * 🇹🇭 เรียกใช้ Stored Procedure
- * @param spName - ชื่อ Stored Procedure
- * @param inputs - Input parameters
- * @param outputs - Output parameters (ถ้ามี)
- */
 export async function execSP<T = any>(
     spName: string,
     inputs?: Record<string, { type: any; value: any }>,
@@ -160,9 +129,6 @@ export async function execSP<T = any>(
     return request.execute<T>(resolveStoredProcedureName(spName));
 }
 
-/**
- * 🇹🇭 ปิดการเชื่อมต่อ (ใช้เมื่อปิด Server)
- */
 export async function closePool(): Promise<void> {
     if (pool) {
         await pool.close();
@@ -171,6 +137,4 @@ export async function closePool(): Promise<void> {
     }
 }
 
-// Export sql types เพื่อให้ไฟล์อื่นเรียกใช้ Type ได้ง่าย (เช่น sql.Int, sql.NVarChar)
 export { sql };
-

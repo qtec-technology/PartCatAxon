@@ -2,6 +2,7 @@ import {
     asRecord,
     parseBooleanFlag,
     parseNullableString,
+    parsePositiveInt,
     parseString,
 } from '#src/dtos/common/request-parsers.js';
 
@@ -15,6 +16,8 @@ export interface SearchFTSQueryDTO {
     keyword: string;
     brand: string;
     myItems: boolean;
+    page: number;
+    pageSize: number;
 }
 
 export interface SearchFTSBrandsQueryDTO {
@@ -31,6 +34,8 @@ export interface SearchStandardQueryDTO {
     brand: string | null;
     exactMatch: boolean;
     myItems: boolean;
+    page: number;
+    pageSize: number;
 }
 
 export interface SearchPartNoQueryDTO {
@@ -44,6 +49,8 @@ export function toSearchFTSQueryDTO(query: unknown): SearchFTSQueryDTO {
         keyword: parseString(q.keyword, ''),
         brand: parseString(q.brand, '_Null'),
         myItems: parseBooleanFlag(q.myItems, false),
+        page: parsePositiveInt(q.page, 1, 1),
+        pageSize: parsePositiveInt(q.pageSize, 50, 1, 400),
     };
 }
 
@@ -69,6 +76,8 @@ export function toSearchStandardQueryDTO(query: unknown): SearchStandardQueryDTO
         brand: parseNullableString(q.brand),
         exactMatch: parseBooleanFlag(q.exactMatch, false),
         myItems: parseBooleanFlag(q.myItems, false),
+        page: parsePositiveInt(q.page, 1, 1),
+        pageSize: parsePositiveInt(q.pageSize, 50, 1, 400),
     };
 }
 

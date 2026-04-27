@@ -10,8 +10,8 @@ import {
 
 const router = Router();
 
+router.get('/:id/download', validate(attachmentIdParamSchema, 'params'), validate(attachmentDeleteQuerySchema, 'query'), ctrl.downloadAttachment);
 router.post('/', requireAuth, validate(createAttachmentBodySchema, 'body'), ctrl.createAttachment);
 router.delete('/:id', requireAuth, validate(attachmentIdParamSchema, 'params'), validate(attachmentDeleteQuerySchema, 'query'), ctrl.deleteAttachment);
 
 export default router;
-
