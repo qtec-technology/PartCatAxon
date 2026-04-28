@@ -360,17 +360,32 @@ export const RightColumn = memo(function RightColumn({
 
       <section className="bg-white border border-gray-200 rounded-md p-3 shadow-sm space-y-1.5" aria-labelledby={`${idBase}-links-heading`}>
         <h2 id={`${idBase}-links-heading`} className="text-xs font-bold text-gray-700 block mb-2">Reference Links</h2>
-        {REFERENCE_LINKS.map((link) => (
-          <a
-            key={link.key}
-            href={referenceFileApi.getUrl(link.key)}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs text-term-green hover:text-[#1D6F16] hover:underline flex items-center gap-1.5"
-          >
-            <ExternalLink className="w-3.5 h-3.5" /> {link.label}
-          </a>
-        ))}
+        {REFERENCE_LINKS.map((link) => {
+          const isOffice = referenceFileApi.isOfficeFile(link.key);
+          const url = isOffice
+            ? referenceFileApi.getOfficeUrl(link.key)
+            : referenceFileApi.getUrl(link.key);
+
+          return (
+            <a
+              key={link.key}
+              href={isOffice ? '#' : url}
+              target={isOffice ? undefined : '_blank'}
+              rel="noreferrer"
+              className="text-xs text-term-green hover:text-[#1D6F16] hover:underline flex items-center gap-1.5 cursor-pointer"
+              onClick={
+                isOffice
+                  ? (e) => {
+                      e.preventDefault();
+                      window.location.href = url;
+                    }
+                  : undefined
+              }
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> {link.label}
+            </a>
+          );
+        })}
       </section>
 
       <section className="border border-term-green rounded-md overflow-hidden shadow-sm flex-1 min-h-0 flex flex-col" aria-labelledby={`${idBase}-attachments-heading`}>

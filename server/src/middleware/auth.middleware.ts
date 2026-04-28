@@ -188,7 +188,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
             username = devUser.username;
             domain = devUser.domain;
 
-            // DEV_DISPLAY_NAME allows simulating full name (e.g. "Kittipat Milawan")
+            // DEV_DISPLAY_NAME allows simulating full name 
             const devDisplayName = (process.env.DEV_DISPLAY_NAME || '').trim();
             if (devDisplayName) {
                 displayName = devDisplayName;

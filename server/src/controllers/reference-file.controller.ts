@@ -40,7 +40,8 @@ function toSafeHeaderFileName(fileName: string): string {
 
 export async function openReferenceFile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-        const key = String(req.params.key || '').trim().toLowerCase();
+        const rawKey = String(req.params.key || '').trim().toLowerCase();
+        const key = rawKey.replace(/\.(xlsx|xls|ppsx|pptx|ppt|pdf|jpg|jpeg|png)$/, '');
         const referenceFile = referenceFiles[key];
 
         if (!referenceFile) {
