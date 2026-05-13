@@ -25,7 +25,7 @@
 | Backend API | ✅ Phase 3A Live — `POST /api/bulk-cost/runs` draft snapshot save, `GET /runs`, `GET /runs/:id`, `PATCH /runs/:id/status` |
 | DB persistence | ✅ Live — `BulkCostRun` / `BulkCostLine` / `AxonExtractionQueue` in `PART_CATALOG_AIX`; 13 seed rows in queue; mock fallbacks removed |
 | GraingerWeightData table | 🔲 Script ready — run `server/sql/20260512_grainger_weight_table.sql` via SSMS; defer until CWeight feature wired |
-| C1 CWeight AI lookup | 🚧 Scaffolded — `ai-services/weight-lookup.service.ts` Grainger path ready; endpoint not yet wired |
+| CWeight / Weight module | 🚧 Scaffolded — `ai-services/weight-lookup.service.ts` Grainger path ready; next step is local pattern research/tests before endpoint wiring |
 | Real AXON data source | ❌ Not Started |
 
 ---
@@ -230,11 +230,12 @@ Flow:
 1. Review `.docs/BULK_COST_TEST_DATA_AUDIT.md` with business/owner
 2. Collect missing golden-case data for ET/MT/MiscTax/SCC/STK, CWeight, and additional order-term variants
 3. คุย business owner เรื่อง UI acceptance + field confirmations + Golden Case verification สำหรับ document fee basis
-4. Deploy `GraingerWeightData` table: run `server/sql/20260512_grainger_weight_table.sql` via SSMS (requires sa/db_owner)
-5. Wire C1 CWeight lookup: `GET /api/bulk-cost/weight-lookup` endpoint → query GraingerWeightData → fallback `ai-services/weight-lookup.service.lookupWeight()`
-6. Connect real AXON data source แทน seed data
-7. ออกแบบ Awarded reverse mapping flow ก่อนสร้าง endpoint จริง
-8. ทำ E2E test สำหรับ full allocation → save → draft item flow
+4. Build CWeight local research module/tests first: formula, divisor, rounding, ship mode, dim unit, matching fields
+5. Deploy `GraingerWeightData` table later: run `server/sql/20260512_grainger_weight_table.sql` via SSMS (requires sa/db_owner)
+6. Wire CWeight lookup endpoint later only after local pattern passes review: query GraingerWeightData → fallback `ai-services/weight-lookup.service.lookupWeight()`
+7. Connect real AXON data source แทน seed data
+8. ออกแบบ Awarded reverse mapping flow ก่อนสร้าง endpoint จริง
+9. ทำ E2E test สำหรับ full allocation → save snapshot flow
 
 ---
 
@@ -255,6 +256,6 @@ Flow:
 |---|---|
 | `.docs/BULK_COST_CALCULATION.md` | สูตรคำนวณ Bulk Cost จาก Excel sample + reconciliation กับ Term engine |
 | `.docs/BULK_COST.md` | Feature guide และ decision log สรุปของ Bulk Cost |
-| `.docs/AXON_INTEGRATION.md` | AXON extraction contract และ draft Item/Term flow |
+| `.docs/AXON_INTEGRATION.md` | AXON extraction contract และ BulkCostRun/BulkCostLine snapshot flow |
 | `.docs/DATA_SCHEMA.md` | Item/Term schema และ calculation field mapping |
 | `.docs/FEATURE_STATUS.md` | สถานะล่าสุดและ decision log |
