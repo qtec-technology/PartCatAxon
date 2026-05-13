@@ -21,7 +21,7 @@
 | Bulk Cost Run List + Status | ✅ Done | 2 tabs (Allocations / New Allocation), GET /runs, GET /runs/:id, PATCH /runs/:id/status, restore saved run, saleIncharge filter |
 | Bulk Cost backend API + DB | ✅ Phase 3A Live | `BulkCostRun` / `BulkCostLine` tables in `PART_CATALOG_AIX`; POST /api/bulk-cost/runs, mock fallbacks removed; AxonExtractionQueue seeded (13 rows) |
 | Bulk Cost viewport-locked layout | ✅ Done | `/bulk-cost` pages use app-shell-locked layout (internal scroll, no page scroll) matching `/partcatalog` |
-| AI-assisted workflow | 🚧 In Progress | ai-services/ package scaffolded; C1 Grainger weight path ready; C2/C3 deferred |
+| AI-assisted workflow | 🚧 In Progress | CWeight / Weight & Dimension is current Kim/Codex scope; HS Code, Duty, Permit, Shelf Life are AXON/team scope |
 | Executive requirement collection | 🔄 Active | ใช้ `10.Excutive Questions.md` |
 | AIX intake automation | ❌ Not Started | |
 | client/ retirement | ✅ Done | ลบ 2026-05-07 — all smoke tests passed |
@@ -65,7 +65,7 @@
 - Real AXON/UI/API persistence for explicit `DocumentFeeBasis` and generated
   By Lot / Batch document-fee line candidates
 - Real SQL Server `PART_CATALOG_AIX` DB: `BulkCostRun`, `BulkCostLine`, `AxonExtractionQueue` tables live; mock fallbacks removed
-- `ai-services/` package scaffolded: C1 Grainger weight lookup path implemented; C2 (HS Code RAG) and C3 (Permit/Shelf Life rules) deferred
+- `ai-services/` package scaffolded: CWeight/Grainger weight lookup path implemented; HS Code, Duty, Permit, Shelf Life are not Kim/Codex scope in the current phase
 - GraingerWeightData table: SQL script ready (`server/sql/20260512_grainger_weight_table.sql`), not yet deployed to DB (deferred until CWeight feature wired)
 - AI extraction จากเอกสารหรือ quotation
 - AI prefill ใน Item/Term
@@ -142,9 +142,10 @@
 | 2026-05-13 | Viewport-locked layout for `/bulk-cost`: extended `app-shell-locked` class to `/bulk-cost` paths in AppShell; added CSS classes `bulk-cost-page-root`, `bulk-cost-tabs-root`, `bulk-cost-tab-content`, `bulk-cost-workspace`, `bulk-cost-workspace-body`; toolbar fixed, body scrolls internally matching `/partcatalog` behaviour | `npm --prefix next-shell run typecheck` |
 | 2026-05-13 | Removed all mock fallbacks from `bulk-cost.repository.ts`: deleted `MOCK_QUEUE_ITEMS`, `MOCK_RUNS`, `MOCK_RUN1_LINES`, `MOCK_RUN1_PREVIEW`, `applyMockFilters`, `isMissingTableError`; `listAxonQueueItems`, `listBulkCostRuns`, `loadBulkCostRun` now use real DB only | `npm --prefix server run build`, `npm --prefix server test -- --run` (83), `npm --prefix next-shell run typecheck` |
 | 2026-05-13 | Created SQL scripts: `20260512_grainger_weight_table.sql` (GraingerWeightData + GraingerWeightImportLog tables + 11 seed rows), `20260512_seed_mock_data.sql` (AxonExtractionQueue 13 rows), `20260512_axon_ai_tables.sql` (AXON AI helper tables); all run via SSMS (partcataloguser lacks DDL rights) | Manual SSMS execution confirmed |
-| 2026-05-13 | Scaffolded `ai-services/` package: C1 Grainger weight lookup (`weight-lookup.service.ts`) with Grainger-first path, AI fallback via Gemini (Google Search grounded); C2/C3 stubs present but deferred | `npm --prefix ai-services install` — types restored |
-| 2026-05-13 | 2026-05-12 Decision Log update: confirmed business decisions from Pi-Or/Pi-Jo on AXON hybrid model, Item Group flow, AI scope (C1/C2/C3), three-tier fallback, LLM providers; updated AXON_INTEGRATION.md §10 and ROADMAP.md Phase 3B | Docs-only update |
-| 2026-05-12 | Confirmed business decisions from Pi-Or/Pi-Jo: (1) AXON Model = Hybrid Push+Pull — AXON pushes Origin snapshot to DB automatically, sales pulls via Dashboard; (2) Item Group = AI Suggest (🪄 icon) + Sales Edit dropdown + Manager Approve at AWARDED stage — no SAP impact until Awarded; (3) AI auto-recommend scope: Weight/Dim (Grainger + AI fallback), HS Code (historical RAG + LLM), Import Permit/Shelf Life (rules + LLM); (4) Three-tier fallback: AXON → AI → User manual; (5) LLMs: GPT + Gemini; (6) Workspace columns must match legacy Term form with inter-field dependencies preserved | Docs updated: AXON_INTEGRATION.md §10, ROADMAP.md Phase 3B |
+| 2026-05-13 | Confirmed current AI scope: Kim/Codex works only on CWeight / Weight & Dimension local research and pattern tests first; HS Code, Duty, Permit, Shelf Life are AXON/team scope; production endpoint/API-key work comes later | Docs-only update |
+| 2026-05-13 | Scaffolded `ai-services/` package: CWeight/Grainger weight lookup (`weight-lookup.service.ts`) with Grainger-first path; HS Code/Permit stubs exist from earlier scaffold but are not active scope | `npm --prefix ai-services install` — types restored |
+| 2026-05-13 | 2026-05-12 Decision Log update superseded for Kim/Codex scope: AXON hybrid model and Item Group flow remain; Kim/Codex current scope narrowed to CWeight / Weight & Dimension only | Docs-only update |
+| 2026-05-12 | Confirmed business decisions from Pi-Or/Pi-Jo: (1) AXON Model = Hybrid Push+Pull — AXON pushes Origin snapshot to DB automatically, sales pulls via Dashboard; (2) Item Group = AI Suggest (🪄 icon) + Sales Edit dropdown + Manager Approve at AWARDED stage — no SAP impact until Awarded; (3) AI auto-recommend scope was initially listed as Weight/Dim, HS Code, Permit/Shelf Life but Kim/Codex scope was narrowed on 2026-05-13 to CWeight only; (4) Three-tier fallback remains suggestion → user manual; (5) Workspace columns must match legacy Term form with inter-field dependencies preserved | Docs updated: AXON_INTEGRATION.md §10, ROADMAP.md Phase 3B |
 | 2026-05-12 | Fixed Term SlpName / SlpSprtName / CntctName always empty in Term page response: `vw@PITM1` does not JOIN `[@OSLP]`/`[@OCPR]` for name resolution so all three name fields returned empty strings. Added `enrichTermNames` post-load step in `getTermById` (repository) that runs parallel `queryOne` lookups against `[@OSLP]` (for SlpCode, SlpSprtCode) and `[@OCPR]` (for CntctCode) when codes are set but names are blank. Also added `SlpName`, `SlpSprtName`, `CntctName` to the server `Term` TypeScript interface (previously omitted despite being in `TERM_PAGE_COLUMNS`). Bug was pre-existing — not introduced by Next.js migration. | `npm run typecheck`, `npm test` (server 83 + next-shell 51) pass |
 | 2026-05-12 | Completed Phase 5 AllocationList UI polish: (1) Tab active color → `#2264A0` (matches rest of app); (2) AllocationList rewritten — resizable columns (useResizableTableColumns), double-click auto-fit, separate Supplier / Vendor Code columns, 400-row server-side pagination with TablePager, anti-flicker with refresh overlay; (3) BulkCostWorkspace restore auto-scrolls to Result Review (Step 3) when previewSnapshot is loaded; (4) Server pagination in `listBulkCostRuns` repository + controller `meta` response; (5) Mock Run #1 now has 3 lines + pre-calculated preview snapshot | `npm run typecheck`, `npm test` (server 83 + next-shell 51) pass |
 | 2026-05-11 | Hide `matchStatus` column from all Bulk Cost line presets (basic/price/docs/weight/term/all) | During quotation phase no duplicate check occurs — column always shows "New Item" which confuses sales. Field `itemCode` and match-related backend fields (`MatchMethod`, `MatchConfidence`, `UniqueLineID`) are preserved in TypeScript types for future Awarded Reverse Mapping (Pi-Or directive) |
@@ -186,12 +187,13 @@
 
 ### Bulk Cost
 
-- [ ] Deploy `GraingerWeightData` table: run `server/sql/20260512_grainger_weight_table.sql` via SSMS (requires sa/db_owner)
-- [ ] Wire C1 CWeight lookup: `GET /api/bulk-cost/weight-lookup` → query GraingerWeightData → fallback ai-services lookupWeight()
+- [ ] Build CWeight local research module/tests: formula, divisor, rounding, ship mode, dim unit, matching fields
+- [ ] Deploy `GraingerWeightData` table later: run `server/sql/20260512_grainger_weight_table.sql` via SSMS (requires sa/db_owner)
+- [ ] Wire CWeight lookup endpoint later: query GraingerWeightData → fallback ai-services lookupWeight()
 - [ ] Connect real AXON data source (replace AxonExtractionQueue seed data with live AXON push)
 - [ ] Design Awarded reverse mapping flow before creating award/reverse-map endpoint
 - [ ] คุยกับผู้บริหารเรื่อง UI acceptance + Golden Case verification สำหรับ document fee basis
-- [ ] E2E test: full allocation → save → draft item flow
+- [ ] E2E test: full allocation → save snapshot flow
 
 ### AI-Assisted Workflow (ระยะยาว)
 

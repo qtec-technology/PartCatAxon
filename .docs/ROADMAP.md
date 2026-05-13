@@ -96,8 +96,8 @@ Phase 5 ⏳  Full AI Automation
 **Business Decisions ยืนยันแล้ว (2026-05-12):**
 - [x] AXON Model = **Hybrid Push+Pull**: AXON push เข้า DB อัตโนมัติ, เซลล์ Pull ผ่าน Dashboard
 - [x] Item Group = AI Suggest (🪄) → Sales Edit → Manager Approve ตอน AWARDED
-- [x] Three-tier fallback: AXON → AI (GPT/Gemini) → User manual (เสมอแก้ได้)
-- [x] LLMs: GPT + Gemini สำหรับ AI auto-recommend
+- [x] Three-tier fallback สำหรับ CWeight: existing/export data → AI suggestion (ภายหลัง) → User manual (เสมอแก้ได้)
+- [x] Scope ล่าสุด: Kim/Codex ทำเฉพาะ CWeight / Weight & Dimension; HS Code, Duty, Permit, Shelf Life เป็น AXON/ทีมอื่น
 
 **งาน Claude Sonnet 4.6 (codebase owner):**
 - [ ] A2: SupplierSelection โหลดจาก real `@OCRD`
@@ -108,19 +108,19 @@ Phase 5 ⏳  Full AI Automation
 - [ ] B4: Supplier matching confirmation UI (AXON hint → user confirm/reject)
 - [ ] B5: Three-tier badge UI (AXON / AI / manual)
 - [ ] B6: Workspace columns ตาม legacy Term form (UOM dropdown, Ship Mode ฯลฯ)
-- [ ] C5: Wire AI service routes (`/api/ai/weight`, `/api/ai/hscode`, `/api/ai/permit`) เข้า Express
-- [ ] C6: Verify Codex AI service response ตรง `AllocationLineSource` TypeScript types
+- [ ] C5: Wire CWeight service route ภายหลังเมื่อ local pattern ผ่าน test แล้ว
+- [ ] C6: Verify Codex CWeight response ตรง Bulk Cost weight fields
 - [ ] D1: Manager Approve dialog + PATCH status AWARDED
 - [ ] D2: Reverse Mapping summary (read-only preview หลัง AWARDED)
 
-**งาน Codex / GPT 5.5 (AI service layer — isolated):**
-- [ ] C1: Weight & Dimension lookup service (Grainger API + OpenAI/Gemini fallback)
-- [ ] C2: HS Code suggestion service (historical CSV RAG + LLM)
-- [ ] C3: Import Permit & Shelf Life checker (rules + LLM)
-- [ ] C4: Prompt templates สำหรับ C1-C3
+**งาน Codex / GPT 5.5 (CWeight layer — isolated):**
+- [ ] C1: CWeight / Weight & Dimension local research module
+- [ ] C2: Pattern tests สำหรับ dimensional weight, chargeable weight, divisor, rounding, ship mode, dim unit
+- [ ] C3: Matching strategy เริ่มจาก exact/rule-based fields (supplier order code, mfr no, brand, vendor, description)
+- [ ] C4: CWeight prompt/research notes เฉพาะกรณีที่ต้องใช้ AI ภายหลัง
 
-**ทำพร้อมกันได้ (parallel):** A2/A3/B1-B6 (Claude) + C1-C4 (Codex) — merge ที่ C5/C6
-**ต้องรอลำดับ:** C5 รอ C1-C4 เสร็จก่อน | D1 รอ B2-B3 เสร็จก่อน
+**ทำพร้อมกันได้ (parallel):** A2/A3/B1-B6 (Claude/AXON) + C1-C4 (Codex CWeight)
+**ต้องรอลำดับ:** C5 รอ CWeight local pattern/test ผ่านก่อน | D1 รอ B2-B3 เสร็จก่อน
 
 ### 3C — Prisma ORM (ขึ้นอยู่กับ 3A)
 
