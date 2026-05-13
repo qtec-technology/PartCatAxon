@@ -1,297 +1,148 @@
 # QTEC Part Catalog
 
-ระบบ Part Catalog แบบ Web Application สำหรับใช้งานภายในเครือข่ายองค์กร แทนระบบเดิมที่ทำงานบน Microsoft Access โดยยังคง business flow หลักของ `Item`, `Term`, `Search`, `Attachment`, และ `Calculation` ไว้
+PartCatalog is an internal web application for Item, Term, Attachment, Calculation, and Bulk Cost workflows.
 
-## ภาพรวมระบบ
+## Current Architecture
 
-- `client/` = Frontend (React + Vite)
-- `server/` = Backend API (Node.js + Express + TypeScript)
-- `SQL Server` = ฐานข้อมูลหลัก
-- `File Server` = เก็บรูป `Item` และ `Attachment`
+```text
+Browser
+  -> next-shell (Next.js 16 + React 19, port 3010)
+      -> /api/[...path] proxy
+          -> server (Express + TypeScript, port 3001)
+              -> SQL Server
+              -> network file shares
+```
 
-ระบบนี้ออกแบบให้:
-- ฝั่งเว็บเรียก API ผ่าน `/api/*`
-- Frontend dev server ทำงานที่ `http://localhost:5173/#/`
-- Backend API ทำงานที่ `http://localhost:3001`
-- Production ใช้ Windows Authentication เป็นหลัก
+`next-shell/` is the active frontend. `server/` remains the backend API. `client/` is a legacy React/Vite frontend kept only as temporary reference during retirement and must not be part of normal dev or deploy.
 
-## สิ่งที่ต้องมีในเครื่อง
+Read [.docs/CLIENT_RETIREMENT_PLAN.md](.docs/CLIENT_RETIREMENT_PLAN.md) before deleting `client/`.
+
+## Project Structure
+
+```text
+PartCatalog/
+  next-shell/  Active Next.js frontend and BFF proxy
+  server/      Express API, DB access, auth, file-share logic
+  .docs/       Technical docs and handoff plans
+  .github/     Agent instructions
+```
+
+## Requirements
 
 - Windows environment
-- Node.js 22+ และ npm
-- สิทธิ์เข้าถึง SQL Server
-- สิทธิ์เข้าถึง network share สำหรับ:
+- Node.js 22+ and npm
+- Access to SQL Server
+- Access to required network shares:
   - `ITEM_IMAGE_DIR`
   - `ATTACHMENT_DIR`
-  - `USER_PICTURE_DIR` (ถ้าใช้งานรูป profile)
+  - `USER_PICTURE_DIR`
 
-## โครงสร้างโปรเจค
-
-```text
-PartCatalogApp/
-  client/   # React + Vite frontend
-  server/   # Express + TypeScript API
-```
-
-## ดึงโปรเจคครั้งแรก
+## Install
 
 ```powershell
-git clone https://github.com/qtec-technology/PartCatalog.git PartCatalogApp
-cd PartCatalogApp
-```
-
-ติดตั้ง dependencies แยก 2 ส่วน
-
-```powershell
-npm --prefix .\client ci
 npm --prefix .\server ci
+npm --prefix .\next-shell ci
 ```
 
-## กรณีมีโปรเจคอยู่แล้วและต้องการดึงโค้ดล่าสุด
+## Environment
 
-```powershell
-cd PartCatalogApp
-git pull origin main
-npm --prefix .\client ci
-npm --prefix .\server ci
-```
-
-หมายเหตุ:
-- ถ้า `package-lock.json` ไม่เปลี่ยน อาจใช้แค่ `git pull` ก็พอ
-- ถ้าหลัง pull แล้ว dependency เปลี่ยน ให้รัน `npm ci` ใหม่ทั้ง `client` และ `server`
-
-## ตั้งค่า Environment
-
-### 1. Frontend
-
-คัดลอกไฟล์ตัวอย่าง
-
-```powershell
-Copy-Item .\client\.env.example .\client\.env
-```
-
-ค่าหลักที่ต้องตรวจ:
-
-```env
-VITE_APP_BASE_PATH=/
-VITE_API_PROXY_TARGET=http://localhost:3001
-```
-
-คำอธิบาย:
-- `VITE_APP_BASE_PATH` ใช้กำหนด base path ของเว็บ
-- `VITE_API_PROXY_TARGET` ใช้ให้ Vite proxy `/api/*` ไป backend ตอนรัน dev
-
-### 2. Backend
-
-คัดลอกไฟล์ตัวอย่าง
+Create or update:
 
 ```powershell
 Copy-Item .\server\.env.example .\server\.env
 ```
 
-ค่าหลักที่ต้องตั้งใน `server/.env`
+Key local values:
 
 ```env
+# server/.env
 NODE_ENV=development
 PORT=3001
-
-DB_HOST=<SQL_SERVER_HOST>
-DB_PORT=1433
-DB_NAME_QTEC=<QTEC_DATABASE_NAME>
-DB_NAME_SAP=<SAP_DATABASE_NAME>
-DB_USER=<SQL_USERNAME>
-DB_PASSWORD=<ASK_ADMIN_FOR_PASSWORD>
-
-ITEM_IMAGE_DIR=\\<FILE_SERVER>\AttachmentItemImage
-ATTACHMENT_DIR=\\<FILE_SERVER>\Attachment
-USER_PICTURE_DIR=\\<FILE_SERVER>\_PartCat_Resource\user_picture
-
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-
-ROLE_MANAGERS=
-ROLE_SUPERVISORS=
-
-DEV_DISPLAY_NAME=
-DEV_EMAIL=
+CORS_ALLOWED_ORIGINS=http://localhost:3010
+CORS_ORIGIN=http://localhost:3010
 ```
 
-คำอธิบายสำคัญ:
-- `ITEM_IMAGE_DIR` และ `ATTACHMENT_DIR` เป็น required env
-- ไม่มี local fallback path แล้ว ถ้าไม่ตั้ง server จะ start ไม่ขึ้น
-- `ROLE_MANAGERS` และ `ROLE_SUPERVISORS` ใช้เฉพาะ non-production
-- `DEV_DISPLAY_NAME` และ `DEV_EMAIL` ใช้เฉพาะ non-production
-- Production ใช้ Windows Auth headers / Windows permissions เท่านั้น
+```env
+# next-shell/.env.local
+EXPRESS_API_URL=http://localhost:3001
+EXPRESS_CSRF_ORIGIN=http://localhost:3010
+```
 
-## วิธีรันระบบในโหมดพัฒนา
+## Development
 
-ต้องเปิด 2 terminal
-
-### Terminal 1: Backend
+From repo root:
 
 ```powershell
-cd PartCatalogApp
-npm --prefix .\server run dev
+npm run dev
 ```
 
-### Terminal 2: Frontend
+This starts:
+
+- Express API: `http://localhost:3001`
+- Next.js app: `http://localhost:3010`
+
+Separate commands:
 
 ```powershell
-cd PartCatalogApp
-npm --prefix .\client run dev
+npm run dev:server
+npm run dev:next
 ```
 
-จากนั้นเปิด:
+## Verification
 
-```text
-http://localhost:5173/#/
+```powershell
+npm run typecheck
+npm test
+npm run build
 ```
 
-## วิธี build
+Current verified baseline:
 
-### Build backend
+- `npm run typecheck` passes for `server` and `next-shell`
+- `npm test` passes: `server` 37 tests, `next-shell` 33 tests
+- `npm run build` passes for `server` and `next-shell`
+- Production smoke passed:
+  - `GET http://localhost:3001/api/health` -> `200`
+  - `GET http://localhost:3010/api/health` -> `200`
+  - `GET http://localhost:3010/` -> `307 /partcatalog`
+  - `GET http://localhost:3010/partcatalog` -> `200`
+  - `GET http://localhost:3010/api/items?page=1&pageSize=1` -> `200`
+
+## Production Shape
+
+Run as two services:
 
 ```powershell
 npm --prefix .\server run build
+npm --prefix .\server start
+
+npm --prefix .\next-shell run build
+npm --prefix .\next-shell start
 ```
 
-### Build frontend
-
-```powershell
-npm --prefix .\client run build
-```
-
-## วิธีรัน backend จาก build output
-
-```powershell
-npm --prefix .\server run start
-```
-
-หมายเหตุ:
-- `server` จะรันจาก `dist/index.js`
-- `client` หลัง build จะได้ไฟล์ใน `client/dist/`
-
-## คำสั่งที่ใช้บ่อย
-
-### Frontend
-
-```powershell
-npm --prefix .\client run dev
-npm --prefix .\client run build
-```
-
-### Backend
-
-```powershell
-npm --prefix .\server run dev
-npm --prefix .\server run build
-npm --prefix .\server run start
-npm --prefix .\server test
-```
-
-## ตรวจสอบว่า backend พร้อมใช้งานหรือไม่
-
-เปิด:
+Recommended reverse proxy:
 
 ```text
-http://localhost:3001/api/health
+https://partcatalog.example.local -> http://127.0.0.1:3010
+next-shell /api/[...path]         -> http://127.0.0.1:3001
 ```
 
-ถ้าปกติควรได้ response แนว `ok`
+Production env must set matching origins:
 
-## พฤติกรรมสำคัญที่ควรรู้
+```env
+# next-shell
+EXPRESS_API_URL=http://127.0.0.1:3001
+EXPRESS_CSRF_ORIGIN=https://partcatalog.example.local
 
-- Frontend ใช้ `HashRouter`
-  - URL จะเป็นรูปแบบ `/#/item/123`
-  - เหตุผลคือช่วยให้ deploy ง่ายใน environment ที่ยังไม่ได้ตั้ง rewrite rule
-
-- Attachment และ Item image เขียนไฟล์ไปที่ network share โดยตรง
-  - `POST /api/items/:id/image`
-  - `POST /api/attachments`
-
-- การลบข้อมูลใช้สิทธิ์ตาม role / ownership
-  - `Item` และ `Term`: `owner / supervisor / manager`
-  - `Attachment`: `owner / supervisor / manager`
-
-- `Item` ยังห้ามลบถ้ายังมี `Term` อยู่
-
-- Production authentication:
-  - ใช้ Windows Authentication only
-  - ไม่ fallback ไป `ROLE_*` env แล้ว
-
-## Troubleshooting
-
-### 1. Server start ไม่ขึ้น
-
-ตรวจสอบ:
-- `server/.env` ตั้งค่าครบหรือยัง
-- SQL Server เข้าถึงได้หรือไม่
-- path ของ `ITEM_IMAGE_DIR` / `ATTACHMENT_DIR` ใช้งานได้หรือไม่
-
-### 2. แนบไฟล์ได้แต่ไฟล์ไม่ไป network share
-
-ตรวจสอบ:
-- ค่า `ATTACHMENT_DIR`
-- สิทธิ์ของ process ที่รัน Node.js
-- สิทธิ์เขียนไปยัง UNC path
-
-### 3. อัปโหลดรูป item ไม่สำเร็จ
-
-ตรวจสอบ:
-- ค่า `ITEM_IMAGE_DIR`
-- ประเภทไฟล์ต้องเป็น `JPG`, `PNG`, `GIF`
-
-### 4. Frontend เรียก API ไม่ได้ตอน dev
-
-ตรวจสอบ:
-- backend รันอยู่หรือไม่ที่ `http://localhost:3001`
-- `client/.env` มี `VITE_API_PROXY_TARGET=http://localhost:3001`
-
-### 5. Login/role ไม่ตรงในเครื่อง dev
-
-ตรวจสอบ:
-- `NODE_ENV=development`
-- `ROLE_MANAGERS`
-- `ROLE_SUPERVISORS`
-- `DEV_DISPLAY_NAME`
-- `DEV_EMAIL`
-
-## ลำดับการเริ่มงานสำหรับเครื่องใหม่
-
-ถ้าต้อง setup ตั้งแต่ศูนย์ ให้ทำตามนี้
-
-```powershell
-git clone https://github.com/qtec-technology/PartCatalog.git PartCatalogApp
-cd PartCatalogApp
-npm --prefix .\client ci
-npm --prefix .\server ci
-Copy-Item .\client\.env.example .\client\.env
-Copy-Item .\server\.env.example .\server\.env
+# server
+NODE_ENV=production
+CORS_ALLOWED_ORIGINS=https://partcatalog.example.local
 ```
 
-จากนั้นแก้ค่าใน `.env` ทั้ง 2 ฝั่ง แล้วรัน
+## Important Rules
 
-```powershell
-npm --prefix .\server run dev
-npm --prefix .\client run dev
-```
-
-## ลำดับการอัปเดตโค้ดสำหรับเครื่องที่มีโปรเจคอยู่แล้ว
-
-```powershell
-cd PartCatalogApp
-git pull origin main
-npm --prefix .\client ci
-npm --prefix .\server ci
-npm --prefix .\server run dev
-npm --prefix .\client run dev
-```
-
-## หมายเหตุสำหรับทีม
-
-- เอกสารวิเคราะห์เชิงลึกบางส่วนอยู่นอก repo หลักและไม่ได้ถูก push ขึ้น git
-- ถ้าจะ deploy production ต้องเตรียม:
-  - Windows Auth / IIS integration
-  - SQL Server access
-  - file share permissions
-  - CORS origins ที่ถูกต้อง
-
+- Do not move `server/` into `next-shell/` during this cutover.
+- Do not deploy or run `client/` as the active frontend.
+- Term calculation remains backend source of truth.
+- Bulk Cost backend persistence must wait for approved schema/rules in `.docs`.
+- Keep docs updated when architecture or workflow changes.

@@ -106,7 +106,7 @@ export function buildSubLocationsQuery(module?: string, country?: string): Query
         sqlText += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    sqlText += ` ORDER BY Priority`;
+    sqlText += ` ORDER BY Priority, Name`;
 
     return { sqlText, params };
 }

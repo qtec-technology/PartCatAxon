@@ -1,0 +1,278 @@
+'use client';
+
+// ── Phase 2: Native ItemPage in Next.js ─────────────────────────────────────
+// Replaces the iframe bridge for item view/edit/create.
+// Uses the same ItemForm component from the legacy React SPA (copied to next-shell).
+// Router adaptor: Next.js useParams/useRouter → legacy ItemPage logic.
+
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ItemForm, ItemFormSaveOptions } from '@/components/features/item/ItemForm';
+import { ItemData, FormMode } from '@/types/item_types';
+import { itemApi } from '@/services/item.api';
+import { attachmentApi } from '@/services/attachment.api';
+import { lookupApi, ItemFormLookups } from '@/services/lookup.api';
+import { featureFlags } from '@/config/feature-flags';
+import { clientLogger } from '@/utils/logger';
+import { toast } from 'sonner';
+
+interface ItemAttachmentView {
+    id: string;
+    category: string;
+    fileName: string;
+    updatedBy: string;
+    updatedDate: string;
+}
+
+const mapAttachmentRows = (rows: Array<Record<string, unknown>>): ItemAttachmentView[] =>
+    rows
+        .map((row) => ({
+            id: String(row.AttachmentID ?? row.id ?? ''),
+            category: String(row.Category ?? ''),
+            fileName: String(row.Attachement ?? row.fileName ?? ''),
+            updatedBy: String(row.Updatedby ?? row.updatedBy ?? ''),
+            updatedDate: String(row.UpdatedDate ?? row.updatedDate ?? ''),
+        }))
+        .filter((row) => row.id || row.fileName);
+
+export default function ItemPage() {
+    const params = useParams<{ id: string }>();
+    const router = useRouter();
+    const id = params?.id;
+    const readOnlyMode = featureFlags.readOnlyMode;
+
+    // Determine mode from URL pattern or default to VIEW
+    const [mode, setMode] = useState<FormMode>('VIEW');
+    const [data, setData] = useState<ItemData | undefined>(undefined);
+    const [termCount, setTermCount] = useState<number | null>(null);
+    const [attachments, setAttachments] = useState<ItemAttachmentView[]>([]);
+    const [prefetchedLookups, setPrefetchedLookups] = useState<ItemFormLookups | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    const navigate = useCallback((path: string) => {
+        router.push(path);
+    }, [router]);
+
+    const syncItemArtifacts = async (itemId: number, options: ItemFormSaveOptions) => {
+        const pendingAttachments = options?.pendingAttachments || [];
+        const imageFile = options?.imageFile || null;
+
+        let attachmentSyncFailed = false;
+        let imageUploadFailed = false;
+
+        if (pendingAttachments.length > 0) {
+            const results = await Promise.allSettled(
+                pendingAttachments.map((item) => attachmentApi.createAttachment({
+                    relatedId: itemId,
+                    relatedType: 'ITEM',
+                    fileName: item.fileName,
+                    filePath: '',
+                    fileType: item.category,
+                    file: item.file,
+                }))
+            );
+
+            if (results.some((result) => result.status === 'rejected')) {
+                attachmentSyncFailed = true;
+                results
+                    .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+                    .forEach((result) => clientLogger.error('Attachment save failed', result.reason));
+            }
+        }
+
+        if (imageFile) {
+            try {
+                await itemApi.uploadItemImage(itemId, imageFile);
+            } catch (imageErr) {
+                imageUploadFailed = true;
+                clientLogger.error('Image upload failed', imageErr);
+            }
+        }
+
+        return { attachmentSyncFailed, imageUploadFailed };
+    };
+
+    const refreshItemArtifacts = async (itemId: number) => {
+        const [itemResult, attachmentResult] = await Promise.allSettled([
+            itemApi.getItemById(itemId),
+            lookupApi.getItemAttachments(itemId),
+        ]);
+
+        if (itemResult.status === 'fulfilled') {
+            setData(itemResult.value);
+        }
+
+        if (attachmentResult.status === 'fulfilled') {
+            setAttachments(mapAttachmentRows(attachmentResult.value));
+        }
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!id) {
+            toast.error('Invalid item id');
+            navigate('/partcatalog');
+            return;
+        }
+
+        const itemId = Number(id);
+        if (Number.isNaN(itemId)) {
+            toast.error('Invalid item id');
+            navigate('/partcatalog');
+            return;
+        }
+
+        const loadItemView = async () => {
+            setLoading(true);
+            try {
+                const [itemResult, termCountResult, attachmentResult, lookupResult] = await Promise.allSettled([
+                    itemApi.getItemById(itemId),
+                    itemApi.getTermCount(itemId),
+                    lookupApi.getItemAttachments(itemId),
+                    lookupApi.getItemFormLookups(),
+                ]);
+
+                if (itemResult.status === 'rejected') {
+                    throw itemResult.reason;
+                }
+
+                if (!cancelled) {
+                    setData(itemResult.value);
+                }
+
+                if (!cancelled) {
+                    setTermCount(termCountResult.status === 'fulfilled' ? termCountResult.value : null);
+                }
+
+                if (!cancelled) {
+                    setAttachments(attachmentResult.status === 'fulfilled'
+                        ? mapAttachmentRows(attachmentResult.value)
+                        : []);
+                }
+
+                if (!cancelled) {
+                    setPrefetchedLookups(lookupResult.status === 'fulfilled' ? lookupResult.value : null);
+                }
+            } catch (err) {
+                clientLogger.error('Failed to fetch item', err);
+                if (!cancelled) {
+                    toast.error('Failed to load item data');
+                    navigate('/partcatalog');
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        loadItemView();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [id, navigate]);
+
+    const handleSave = async (formData: ItemData, options: ItemFormSaveOptions) => {
+        try {
+            if (readOnlyMode) {
+                toast.info('Read-only phase: save is disabled');
+                return;
+            }
+            if (mode === 'NEW') {
+                const newItemId = await itemApi.createItem(formData);
+                const { attachmentSyncFailed, imageUploadFailed } = await syncItemArtifacts(newItemId, options);
+
+                if (attachmentSyncFailed || imageUploadFailed) {
+                    const warnings: string[] = [];
+                    if (attachmentSyncFailed) warnings.push('attachments');
+                    if (imageUploadFailed) warnings.push('image');
+                    toast.warning(`Item created, but failed to sync ${warnings.join(' and ')}`);
+                } else {
+                    toast.success('Item created successfully');
+                }
+
+                navigate(`/item/${newItemId}`);
+            } else {
+                if (!id) return;
+                await itemApi.updateItem(id, formData);
+                const itemId = Number(id);
+                const { attachmentSyncFailed, imageUploadFailed } = await syncItemArtifacts(itemId, options);
+
+                if (attachmentSyncFailed || imageUploadFailed) {
+                    const warnings: string[] = [];
+                    if (attachmentSyncFailed) warnings.push('attachments');
+                    if (imageUploadFailed) warnings.push('image');
+                    toast.warning(`Item updated, but failed to sync ${warnings.join(' and ')}`);
+                } else {
+                    toast.success('Item updated successfully');
+                }
+
+                await refreshItemArtifacts(itemId);
+                setMode('VIEW');
+            }
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            clientLogger.error('Save failed', err);
+            toast.error('Failed to save item: ' + message);
+        }
+    };
+
+    const handleDeleteAttachment = async (attachmentId: string) => {
+        if (!id) throw new Error('Invalid item id');
+
+        const itemId = Number(id);
+        if (Number.isNaN(itemId) || itemId <= 0) throw new Error('Invalid item id');
+
+        const parsedAttachmentId = Number(attachmentId);
+        if (Number.isNaN(parsedAttachmentId) || parsedAttachmentId <= 0) throw new Error('Invalid AttachmentID');
+
+        await attachmentApi.deleteAttachment(parsedAttachmentId, {
+            relatedType: 'ITEM',
+            relatedId: itemId,
+        });
+
+        setAttachments((prev) => prev.filter((row) => Number(row.id) !== parsedAttachmentId));
+    };
+
+    const handleDeleteItem = async (itemId: number, confirmText: string) => {
+        if (readOnlyMode) throw new Error('Read-only phase: delete is disabled');
+        await itemApi.deleteItem(itemId, confirmText);
+        navigate('/partcatalog');
+    };
+
+    if (loading) {
+        return (
+            <div className="page-stack" style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--muted-fg)' }}>
+                        Loading Item…
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="h-full overflow-y-auto">
+            <ItemForm
+                mode={mode}
+                initialData={data}
+                onSave={handleSave}
+                onDeleteAttachment={handleDeleteAttachment}
+                onDeleteItem={handleDeleteItem}
+                onCancel={() => setMode('VIEW')}
+                onExit={() => navigate('/partcatalog')}
+                onChangeMode={setMode}
+                onOpenItem={(itemId) => navigate(`/item/${itemId}`)}
+                onCreateTerm={(itemId) => navigate(`/term/new?itemId=${itemId}`)}
+                readOnlyMode={readOnlyMode}
+                termCount={termCount}
+                attachments={attachments}
+                prefetchedLookups={prefetchedLookups || undefined}
+            />
+        </div>
+    );
+}

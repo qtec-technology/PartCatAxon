@@ -134,8 +134,11 @@ function buildTermParams(
         LeadTime: normalizeTermText('LeadTime', data.LeadTime, 5),
         U_VendorBPA: normalizeTermText('U_VendorBPA', data.U_VendorBPA, 3),
         CntctCode: data.CntctCode ?? null,
+        CntctName: null,        // resolved and overwritten by resolveTermNames before INSERT/UPDATE
         SlpCode: data.SlpCode ?? null,
+        SlpName: null,
         SlpSprtCode: data.SlpSprtCode ?? null,
+        SlpSprtName: null,
         U_ValidFrom: data.U_ValidFrom ?? null,
         U_ValidTo: data.U_ValidTo ?? null,
         U_SalesTerm: normalizeTermText('U_SalesTerm', data.U_SalesTerm, 20),
@@ -188,7 +191,49 @@ export async function getTermsByItemId(itemId: number): Promise<Term[]> {
  */
 // ใช้สำหรับดึง Term เดียวตาม TermID
 export async function getTermById(termId: number): Promise<Term | null> {
-    return await queryOne<Term>(GET_TERM_PAGE_BY_ID_SQL, { termId });
+    const term = await queryOne<Term>(GET_TERM_PAGE_BY_ID_SQL, { termId });
+    if (!term) return null;
+    return enrichTermNames(term);
+}
+
+// vw@PITM1 returns empty strings for SlpName/SlpSprtName/CntctName when the view
+// does not JOIN [@OSLP]/[@OCPR]. Resolve them post-load to avoid altering the view.
+async function enrichTermNames(term: Term): Promise<Term> {
+    const needsSlp   = !term.SlpName?.trim()    && (term.SlpCode ?? 0) > 0;
+    const needsSprt  = !term.SlpSprtName?.trim() && (term.SlpSprtCode ?? 0) > 0;
+    const needsCntct = !term.CntctName?.trim()   && (term.CntctCode ?? 0) > 0;
+
+    if (!needsSlp && !needsSprt && !needsCntct) return term;
+
+    const [slpRow, sprtRow, cntctRow] = await Promise.all([
+        needsSlp  ? queryOne<{ SlpName: string }>(`SELECT SlpName FROM ${dbObjects.tables.qtec.salesPerson} WHERE SlpCode = @code`, { code: term.SlpCode })   : null,
+        needsSprt ? queryOne<{ SlpName: string }>(`SELECT SlpName FROM ${dbObjects.tables.qtec.salesPerson} WHERE SlpCode = @code`, { code: term.SlpSprtCode }) : null,
+        needsCntct? queryOne<{ Name: string    }>(`SELECT Name     FROM ${dbObjects.tables.qtec.contact}    WHERE CntctCode = @code`, { code: term.CntctCode })  : null,
+    ]);
+
+    return {
+        ...term,
+        SlpName:     needsSlp   && slpRow  ? slpRow.SlpName  : term.SlpName,
+        SlpSprtName: needsSprt  && sprtRow ? sprtRow.SlpName : term.SlpSprtName,
+        CntctName:   needsCntct && cntctRow? cntctRow.Name   : term.CntctName,
+    };
+}
+
+// Lookup names for the three person-code fields so they are persisted alongside codes.
+async function resolveTermNames(params: Record<string, unknown>): Promise<void> {
+    const slpCode   = params.SlpCode    as number | null;
+    const sprtCode  = params.SlpSprtCode as number | null;
+    const cntctCode = params.CntctCode  as number | null;
+
+    const [slpRow, sprtRow, cntctRow] = await Promise.all([
+        slpCode  ? queryOne<{ SlpName: string }>(`SELECT SlpName FROM ${dbObjects.tables.qtec.salesPerson} WHERE SlpCode = @code`, { code: slpCode })   : null,
+        sprtCode ? queryOne<{ SlpName: string }>(`SELECT SlpName FROM ${dbObjects.tables.qtec.salesPerson} WHERE SlpCode = @code`, { code: sprtCode })  : null,
+        cntctCode? queryOne<{ Name: string    }>(`SELECT Name     FROM ${dbObjects.tables.qtec.contact}    WHERE CntctCode = @code`, { code: cntctCode }): null,
+    ]);
+
+    params.SlpName     = slpRow?.SlpName  ?? null;
+    params.SlpSprtName = sprtRow?.SlpName ?? null;
+    params.CntctName   = cntctRow?.Name   ?? null;
 }
 
 /**
@@ -205,6 +250,7 @@ export async function createTerm(
         ItemID: data.ItemID,
         ...buildTermParams(data, calculatedFields, updatedBy),
     };
+    await resolveTermNames(params);
 
     const row = await queryOne<{ TermID: number }>(
         buildCreateTermSql(targetTable),
@@ -232,6 +278,7 @@ export async function updateTerm(
         TermID: termId,
         ...buildTermParams(data, calculatedFields, updatedBy),
     };
+    await resolveTermNames(params);
 
     const result = await queryOne<{ RowsAffected: number }>(
         buildUpdateTermSql(targetTable),

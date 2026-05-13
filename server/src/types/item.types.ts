@@ -62,7 +62,7 @@ export interface CreateItemDTO {
     InvntryUom: string;
     U_CountryOrg?: string;
     BPStockItemNo?: string;
-    B1ItemNo?: string;
+    B1ItemNo?: string | null;
     SAPB1Desc?: string;
     VatGroupPu?: string;
     VatGourpSa?: string;

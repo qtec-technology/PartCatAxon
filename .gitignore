@@ -84,3 +84,10 @@ skills-lock.json
 # Local planning docs
 # ------------------------------
 docs/
+
+# ------------------------------
+# Local data exports / scratch files
+# ------------------------------
+.datatest/
+answer.md
+parth_list.txt

@@ -281,4 +281,45 @@ describe('Calculation Engine — calculate()', () => {
             expect(decimals.length).toBeLessThanOrEqual(6);
         }
     });
+    // ────────────────────────────────────────────────────────────────────────
+    // 10. DT breakdown for Exwork + Air Courier (mode 6)
+    // ────────────────────────────────────────────────────────────────────────
+
+    it('Exwork + Air COUR (mode 6): DT_FR and DT_FRZONE should be computed independently, DT = MAX', () => {
+        const result = calculate(makeInput({
+            orderTerm: 'Exwork', shipModeNo: 6,
+            productCost: 100, pkh: 0, soc: 0,
+            exchangeRate: 35,
+            length: 30, width: 20, height: 10,
+            itemWeight: 2, zoneRate: 15,
+            freight: 200, dtPercent: 10, insPercent: 1,
+        }));
+
+        // OP = 100, OP_THB = 100 * 35 * 1.03 = 3605 (surcharge for Exwork + mode 6)
+        expect(result.U_OP_THB).toBeCloseTo(3605, 2);
+
+        // CIF = OP_THB + INS + FR = 3605 + 36.05 + 200 = 3841.05
+        expect(result.U_CIF).toBeCloseTo(3841.05, 2);
+
+        // FRZONE = MAX(DW, itemWeight) * zoneRate
+        // DW = (30*20*10) / 5000 = 1.2, MAX(1.2, 2) = 2, FRZONE = 2 * 15 = 30
+        expect(result.U_FRZONE).toBeCloseTo(30, 2);
+
+        // CIFZONE = OP_THB + INS + FRZONE = 3605 + 36.05 + 30 = 3671.05
+        expect(result.U_CIFZONE).toBeCloseTo(3671.05, 2);
+
+        // DT_FR = CIF * 10% = 384.105
+        expect(result.U_DT_FR).toBeCloseTo(384.105, 3);
+
+        // DT_FRZONE = CIFZONE * 10% = 367.105
+        expect(result.U_DT_FRZONE).toBeCloseTo(367.105, 3);
+
+        // DT = MAX(DT_FR, DT_FRZONE) = 384.105
+        expect(result.U_DT).toBe(result.U_DT_FR);
+        expect(result.U_DT).toBeGreaterThanOrEqual(result.U_DT_FRZONE);
+
+        // DT_FR and DT_FRZONE should be different values
+        expect(result.U_DT_FR).not.toEqual(result.U_DT_FRZONE);
+    });
+
 });

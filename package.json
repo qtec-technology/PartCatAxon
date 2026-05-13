@@ -1,0 +1,33 @@
+{
+  "name": "partcatalogapp",
+  "version": "1.0.0",
+  "description": "ระบบ Part Catalog แบบ Web Application สำหรับใช้งานภายในเครือข่ายองค์กร แทนระบบเดิมที่ทำงานบน Microsoft Access โดยยังคง business flow หลักของ `Item`, `Term`, `Search`, `Attachment`, และ `Calculation` ไว้",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently -n server,next -c blue,magenta \"npm --prefix server run dev\" \"npm --prefix next-shell run dev\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:next": "npm --prefix next-shell run dev",
+    "build": "npm --prefix server run build && npm --prefix next-shell run build",
+    "build:server": "npm --prefix server run build",
+    "build:next": "npm --prefix next-shell run build",
+    "start:server": "npm --prefix server start",
+    "start:next": "npm --prefix next-shell start",
+    "typecheck": "npm --prefix server run build && npm --prefix next-shell run typecheck",
+    "test": "npm --prefix server test -- --run && npm --prefix next-shell test -- --run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qtec-technology/PartCatalog.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/qtec-technology/PartCatalog/issues"
+  },
+  "homepage": "https://github.com/qtec-technology/PartCatalog#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

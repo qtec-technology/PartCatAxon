@@ -98,8 +98,11 @@ export interface Term {
     LeadTime: string | null;
     U_VendorBPA: string | null;
     CntctCode: number | null;
+    CntctName: string | null;
     SlpCode: number | null;
+    SlpName: string | null;
     SlpSprtCode: number | null;
+    SlpSprtName: string | null;
     Updatedby: string | null;
     UpdatedDate: Date | null;
     U_SalesTerm: string | null;

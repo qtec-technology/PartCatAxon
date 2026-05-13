@@ -48,7 +48,7 @@ const TERM_COLUMNS = [
     'U_ValidFrom', 'U_ValidTo',
     'BuyUnitMsr', 'NumInBuy', 'SalUnitMsr', 'NumInSale',
     'U_MOQ', 'LeadTime', 'U_VendorBPA',
-    'CntctCode', 'SlpCode', 'SlpSprtCode',
+    'CntctCode', 'CntctName', 'SlpCode', 'SlpName', 'SlpSprtCode', 'SlpSprtName',
     'Updatedby', 'UpdatedDate',
     'U_SalesTerm', 'U_Remark', 'SaleSubLocation',
     'Active', 'ContractNo', 'U_CWeight',

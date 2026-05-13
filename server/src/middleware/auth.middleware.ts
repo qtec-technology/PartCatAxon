@@ -227,7 +227,18 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
         req.authUser = authUser;
         next();
     } catch (err) {
-        logger.error('Auth middleware error', err instanceof Error ? err : undefined);
+        // Auth infrastructure failure — log distinctly for production alerting.
+        // Note: requireCatalogAccess (next middleware) will block Guest from all
+        // data routes, so this degradation does NOT create unauthorized access.
+        // The concern is visibility: without explicit logging, a broken auth
+        // pipeline silently returns 403 on every request with no root-cause clue.
+        if (env.isProd) {
+            logger.error('CRITICAL: Auth middleware infrastructure failure — all requests will be blocked as Guest', err instanceof Error ? err : undefined);
+        } else {
+            logger.warn('Auth middleware error (dev mode — degrading to Guest)', err instanceof Error ? err : undefined);
+        }
+
+        res.setHeader('X-Auth-Degraded', 'true');
         req.authUser = {
             username: 'Guest',
             firstname: 'Guest',

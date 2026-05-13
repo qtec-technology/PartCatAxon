@@ -217,7 +217,7 @@ export async function createItem(
         InvntryUom: toDbText(data.InvntryUom),
         U_CountryOrg: countryOfOrigin,
         BPStockItemNo: toDbText(data.BPStockItemNo),
-        B1ItemNo: toDbText(data.B1ItemNo),
+        B1ItemNo: toDbNullableText(data.B1ItemNo),
         SAPB1Desc: toDbText(data.SAPB1Desc),
         VatGroupPu: vatGroupPu,
         VatGourpSa: vatGourpSa,
@@ -338,7 +338,7 @@ export async function updateItem(
         fieldsToUpdate.U_CountryOrg = toDbText(data.U_CountryOrg).trim() || DEFAULT_NULL_LOOKUP_VALUE;
     }
     if (hasOwn(data, 'BPStockItemNo')) fieldsToUpdate.BPStockItemNo = toDbText(data.BPStockItemNo);
-    if (hasOwn(data, 'B1ItemNo')) fieldsToUpdate.B1ItemNo = toDbText(data.B1ItemNo);
+    if (hasOwn(data, 'B1ItemNo')) fieldsToUpdate.B1ItemNo = toDbNullableText(data.B1ItemNo);
     if (hasOwn(data, 'SAPB1Desc')) fieldsToUpdate.SAPB1Desc = toDbText(data.SAPB1Desc);
     if (hasOwn(data, 'VatGroupPu')) {
         fieldsToUpdate.VatGroupPu = toDbText(data.VatGroupPu).trim() || DEFAULT_VAT_GROUP_PU;

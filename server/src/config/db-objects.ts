@@ -49,6 +49,10 @@ export const dbObjects = {
             contact: qtecObject('DB_TABLE_CONTACT', '@OCPR'),
             brandVendor: qtecObject('DB_TABLE_BRAND_VENDOR', '@PITM1_BRAND_VENDOR'),
             vendorBrand: qtecObject('DB_TABLE_VENDOR_BRAND', '@PITM1_VENDOR_BRAND'),
+            bulkCostRun: qtecObject('DB_TABLE_BULK_COST_RUN', 'BulkCostRun'),
+            draftItem: qtecObject('DB_TABLE_DRAFT_ITEM', 'DraftItem'),
+            draftTerm: qtecObject('DB_TABLE_DRAFT_TERM', 'DraftTerm'),
+            axonExtractionQueue: qtecObject('DB_TABLE_AXON_QUEUE', 'AxonExtractionQueue'),
         },
     },
     views: {
