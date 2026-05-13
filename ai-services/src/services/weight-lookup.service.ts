@@ -1,4 +1,3 @@
-import { GeminiProvider } from "../providers/gemini.provider.js";
 import type { JsonProvider } from "../providers/openai.provider.js";
 import { SYSTEM_PROMPT, buildUserPrompt } from "../prompts/weight-lookup.prompt.js";
 
@@ -106,11 +105,12 @@ export const lookupWeight = async (
     };
   }
 
-  // Gemini is preferred here because product weight/dimension fallback benefits from web-grounded product search.
-  const aiProvider = provider ?? new GeminiProvider({ useGoogleSearch: true });
+  if (provider === undefined) {
+    return notFound();
+  }
 
   try {
-    const aiResult = await aiProvider.generateJson<WeightLookupResult>({
+    const aiResult = await provider.generateJson<WeightLookupResult>({
       systemPrompt: SYSTEM_PROMPT,
       userPrompt: buildUserPrompt(input),
       temperature: 0.2,

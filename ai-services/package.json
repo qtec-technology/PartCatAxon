@@ -10,7 +10,10 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "report:cweight": "node dist/src/scripts/cweight-local-report.js",
+    "report:cweight:incomplete": "node dist/src/scripts/cweight-incomplete-input-report.js",
+    "report:cweight:semantic": "node dist/src/scripts/cweight-semantic-evaluation-report.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

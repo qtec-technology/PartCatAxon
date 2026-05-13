@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { JsonProvider, WeightLookupResult } from "../src/index.js";
-import { lookupWeight } from "../src/index.js";
+import type { JsonProvider } from "../src/providers/openai.provider.js";
+import type { WeightLookupResult } from "../src/services/weight-lookup.service.js";
+import { lookupWeight } from "../src/services/weight-lookup.service.js";
 
 const requiredKeys = [
   "itemWeightKg",
@@ -92,5 +93,27 @@ describe("lookupWeight", () => {
       confidence: 0.52,
     });
     expect(Object.keys(result)).toEqual(requiredKeys);
+  });
+
+  it("does not create a default external provider when no provider is injected", async () => {
+    const result = await lookupWeight({
+      supplierOrderCode: "A9D11810",
+      mfrBrand: "Schneider Electric",
+      mfrCatalogNo: "A9D11810",
+      description: "Acti9 iC60 RCBO 10A 1P+N 30mA",
+      uom: "EA",
+      graingerRow: null,
+    });
+
+    expect(result).toEqual({
+      itemWeightKg: null,
+      chargeableWeightKg: null,
+      dimensionL: null,
+      dimensionW: null,
+      dimensionH: null,
+      dimUnit: null,
+      source: "not_found",
+      confidence: 0,
+    });
   });
 });
