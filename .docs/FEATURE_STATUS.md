@@ -21,7 +21,7 @@
 | Bulk Cost Run List + Status | ✅ Done | 2 tabs (Allocations / New Allocation), GET /runs, GET /runs/:id, PATCH /runs/:id/status, restore saved run, saleIncharge filter |
 | Bulk Cost backend API + DB | ✅ Phase 3A Live | `BulkCostRun` / `BulkCostLine` tables in `PART_CATALOG_AIX`; POST /api/bulk-cost/runs, mock fallbacks removed; AxonExtractionQueue seeded (13 rows) |
 | Bulk Cost viewport-locked layout | ✅ Done | `/bulk-cost` pages use app-shell-locked layout (internal scroll, no page scroll) matching `/partcatalog` |
-| AI-assisted workflow | 🚧 In Progress | CWeight / Weight & Dimension is current Kim/Codex scope; HS Code, Duty, Permit, Shelf Life are AXON/team scope |
+| AI-assisted workflow | 🚧 In Progress | CWeight / Weight & Dimension local research and backend-only wrapper are current Kim/Codex scope; HS Code, Duty, Permit, Shelf Life are AXON/team scope |
 | Executive requirement collection | 🔄 Active | ใช้ `10.Excutive Questions.md` |
 | AIX intake automation | ❌ Not Started | |
 | client/ retirement | ✅ Done | ลบ 2026-05-07 — all smoke tests passed |
@@ -65,7 +65,8 @@
 - Real AXON/UI/API persistence for explicit `DocumentFeeBasis` and generated
   By Lot / Batch document-fee line candidates
 - Real SQL Server `PART_CATALOG_AIX` DB: `BulkCostRun`, `BulkCostLine`, `AxonExtractionQueue` tables live; mock fallbacks removed
-- `ai-services/` package scaffolded: CWeight/Grainger weight lookup path implemented; HS Code, Duty, Permit, Shelf Life are not Kim/Codex scope in the current phase
+- `ai-services/` package scaffolded: local CWeight formula, local lookup, sample analyzer, semantic evaluation reports/tests implemented; HS Code, Duty, Permit, Shelf Life are not Kim/Codex scope in the current phase
+- Backend CWeight wrapper exists at `server/src/services/cweight.service.ts`; it is pure service code only and is not wired to an Express route or Next.js UI.
 - GraingerWeightData table: SQL script ready (`server/sql/20260512_grainger_weight_table.sql`), not yet deployed to DB (deferred until CWeight feature wired)
 - AI extraction จากเอกสารหรือ quotation
 - AI prefill ใน Item/Term
@@ -140,6 +141,7 @@
 | วันที่ | Decision | เหตุผล |
 |---|---|---|
 | 2026-05-13 | Viewport-locked layout for `/bulk-cost`: extended `app-shell-locked` class to `/bulk-cost` paths in AppShell; added CSS classes `bulk-cost-page-root`, `bulk-cost-tabs-root`, `bulk-cost-tab-content`, `bulk-cost-workspace`, `bulk-cost-workspace-body`; toolbar fixed, body scrolls internally matching `/partcatalog` behaviour | `npm --prefix next-shell run typecheck` |
+| 2026-05-13 | Added backend-only CWeight wrapper service: `resolveChargeableWeight(input)` returns `AUTO_ACCEPT`, `REVIEW_SUGGESTION`, or `NOT_FOUND` for direct formula/local research results; no route, UI, external API, or API-key integration added | `npm --prefix server test -- --run`, `npm --prefix server run build` |
 | 2026-05-13 | Removed all mock fallbacks from `bulk-cost.repository.ts`: deleted `MOCK_QUEUE_ITEMS`, `MOCK_RUNS`, `MOCK_RUN1_LINES`, `MOCK_RUN1_PREVIEW`, `applyMockFilters`, `isMissingTableError`; `listAxonQueueItems`, `listBulkCostRuns`, `loadBulkCostRun` now use real DB only | `npm --prefix server run build`, `npm --prefix server test -- --run` (83), `npm --prefix next-shell run typecheck` |
 | 2026-05-13 | Created SQL scripts: `20260512_grainger_weight_table.sql` (GraingerWeightData + GraingerWeightImportLog tables + 11 seed rows), `20260512_seed_mock_data.sql` (AxonExtractionQueue 13 rows), `20260512_axon_ai_tables.sql` (AXON AI helper tables); all run via SSMS (partcataloguser lacks DDL rights) | Manual SSMS execution confirmed |
 | 2026-05-13 | Confirmed current AI scope: Kim/Codex works only on CWeight / Weight & Dimension local research and pattern tests first; HS Code, Duty, Permit, Shelf Life are AXON/team scope; production endpoint/API-key work comes later | Docs-only update |
@@ -187,7 +189,8 @@
 
 ### Bulk Cost
 
-- [ ] Build CWeight local research module/tests: formula, divisor, rounding, ship mode, dim unit, matching fields
+- [x] Build CWeight local research module/tests: formula, divisor, rounding, ship mode, dim unit, matching fields
+- [x] Add backend-only CWeight wrapper service without route/UI integration
 - [ ] Deploy `GraingerWeightData` table later: run `server/sql/20260512_grainger_weight_table.sql` via SSMS (requires sa/db_owner)
 - [ ] Wire CWeight lookup endpoint later: query GraingerWeightData → fallback ai-services lookupWeight()
 - [ ] Connect real AXON data source (replace AxonExtractionQueue seed data with live AXON push)

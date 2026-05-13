@@ -241,7 +241,7 @@ server/src/services/calculation.service.ts
   existing term calculation source of truth
 
 server/src/services/cweight.service.ts
-  future orchestration wrapper
+  backend-only orchestration wrapper; no route/UI integration yet
 
 ai-services/src/services/cweight-*.ts
   pure local research functions and tests
@@ -269,6 +269,15 @@ interface CWeightResult {
   reason: string;
 }
 ```
+
+Current backend wrapper status:
+
+- `server/src/services/cweight.service.ts` exposes `resolveChargeableWeight(input)`.
+- Direct formula inputs return `AUTO_ACCEPT` with `source: "direct_formula"`.
+- Approved exact local matches can be passed through as `AUTO_ACCEPT`.
+- Local description/semantic matches remain `REVIEW_SUGGESTION`.
+- Missing or weak evidence returns `NOT_FOUND`.
+- No Express route, Next.js integration, external API call, or API key path has been added.
 
 ## Technology Decision
 
