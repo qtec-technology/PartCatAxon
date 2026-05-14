@@ -61,15 +61,15 @@ Phase 5 ⏳  Full AI Automation
 
 **Blocking questions (ตอบแล้วสำหรับ Phase 3A):**
 - [x] Q7: Allocation result เก็บใน BulkCostRun table แยก (ไม่ overwrite @PITM1)
-- [x] Q5: BulkCostLine เป็น snapshot (ไม่ใช่ FK reference TermID)
+- [x] Q5: DraftItem/DraftTerm เป็น snapshot (ไม่ใช่ FK reference TermID); `BulkCostLine` removed from live Phase 3A schema
 - [x] Q6: Exchange Rate มาจาก Term/default currency lookup → editable
 - [x] Q9: BulkCostRun ไม่ต้องมี approval gate ก่อน save `DRAFT`
 - [x] Bulk Cost DB อยู่ใน `PART_CATALOG_AIX`
-- [x] Phase 3A save เก็บเฉพาะ `BulkCostRun` / `BulkCostLine`; ไม่สร้าง Draft Item/Term
+- [x] Phase 3A save เก็บ `BulkCostRun` / `DraftItem` / `DraftTerm`; ไม่เขียน `@POITM` / `@PITM1`
 - [x] AXON matching hints เก็บแบบ hidden (`UniqueLineID`, `MatchMethod`, `MatchConfidence`)
 
 **งานที่ต้องทำ:**
-- [x] ออกแบบ DB schema: `BulkCostRun`, `BulkCostLine`
+- [x] ออกแบบ DB schema: `BulkCostRun`, `DraftItem`, `DraftTerm`
 - [x] สร้าง SQL script: `server/sql/20260508_bulk_cost_draft_snapshot.sql`
 - [x] สร้าง Express API route: `POST /api/bulk-cost/runs`
 - [x] เชื่อม BulkCostWorkspace save draft เข้า API

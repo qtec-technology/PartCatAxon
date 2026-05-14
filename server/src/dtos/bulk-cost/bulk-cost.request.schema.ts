@@ -14,13 +14,30 @@ const axonHintsSchema = z.object({
     matchConfidence: z.number().finite().min(0).max(1).nullable().optional(),
 }).strict();
 
-const saveBulkCostLineSchema = z.object({
+const saveBulkCostDraftLineSchema = z.object({
     lineKey: nonEmptyString,
     origin: jsonObject.nullable(),
     latest: jsonObject,
     result: jsonObject,
     axon: axonHintsSchema.optional(),
 }).strict();
+
+const nullableShipModeNo = z.union([z.string(), z.number(), z.null()]).optional();
+
+const cweightPrefillLineSchema = z.object({
+    lineKey: nonEmptyString,
+    latest: jsonObject,
+    lockedByUser: z.boolean().optional().default(false),
+}).strict();
+
+export const bulkCostCWeightPrefillBodySchema = z.object({
+    defaults: z.object({
+        shipModeNo: nullableShipModeNo,
+    }).strict().optional().default({}),
+    lines: z.array(cweightPrefillLineSchema).min(1, 'lines must contain at least one line'),
+}).strict();
+
+export type BulkCostCWeightPrefillBodyDTO = z.infer<typeof bulkCostCWeightPrefillBodySchema>;
 
 export const saveBulkCostRunBodySchema = z.object({
     supplierCode: nonEmptyString,
@@ -30,7 +47,7 @@ export const saveBulkCostRunBodySchema = z.object({
     originLines: z.array(jsonObject).default([]),
     latestLines: z.array(jsonObject).min(1, 'latestLines must contain at least one line'),
     preview: jsonObject,
-    lines: z.array(saveBulkCostLineSchema).min(1, 'lines must contain at least one line'),
+    lines: z.array(saveBulkCostDraftLineSchema).min(1, 'lines must contain at least one line'),
 }).strict();
 
 export type SaveBulkCostRunBodyDTO = z.infer<typeof saveBulkCostRunBodySchema>;

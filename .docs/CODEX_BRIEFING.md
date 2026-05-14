@@ -73,7 +73,7 @@ interface WeightLookupResult {
 ```
 
 **ลำดับ phase แรก:**
-1. ใช้ sample/export/local data ก่อน เช่น GraingerWeightData, legacy Term exports, GER exports
+1. ใช้ sample/export/local data ก่อน เช่น `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`, legacy Term exports, GER exports
 2. เขียน pure functions เพื่อทดลองสูตร dimensional weight / chargeable weight
 3. เทียบ pattern เช่น divisor 5000/6000/1000, dim unit CM/INCH, ship mode, CEILING 0.5
 4. ถ้าไม่มี primary key ให้เริ่มจาก exact/rule-based matching: supplier order code, mfr catalog no, brand, vendor, description

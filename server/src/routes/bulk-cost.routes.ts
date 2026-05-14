@@ -4,6 +4,7 @@ import { requireAuth } from '#src/middleware/auth.middleware.js';
 import { validate } from '#src/middleware/validate.middleware.js';
 import {
     listBulkCostRunsQuerySchema,
+    bulkCostCWeightPrefillBodySchema,
     saveBulkCostRunBodySchema,
     updateBulkCostRunStatusBodySchema,
 } from '#src/dtos/bulk-cost/bulk-cost.request.schema.js';
@@ -11,6 +12,7 @@ import {
 const router = Router();
 
 router.get('/queue', requireAuth, ctrl.getQueueItems);
+router.post('/cweight-prefill', requireAuth, validate(bulkCostCWeightPrefillBodySchema, 'body'), ctrl.resolveCWeightPrefill);
 router.get('/runs', requireAuth, validate(listBulkCostRunsQuerySchema, 'query'), ctrl.getRunsList);
 router.get('/runs/:id', requireAuth, ctrl.getRunById);
 router.post('/runs', requireAuth, validate(saveBulkCostRunBodySchema, 'body'), ctrl.createBulkCostRun);

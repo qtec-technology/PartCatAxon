@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkImportPermit } from "../src/index.js";
+import { checkImportPermit } from "../src/services/permit-check.service.js";
 
 describe("checkImportPermit", () => {
   it("flags chemical items from HS chapter 28", async () => {

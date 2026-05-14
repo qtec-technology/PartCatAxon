@@ -1,3 +1,5 @@
+import type { HeaderCostSuggestions } from '#src/services/axon-payload.service.js';
+
 export const BULK_COST_RUN_STATUSES = ['DRAFT', 'QUOTED', 'AWARDED', 'REVERSE_MAPPED', 'LOST', 'ARCHIVED'] as const;
 
 export type BulkCostRunStatus = (typeof BULK_COST_RUN_STATUSES)[number];
@@ -24,6 +26,7 @@ export interface AxonQueueItem {
     openedAt: string | null;
     openedBy: string | null;
     runId: number | null;
+    headerCostSuggestions: HeaderCostSuggestions | null;
 }
 
 export interface BulkCostRunSummary {
@@ -66,7 +69,7 @@ export interface BulkCostAxonHints {
     matchConfidence?: number | null;
 }
 
-export interface SaveBulkCostLineInput {
+export interface SaveBulkCostDraftLineInput {
     lineKey: string;
     origin: Record<string, unknown> | null;
     latest: Record<string, unknown>;
@@ -82,7 +85,7 @@ export interface SaveBulkCostRunInput {
     originLines: Record<string, unknown>[];
     latestLines: Record<string, unknown>[];
     preview: Record<string, unknown>;
-    lines: SaveBulkCostLineInput[];
+    lines: SaveBulkCostDraftLineInput[];
 }
 
 export interface SavedBulkCostRun {

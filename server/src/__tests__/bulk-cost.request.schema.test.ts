@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { saveBulkCostRunBodySchema } from '#src/dtos/bulk-cost/bulk-cost.request.schema.js';
+import {
+    bulkCostCWeightPrefillBodySchema,
+    saveBulkCostRunBodySchema,
+} from '#src/dtos/bulk-cost/bulk-cost.request.schema.js';
 
 function makePayload(overrides: Record<string, unknown> = {}) {
     return {
@@ -43,6 +46,36 @@ describe('saveBulkCostRunBodySchema', () => {
             latestLines: [],
             lines: [],
         }));
+
+        expect(result.success).toBe(false);
+    });
+});
+
+describe('bulkCostCWeightPrefillBodySchema', () => {
+    it('accepts draft lines for reviewable CWeight suggestions', () => {
+        const result = bulkCostCWeightPrefillBodySchema.safeParse({
+            defaults: { shipModeNo: '1' },
+            lines: [{
+                lineKey: 'L1',
+                latest: {
+                    supplierOrderCode: '100G64',
+                    mfgPartNumber: '1292G',
+                    manufacturer: 'LIBMAN',
+                },
+            }],
+        });
+
+        expect(result.success).toBe(true);
+    });
+
+    it('rejects out-of-scope line wrapper fields', () => {
+        const result = bulkCostCWeightPrefillBodySchema.safeParse({
+            lines: [{
+                lineKey: 'L1',
+                latest: { supplierOrderCode: '100G64' },
+                hsCode: '7326908688',
+            }],
+        });
 
         expect(result.success).toBe(false);
     });

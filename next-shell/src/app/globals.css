@@ -1,7 +1,7 @@
 /* ── Tailwind CSS v4 (for shadcn/radix components from client migration) ── */
-@import '../../node_modules/tailwindcss/index.css' source(none);
+@import 'tailwindcss' source(none);
 @source '../../**/*.{js,ts,jsx,tsx}';
-@import '../../node_modules/tw-animate-css/dist/tw-animate.css';
+@import 'tw-animate-css';
 
 /* ── shadcn/radix theme variables ── */
 @custom-variant dark (&:is(.dark *));

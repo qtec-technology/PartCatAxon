@@ -1,17 +1,83 @@
-export type { JsonGenerationRequest, JsonProvider, OpenAIProviderOptions } from "./providers/openai.provider.js";
-export { OpenAIProvider } from "./providers/openai.provider.js";
-export type { GeminiProviderOptions } from "./providers/gemini.provider.js";
-export { GeminiProvider } from "./providers/gemini.provider.js";
-
-export type { WeightLookupRequest, WeightLookupResult } from "./services/weight-lookup.service.js";
-export { lookupWeight } from "./services/weight-lookup.service.js";
-
-export type { HSCodeRequest, HSCodeResult } from "./services/hscode.service.js";
-export { suggestHSCode } from "./services/hscode.service.js";
-
-export type { PermitCheckRequest, PermitCheckResult } from "./services/permit-check.service.js";
-export { checkImportPermit } from "./services/permit-check.service.js";
-
-export * as weightLookupPrompt from "./prompts/weight-lookup.prompt.js";
-export * as hsCodePrompt from "./prompts/hscode.prompt.js";
-export * as permitCheckPrompt from "./prompts/permit-check.prompt.js";
+export type {
+  CWeightInput,
+  CWeightPatternAnalysis,
+  CWeightPatternCandidate,
+  CWeightResult,
+  CWeightSampleRow,
+  DimUnit,
+  ShipModeNo,
+} from "./services/cweight-pattern.service.js";
+export {
+  analyzeCWeightSample,
+  calculateChargeableWeightKg,
+  calculateDimensionalWeightKg,
+  getShipModeDimensionalDivisor,
+  normalizeDimUnit,
+  normalizeShipModeNo,
+} from "./services/cweight-pattern.service.js";
+export type {
+  CsvRecord,
+  GraingerCWeightRowAnalysis,
+  GraingerCWeightSummary,
+  Pitm1CWeightRowAnalysis,
+  Pitm1CWeightSummary,
+} from "./services/cweight-sample-analyzer.service.js";
+export {
+  analyzeGraingerCWeightCsv,
+  analyzeGraingerCWeightRecord,
+  analyzeGraingerCWeightRecords,
+  analyzePitm1Csv,
+  analyzePitm1Record,
+  analyzePitm1Records,
+  parseCsv,
+} from "./services/cweight-sample-analyzer.service.js";
+export type {
+  CWeightLookupDecision,
+  CWeightLocalLookupRequest,
+  CWeightLocalLookupResult,
+  CWeightLocalLookupSources,
+  CWeightLocalMatchMethod,
+} from "./services/cweight-local-lookup.service.js";
+export {
+  lookupLocalCWeight,
+  normalizeLookupText,
+} from "./services/cweight-local-lookup.service.js";
+export type {
+  CWeightSearchDocument,
+  CWeightSemanticSearchHit,
+} from "./services/cweight-semantic-search.service.js";
+export {
+  normalizeSemanticText,
+  searchCWeightDescriptions,
+} from "./services/cweight-semantic-search.service.js";
+export type {
+  CWeightLocalReport,
+  CWeightLookupCoverageReport,
+  CWeightLookupInputCase,
+  CWeightLookupSample,
+} from "./scripts/cweight-local-report.js";
+export {
+  buildCoverageReport,
+  buildCWeightLocalReport,
+  dedupePitm1Rows,
+  loadDefaultCWeightLocalReport,
+  readPitm1CsvFiles,
+} from "./scripts/cweight-local-report.js";
+export type {
+  CWeightIncompleteInputReport,
+  CWeightIncompleteScenario,
+} from "./scripts/cweight-incomplete-input-report.js";
+export {
+  buildIncompleteInputCases,
+  buildCWeightIncompleteInputReport,
+  loadDefaultCWeightIncompleteInputReport,
+} from "./scripts/cweight-incomplete-input-report.js";
+export type {
+  CWeightSemanticEvaluationReport,
+  CWeightSemanticScenarioEvaluation,
+  CWeightSemanticWrongMatchSample,
+} from "./scripts/cweight-semantic-evaluation-report.js";
+export {
+  buildCWeightSemanticEvaluationReport,
+  loadDefaultCWeightSemanticEvaluationReport,
+} from "./scripts/cweight-semantic-evaluation-report.js";

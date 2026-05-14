@@ -2,7 +2,13 @@ import type { Request, Response, NextFunction } from 'express';
 import { success } from '#src/utils/response.js';
 import { resolveUpdatedByFirstName } from '#src/utils/auth.js';
 import * as bulkCostRepo from '#src/repositories/bulk-cost.repository.js';
-import type { ListBulkCostRunsQueryDTO, SaveBulkCostRunBodyDTO, UpdateBulkCostRunStatusBodyDTO } from '#src/dtos/bulk-cost/bulk-cost.request.schema.js';
+import { resolveBulkCostCWeightPrefill } from '#src/services/bulk-cost-cweight.service.js';
+import type {
+    BulkCostCWeightPrefillBodyDTO,
+    ListBulkCostRunsQueryDTO,
+    SaveBulkCostRunBodyDTO,
+    UpdateBulkCostRunStatusBodyDTO,
+} from '#src/dtos/bulk-cost/bulk-cost.request.schema.js';
 
 /** GET /api/bulk-cost/queue */
 export async function getQueueItems(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -21,6 +27,17 @@ export async function createBulkCostRun(req: Request, res: Response, next: NextF
         const actorName = resolveUpdatedByFirstName(req);
         const saved = await bulkCostRepo.createBulkCostRun(body, actorName);
         res.status(201).json(success(saved, 'Bulk Cost draft saved'));
+    } catch (err) {
+        next(err);
+    }
+}
+
+/** POST /api/bulk-cost/cweight-prefill */
+export async function resolveCWeightPrefill(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+        const body = req.body as BulkCostCWeightPrefillBodyDTO;
+        const suggestions = await resolveBulkCostCWeightPrefill(body);
+        res.json(success(suggestions, 'OK'));
     } catch (err) {
         next(err);
     }

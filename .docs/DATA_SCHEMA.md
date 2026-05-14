@@ -2,7 +2,7 @@
 
 > **วัตถุประสงค์**: เอกสาร reference ถาวรสำหรับ column mapping, DB objects, calculation engine, stored procedures และ data sync jobs  
 > **Source**: สังเคราะห์จาก AI/ folder (docs 5, 6, 8) ก่อน folder ถูกลบ  
-> **อัปเดตล่าสุด**: 2026-05-08  
+> **อัปเดตล่าสุด**: 2026-05-14
 > **Agent protocol**: ถ้าเพิ่ม field ใหม่ หรือแก้สูตร หรือแก้ DB object → อัปเดตเอกสารนี้ด้วย
 
 ---
@@ -69,7 +69,7 @@ Phase 3A stores quotation work as app-side snapshots in `PART_CATALOG_AIX`.
 These tables are independent from master Item/Term writes and must not update
 `@POITM` or `@PITM1`.
 
-Creation script: `server/sql/20260508_bulk_cost_draft_snapshot.sql`.
+Creation script: `server/sql/20260512_bulk_cost_full_schema.sql`.
 
 #### 3.3.1 `BulkCostRun`
 
@@ -84,23 +84,29 @@ Creation script: `server/sql/20260508_bulk_cost_draft_snapshot.sql`.
 | `PreviewSnapshotJson` | `nvarchar(max)` | Full allocation preview used when saved |
 | `CreatedBy`, `CreatedAt`, `UpdatedBy`, `UpdatedAt` | audit | App audit fields |
 
-#### 3.3.2 `BulkCostLine`
+#### 3.3.2 `DraftItem` / `DraftTerm`
 
 | Column | Type | Role |
 |---|---|---|
-| `LineID` | `bigint identity` | Primary key |
+| `DraftItemID` | `bigint identity` | Primary key for item-side draft snapshot |
+| `DraftTermID` | `bigint identity` | Primary key for term-side draft snapshot |
 | `RunID` | `bigint` | FK to `BulkCostRun` |
-| `LineKey`, `SourceNo` | text/int | Source row identity inside the run |
-| `ItemCodeHint`, `TermIDHint` | text/int | Existing item/term hints only; not enforced FK |
-| `UniqueLineID`, `MatchMethod`, `MatchConfidence` | mixed | Hidden AXON matching hints |
-| `OriginSnapshotJson`, `LatestSnapshotJson`, `ResultSnapshotJson` | `nvarchar(max)` | Auditable source/result snapshots |
-| `OP1THB`, `RoundUp`, `Quantity`, `Amount` | numeric | Search/report convenience values |
+| `DraftItemID` on `DraftTerm` | `bigint` | FK from term-side snapshot to item-side snapshot |
+| `LineKey`, `LineNo` | text/int | Source row identity inside the run |
+| `ItemIDHint`, `TermIDHint` | int | Existing item/term hints only; not master writes |
+| `LatestSnapshotJson`, `OriginSnapshotJson` | `nvarchar(max)` | Auditable source/edit snapshots |
+| Item mirror fields | mixed | Draft Item candidate values, e.g. brand, catalog no, description, UOM |
+| Term mirror fields | mixed | Draft Term candidate values, e.g. vendor stock code, costs, weight, CAL outputs |
 
-Document fee note: Phase 3A stores snapshots, so By Lot / Batch document-fee
-line candidates can live inside snapshot JSON first. Before production migration
-or reporting requirements, add explicit columns such as `LineType` and
-`DocumentFeeBasis` if generated certificate/test fee lines need to be queried
-outside the JSON payload.
+`BulkCostLine` was removed from the live Phase 3A schema. Phase 3A now stores
+draft snapshots as `DraftItem` and `DraftTerm` records under `BulkCostRun`.
+These are still AIX draft tables only and must not be treated as writes to
+master `@POITM` / `@PITM1`.
+
+Document fee note: By Lot / Batch document-fee line candidates can live inside
+snapshot JSON first. Before production migration or reporting requirements, add
+explicit columns such as `LineType` and `DocumentFeeBasis` if generated
+certificate/test fee lines need to be queried outside the JSON payload.
 
 Status lifecycle: `DRAFT -> QUOTED -> AWARDED -> REVERSE_MAPPED -> LOST -> ARCHIVED`.
 Awarded reverse mapping remains deferred until existing-term INSERT-vs-UPDATE rules
@@ -546,4 +552,4 @@ a production blocker unless the underlying synonym contract changes.
 
 ---
 
-_Last updated: 2026-05-08 | Source: AI/5, AI/6, AI/8 (distilled before folder deletion) + current code audit_
+_Last updated: 2026-05-14 | Source: AI/5, AI/6, AI/8 (distilled before folder deletion) + current code audit_

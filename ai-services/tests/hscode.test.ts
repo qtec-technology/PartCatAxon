@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { HSCodeResult, JsonGenerationRequest, JsonProvider } from "../src/index.js";
-import { suggestHSCode } from "../src/index.js";
+import type { JsonGenerationRequest, JsonProvider } from "../src/providers/openai.provider.js";
+import type { HSCodeResult } from "../src/services/hscode.service.js";
+import { suggestHSCode } from "../src/services/hscode.service.js";
 
 describe("suggestHSCode", () => {
   it("classifies without historical matches and caps confidence below 0.5", async () => {
