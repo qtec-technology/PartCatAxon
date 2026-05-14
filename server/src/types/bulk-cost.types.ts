@@ -69,7 +69,7 @@ export interface BulkCostAxonHints {
     matchConfidence?: number | null;
 }
 
-export interface SaveBulkCostLineInput {
+export interface SaveBulkCostDraftLineInput {
     lineKey: string;
     origin: Record<string, unknown> | null;
     latest: Record<string, unknown>;
@@ -85,7 +85,7 @@ export interface SaveBulkCostRunInput {
     originLines: Record<string, unknown>[];
     latestLines: Record<string, unknown>[];
     preview: Record<string, unknown>;
-    lines: SaveBulkCostLineInput[];
+    lines: SaveBulkCostDraftLineInput[];
 }
 
 export interface SavedBulkCostRun {

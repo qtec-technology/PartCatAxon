@@ -14,7 +14,7 @@ const axonHintsSchema = z.object({
     matchConfidence: z.number().finite().min(0).max(1).nullable().optional(),
 }).strict();
 
-const saveBulkCostLineSchema = z.object({
+const saveBulkCostDraftLineSchema = z.object({
     lineKey: nonEmptyString,
     origin: jsonObject.nullable(),
     latest: jsonObject,
@@ -47,7 +47,7 @@ export const saveBulkCostRunBodySchema = z.object({
     originLines: z.array(jsonObject).default([]),
     latestLines: z.array(jsonObject).min(1, 'latestLines must contain at least one line'),
     preview: jsonObject,
-    lines: z.array(saveBulkCostLineSchema).min(1, 'lines must contain at least one line'),
+    lines: z.array(saveBulkCostDraftLineSchema).min(1, 'lines must contain at least one line'),
 }).strict();
 
 export type SaveBulkCostRunBodyDTO = z.infer<typeof saveBulkCostRunBodySchema>;
