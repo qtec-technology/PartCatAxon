@@ -35,6 +35,18 @@ describe("local CWeight semantic search", () => {
     expect(hit).toBeNull();
   });
 
+  it("rejects candidates when the quote has unmatched numeric tokens", () => {
+    const hit = searchCWeightDescriptions("floor squeegee set black 24 x 99", [
+      {
+        id: "wrong",
+        description: "Floor Squeegee Set Black 24 L x 18 W",
+        row: { id: "wrong" },
+      },
+    ]);
+
+    expect(hit).toBeNull();
+  });
+
   it("rejects weak generic-family matches", () => {
     const hit = searchCWeightDescriptions("air hose 1 4 id x", [
       {

@@ -188,14 +188,14 @@ function numericTokenCoverage(query: string, document: string): number {
   const queryNumbers = new Set(tokensFor(query).filter(isNumericLike));
   const documentNumbers = new Set(tokensFor(document).filter(isNumericLike));
   if (queryNumbers.size === 0) return 1;
-  if (documentNumbers.size === 0) return queryNumbers.size >= 2 ? 0 : 1;
+  if (documentNumbers.size === 0) return 0;
 
   let matched = 0;
-  for (const token of documentNumbers) {
-    if (queryNumbers.has(token)) matched++;
+  for (const token of queryNumbers) {
+    if (documentNumbers.has(token)) matched++;
   }
 
-  return matched / documentNumbers.size;
+  return matched / Math.max(queryNumbers.size, documentNumbers.size);
 }
 
 function isNumericLike(token: string): boolean {
