@@ -1,6 +1,6 @@
 -- Bulk Cost Phase 3B: AXON Extraction Queue + AI Recommend Cache
 -- Target database: PART_CATALOG_AIX
--- Run after: 20260508_bulk_cost_draft_snapshot.sql (BulkCostRun + BulkCostLine must exist)
+-- Run after: 20260512_bulk_cost_full_schema.sql (BulkCostRun must exist; DraftItem/DraftTerm hold line snapshots)
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- AxonExtractionQueue

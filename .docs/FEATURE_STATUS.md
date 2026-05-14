@@ -19,7 +19,7 @@
 | Next.js Phase 2 (native pages) | ✅ Done | Item, Term, PartCatalog native แล้ว |
 | Bulk Cost UI + DB live | ✅ Active | UI พร้อม, DB connected (mock fallbacks removed), next-shell 51 tests, server 83 tests |
 | Bulk Cost Run List + Status | ✅ Done | 2 tabs (Allocations / New Allocation), GET /runs, GET /runs/:id, PATCH /runs/:id/status, restore saved run, saleIncharge filter |
-| Bulk Cost backend API + DB | ✅ Phase 3A Live | `BulkCostRun` / `BulkCostLine` tables in `PART_CATALOG_AIX`; POST /api/bulk-cost/runs, mock fallbacks removed; AxonExtractionQueue seeded (13 rows) |
+| Bulk Cost backend API + DB | ✅ Phase 3A Live | `BulkCostRun` / `DraftItem` / `DraftTerm` tables in `PART_CATALOG_AIX`; `BulkCostLine` removed from live schema; POST /api/bulk-cost/runs, mock fallbacks removed; AxonExtractionQueue seeded (13 rows) |
 | Bulk Cost viewport-locked layout | ✅ Done | `/bulk-cost` pages use app-shell-locked layout (internal scroll, no page scroll) matching `/partcatalog` |
 | AI-assisted workflow | 🚧 In Progress | CWeight / Weight & Dimension local research and backend-only wrapper are current Kim/Codex scope; HS Code, Duty, Permit, Shelf Life are AXON/team scope |
 | Executive requirement collection | 🔄 Active | ใช้ `10.Excutive Questions.md` |
@@ -64,7 +64,7 @@
 - Bulk Cost master write flow to Item/Term after Awarded
 - Real AXON/UI/API persistence for explicit `DocumentFeeBasis` and generated
   By Lot / Batch document-fee line candidates
-- Real SQL Server `PART_CATALOG_AIX` DB: `BulkCostRun`, `BulkCostLine`, `AxonExtractionQueue` tables live; mock fallbacks removed
+- Real SQL Server `PART_CATALOG_AIX` DB: `BulkCostRun`, `DraftItem`, `DraftTerm`, `AxonExtractionQueue` tables live; `BulkCostLine` removed from live schema; mock fallbacks removed
 - `ai-services/` package scaffolded: local CWeight formula, local lookup, sample analyzer, semantic evaluation reports/tests implemented; HS Code, Duty, Permit, Shelf Life are not Kim/Codex scope in the current phase
 - Backend CWeight wrapper exists at `server/src/services/cweight.service.ts`; backend-only exact `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` lookup is available through `server/src/services/cweight-lookup.service.ts`, `POST /api/cweight/resolve`, and review-only Bulk Cost prefill endpoint `POST /api/bulk-cost/cweight-prefill`; it is not wired to Next.js UI.
 - AIX `GraingerWeightData` / `GraingerWeightImportLog` staging tables are obsolete for the active CWeight path; the real source is `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`.
@@ -102,7 +102,7 @@
 | 2026-05-08 | Updated Bulk Cost formula implementation/tests: split `MIXED_VENDOR` and `MIXED_CURRENCY`, locked document-fee basis helper, and corrected Grainger mock to Excel internal shipping-weight total `194.43675` | Same verification as above |
 | 2026-05-08 | `.datatest` refreshed as CSV/XLSX exports: 500-row Term/Item/vendor synonym samples, 1000-brand sample, lookup CSVs, and `AXON_Extraction_Calculation.xlsx` exact baseline | Docs/data audit update |
 | 2026-05-07 | Prepared `client/` retirement: root scripts now run/build/test `server + next-shell`, CSRF/CORS dev origin moved to `3010` | `npm run typecheck`, `npm test` (`server` 37 + `next-shell` 33), `npm run build`, production smoke health/redirect/item-list pass |
-| 2026-05-08 | Implemented Bulk Cost Phase 3A draft snapshot save: `POST /api/bulk-cost/runs`, transactional `BulkCostRun` / `BulkCostLine` inserts, Next Save Draft button, SQL creation script | `npm --prefix server run build`, `npm --prefix next-shell run typecheck`, server tests 40 pass, next-shell tests 34 pass |
+| 2026-05-08 | Implemented Bulk Cost Phase 3A draft snapshot save: `POST /api/bulk-cost/runs`, transactional draft snapshot inserts, Next Save Draft button, SQL creation script. Superseded 2026-05-14: live schema uses `DraftItem` / `DraftTerm`, not `BulkCostLine`. | `npm --prefix server run build`, `npm --prefix next-shell run typecheck`, server tests 40 pass, next-shell tests 34 pass |
 | 2026-05-08 | Updated Bulk Cost/AXON docs: Qty is AXON-suggested from `QuotedQty`/`RfqQty` then sales verifies/edits; existing SQL Agent sync target `PART_CATALOGSQL` is acceptable because `PART_CATALOG_AIX` exposes synonyms | Docs-only update |
 | 2026-05-08 | Updated Bulk Cost document-fee rule: Per Each / UOM By Each fees enter OP1; By Lot / Batch fees become separate new line items and require Golden Case verification before DB execution | Docs-only update |
 | 2026-05-08 | Updated Bulk Cost test data handoff for current `.datatest` CSV/XLSX exports; corrected `@PITM1_BRAND_VENDOR`, `@PITM1_VENDOR_BRAND`, and `@FULLTEXT` as synonyms, not views | Docs-only update |
@@ -141,6 +141,7 @@
 | วันที่ | Decision | เหตุผล |
 |---|---|---|
 | 2026-05-13 | Viewport-locked layout for `/bulk-cost`: extended `app-shell-locked` class to `/bulk-cost` paths in AppShell; added CSS classes `bulk-cost-page-root`, `bulk-cost-tabs-root`, `bulk-cost-tab-content`, `bulk-cost-workspace`, `bulk-cost-workspace-body`; toolbar fixed, body scrolls internally matching `/partcatalog` behaviour | `npm --prefix next-shell run typecheck` |
+| 2026-05-14 | Confirmed live Phase 3A persistence architecture update: `BulkCostLine` was removed from `PART_CATALOG_AIX`; draft snapshots now persist through `BulkCostRun` + `DraftItem` + `DraftTerm` | Architecture update |
 | 2026-05-14 | Validated compiled Bulk Cost CWeight prefill helper against live `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`: Grainger exact code and manufacturer part+brand return `AUTO_ACCEPT`, unknown returns `NOT_FOUND`, and locked/user-edited lines return `prefillAllowed: false` | `node -e` against `server/dist/services/bulk-cost-cweight.service.js` |
 | 2026-05-14 | Added backend-only Bulk Cost CWeight prefill helper and `POST /api/bulk-cost/cweight-prefill`; it maps draft line fields to the CWeight resolver and returns reviewable suggestions with `prefillAllowed`, without saving or overwriting user edits | `npm --prefix server test -- --run`, `npm --prefix server run build` |
 | 2026-05-14 | Validated compiled backend CWeight lookup against live `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`: `100G64` => `AUTO_ACCEPT` / `53.92`, `100FN6` => `AUTO_ACCEPT` / `0.09`, `1292G` + `LIBMAN` => `AUTO_ACCEPT` / `53.92`, unknown code => `NOT_FOUND` | `node -e` against `server/dist/services/cweight-lookup.service.js` |
@@ -170,14 +171,14 @@
 | 2026-05-08 | Document fee basis split | Per Each / UOM By Each document fees enter OP1; By Lot / Batch certificate/test fees become separate new line items and must not be allocated into product OP1 |
 | 2026-05-07 | Quote-level fields confirmed | Currency, Order Term, and Location are shared by all lines in the same quotation; mixed extracted values must be split or resolved before CAL |
 | 2026-05-07 | Access model clarified | Authenticated domain/catalog users can access normal work; manager/supervisor remain elevated for delete/approval/admin actions |
-| 2026-05-08 | Bulk Cost Phase 3A persistence | Store only `BulkCostRun` / `BulkCostLine` draft snapshots in `PART_CATALOG_AIX`; avoid master DB bloat before Awarded |
+| 2026-05-14 | Bulk Cost Phase 3A persistence | Store `BulkCostRun` + `DraftItem` + `DraftTerm` draft snapshots in `PART_CATALOG_AIX`; `BulkCostLine` removed from live schema; avoid master DB writes before Awarded |
 | 2026-05-08 | Bulk Cost status lifecycle | `DRAFT -> QUOTED -> AWARDED -> REVERSE_MAPPED -> LOST -> ARCHIVED`; current implementation starts with `DRAFT` |
 | 2026-05-08 | AXON matching hints hidden | Persist `UniqueLineID`, `MatchMethod`, `MatchConfidence` behind the scenes; sales UI does not confirm them |
 | 2026-05-08 | Bulk Cost Qty ownership | AXON provides suggested `QuotedQty` or `RfqQty`; sales users verify and edit instead of entering Qty from blank every time |
 | 2026-05-04 | Bulk Cost final result คือ 1 editable row per source item/term | User confirmed: output ต้อง split เป็น item/term rows พร้อม price per 1 piece |
 | 2026-05-04 | Origin = read-only; Latest = editable; Latest เท่านั้นที่ใช้ CAL | ต้องเก็บต้นฉบับจาก AXON/Excel ไว้เปรียบเทียบ |
 | 2026-05-04 | Replace Next.js rewrites ด้วย BFF route handler | Superseded: current active frontend origin is Next `3010` |
-| 2026-04-30 | Bulk Cost แยกจาก master Item/Term (superseded 2026-05-08) | ไม่เขียน `@POITM` / `@PITM1` ก่อน Awarded; persistence จริงใช้ `PART_CATALOG_AIX` table ใหม่ `BulkCostRun` / `BulkCostLine` |
+| 2026-04-30 | Bulk Cost แยกจาก master Item/Term (superseded 2026-05-14) | ไม่เขียน `@POITM` / `@PITM1` ก่อน Awarded; persistence จริงใช้ `PART_CATALOG_AIX` tables `BulkCostRun` / `DraftItem` / `DraftTerm` |
 | 2026-04-30 | Auth เป้าหมายต้องเปลี่ยน — ไม่ใช้ Windows/IIS auth เก่า | Windows auth ยึดติดกับ IIS มากเกินไปสำหรับ future AI/agent identity |
 | 2026-04-30 | Next.js BFF/Shell + Express core (ไม่ big-bang migrate) | ลด risk, รักษา UI parity, rollback ได้ |
 | 2026-04-29 | Bulk Cost เป็น Phase 2 หลัง UAT รอบแรก | ไม่ให้กระทบ Phase 1 UAT |

@@ -99,14 +99,16 @@ turbopack: {
 - Root `PartCatalog/package.json` ควรมีแค่ `concurrently` เท่านั้น
 - ไฟล์ `PartCatalog/.npmrc` มี `package-lock=false` ป้องกันการสร้าง lockfile ใหม่
 
-### globals.css — Explicit import paths
+### globals.css — Tailwind package imports
 
 ```css
-@import '../../node_modules/tailwindcss/index.css' source(none);
-@import '../../node_modules/tw-animate-css/dist/tw-animate.css';
+@import 'tailwindcss' source(none);
+@import 'tw-animate-css';
 ```
 
-ใช้ relative path จาก `next-shell/src/app/` ไปหา `next-shell/node_modules/`
+Use package imports. `next.config.ts` pins `tailwindcss` and `tw-animate-css`
+to `next-shell/node_modules` through `turbopack.resolveAlias`, avoiding brittle
+relative paths that can break under Webpack/Turbopack resolution.
 ไม่ได้ใช้ bare import เพื่อหลีกเลี่ยงปัญหา resolution เดียวกัน
 
 ---
@@ -274,8 +276,10 @@ File: `next-shell/src/features/bulk-cost/bulk-cost.calc.ts`
 - Last-line residual correction (แก้ rounding)
 - Warning model: missing weight, zero qty, mixed vendor, mixed currency,
   rounding residual
-- Phase 3A connects Save Draft to backend persistence as `BulkCostRun` / `BulkCostLine`
-  snapshots in `PART_CATALOG_AIX`; calculation itself remains the pure TypeScript engine.
+- Phase 3A connects Save Draft to backend persistence as `BulkCostRun` plus
+  `DraftItem` / `DraftTerm` snapshots in `PART_CATALOG_AIX`; `BulkCostLine` is
+  no longer part of the live schema. Calculation itself remains the pure
+  TypeScript engine.
 
 ---
 
@@ -338,11 +342,12 @@ model BulkCostRun {
   supplierCode String
   createdBy    String
   status       String   // DRAFT | QUOTED | AWARDED | REVERSE_MAPPED | LOST | ARCHIVED
-  lines        BulkCostLine[]
+  draftItems   DraftItem[]
+  draftTerms   DraftTerm[]
   createdAt    DateTime
 }
 
-model BulkCostLine {
+model DraftItem {
   id         String        @id
   runId      String
   run        BulkCostRun   @relation(...)

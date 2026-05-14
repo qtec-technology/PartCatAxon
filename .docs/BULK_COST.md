@@ -23,7 +23,7 @@
 | Item/Term preview | ✅ Done — localStorage bridge → `/item/preview`, `/term/preview` |
 | Viewport-locked layout | ✅ Done — `/bulk-cost` uses app-shell-locked layout (internal scroll matching `/partcatalog`) |
 | Backend API | ✅ Phase 3A Live — `POST /api/bulk-cost/runs` draft snapshot save, `GET /runs`, `GET /runs/:id`, `PATCH /runs/:id/status` |
-| DB persistence | ✅ Live — `BulkCostRun` / `BulkCostLine` / `AxonExtractionQueue` in `PART_CATALOG_AIX`; 13 seed rows in queue; mock fallbacks removed |
+| DB persistence | ✅ Live — `BulkCostRun` / `DraftItem` / `DraftTerm` / `AxonExtractionQueue` in `PART_CATALOG_AIX`; `BulkCostLine` removed from live Phase 3A schema; mock fallbacks removed |
 | Grainger CWeight source | ✅ Existing DB source — use `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; AIX `GraingerWeightData` staging is obsolete for the active path |
 | CWeight / Weight module | 🚧 Scaffolded — `ai-services/weight-lookup.service.ts` Grainger path ready; next step is local pattern research/tests before endpoint wiring |
 | Real AXON data source | ❌ Not Started |
@@ -76,7 +76,7 @@ URL params `?supplier=CODE&supplierName=NAME` เก็บ supplier ที่เ
 | `next-shell/tests/unit/bulk-cost-api.test.ts` | Save payload unit test |
 | `server/src/routes/bulk-cost.routes.ts` | Express routes: save, list, get, patch status |
 | `server/src/repositories/bulk-cost.repository.ts` | Transactional insert/query — no mock fallbacks |
-| `server/sql/20260508_bulk_cost_draft_snapshot.sql` | `BulkCostRun` / `BulkCostLine` table creation |
+| `server/sql/20260512_bulk_cost_full_schema.sql` | `BulkCostRun` / `DraftItem` / `DraftTerm` Phase 3A draft snapshot schema |
 | `server/sql/20260512_axon_ai_tables.sql` | `AxonExtractionQueue` + AXON AI helper tables |
 | `server/sql/20260512_seed_mock_data.sql` | 13 seed rows for `AxonExtractionQueue` |
 | `server/sql/20260512_grainger_weight_table.sql` | Obsolete AIX staging script for `GraingerWeightData` + `GraingerWeightImportLog`; active CWeight source is `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` |
@@ -205,8 +205,9 @@ Flow:
 - **Delivery Lead Time** เป็น item-level field (อาจต่างกันใน quote เดียวกัน)
 - **ไม่มี** approval gate ใน prototype flow ปัจจุบัน (save ตรง)
 - **ItemCode** ไม่ใช่ user-entered field — ระบบ generate จาก ItemGroup prefix + SP
-- **Save Draft Phase 3A** บันทึกเฉพาะ `BulkCostRun` / `BulkCostLine` เป็น snapshot `DRAFT`
-  ใน `PART_CATALOG_AIX`; ยังไม่สร้าง Draft Item/Term และยังไม่เขียน `@POITM` / `@PITM1`
+- **Save Draft Phase 3A** บันทึก `BulkCostRun` พร้อม `DraftItem` / `DraftTerm`
+  snapshot `DRAFT` ใน `PART_CATALOG_AIX`; `BulkCostLine` ถูกถอดออกจาก live
+  schema แล้ว และยังไม่เขียน `@POITM` / `@PITM1`
 - **Document fee basis is mandatory**: Per Each / UOM By Each fees enter OP1;
   item-line totals must be normalized to per-each first; By Lot / Batch fees
   become separate new line items and must not be allocated into product OP1.
@@ -257,6 +258,6 @@ Flow:
 |---|---|
 | `.docs/BULK_COST_CALCULATION.md` | สูตรคำนวณ Bulk Cost จาก Excel sample + reconciliation กับ Term engine |
 | `.docs/BULK_COST.md` | Feature guide และ decision log สรุปของ Bulk Cost |
-| `.docs/AXON_INTEGRATION.md` | AXON extraction contract และ BulkCostRun/BulkCostLine snapshot flow |
+| `.docs/AXON_INTEGRATION.md` | AXON extraction contract และ BulkCostRun + DraftItem/DraftTerm snapshot flow |
 | `.docs/DATA_SCHEMA.md` | Item/Term schema และ calculation field mapping |
 | `.docs/FEATURE_STATUS.md` | สถานะล่าสุดและ decision log |

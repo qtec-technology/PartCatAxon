@@ -363,8 +363,9 @@ and By Lot / Batch fees that generate PartCatalog add-item candidates.
 Confirmed 2026-05-08 for Phase 3A:
 
 1. Bulk Cost persistence lives in `PART_CATALOG_AIX`.
-2. Save draft creates only `BulkCostRun` and `BulkCostLine` snapshot records.
-   It does not create Draft Item, Draft Term, or write to `@POITM` / `@PITM1`.
+2. Save draft creates `BulkCostRun` plus `DraftItem` and `DraftTerm` snapshot
+   records. `BulkCostLine` is no longer used in the live Phase 3A schema, and
+   draft save still does not write to `@POITM` / `@PITM1`.
 3. Normal authenticated domain/catalog users can save `DRAFT` runs. No manager
    approval gate is required before draft snapshot save.
 4. AXON matching hints such as `UniqueLineID`, `MatchMethod`, and

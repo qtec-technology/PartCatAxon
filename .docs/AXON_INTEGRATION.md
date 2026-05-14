@@ -23,7 +23,7 @@ AXON Python Orchestrator
             └── Latest (สำเนาที่ user แก้ไขได้ — ใช้ CAL จริง)
                 └── User ยืนยัน/แก้ไข fields ที่จำเป็น
                     └── กด CAL → ระบบคำนวณ Bulk Cost Allocation
-                        └── Save Draft → เก็บ BulkCostRun + BulkCostLine snapshot
+                        └── Save Draft → เก็บ BulkCostRun + DraftItem/DraftTerm snapshot
                             └── Awarded phase ค่อย reverse-map เข้า Item/Term master
 ```
 
@@ -185,8 +185,10 @@ HEADER_TOTAL | PER_LINE | PER_UNIT | UNKNOWN
 
 ### 4.3 Item Line Fields (สำคัญที่สุด)
 
-1 source line = 1 BulkCostLine snapshot in Phase 3A. Draft Item/Term creation is
-deferred until Awarded reverse mapping is designed and approved.
+1 source line = 1 DraftItem + 1 DraftTerm snapshot under one BulkCostRun in
+Phase 3A. `BulkCostLine` has been removed from the live schema. These Draft
+tables are still only draft snapshots; they do not write `@POITM` / `@PITM1`
+until Awarded reverse mapping is designed and approved.
 
 | Field | AXON ส่ง | User ยืนยัน | ใช้กับ |
 |---|---|---|---|
@@ -259,7 +261,7 @@ matchingHints: {
 ## 5. Origin / Latest Model
 
 ```typescript
-interface BulkCostLine {
+interface DraftLineSnapshot {
   lineNo: number
   origin: ExtractionLineSnapshot  // จาก AXON — ห้ามแก้ไขหลัง save
   latest: ExtractionLineSnapshot  // user แก้ได้ — ใช้ CAL จริง
@@ -289,13 +291,13 @@ interface ExtractionLineSnapshot {
 |---|---|---|---|
 | Q1 | Qty มาจากไหน? | **AXON suggests `QuotedQty` or `RfqQty`; sales verifies/edits** | UI flow + data model |
 | Q3 | Amount ที่ใช้ value ratio? | **`amount = unitPrice × qty`** | Allocation calc |
-| Q5 | BulkCostLine snapshot หรือ reference TermID? | **Snapshot** — เก็บค่าทั้งหมดตอน save | DB schema |
+| Q5 | DraftItem/DraftTerm snapshot หรือ reference TermID? | **Snapshot** — เก็บค่าทั้งหมดตอน save | DB schema |
 | Q6 | Exchange Rate มาจากไหน? | **From Term/default currency lookup, editable by user** | Quote-level cost input |
 | Q14 | ใครมีสิทธิ save allocation run? | **Authenticated domain/catalog users can access and save normal work; manager/supervisor reserved for delete/approval/admin actions** | Aligns with `AUTH_ALLOW_DOMAIN_USERS` |
 | Q7 | ผล allocation write back ไป @PITM1? | **เก็บแยก (BulkCostRun table)** — ไม่ overwrite Term | DB design |
 | Q9 | BulkCostRun ต้อง approval flow ก่อน save draft? | **No approval gate for draft snapshot save** | Normal domain/catalog users save `DRAFT`; elevated roles remain for delete/approval/admin |
 | DB | Bulk Cost DB อยู่ที่ไหน? | **`PART_CATALOG_AIX`** | Use web DB side; do not create a separate DB |
-| Phase 3A | Save creates Draft Item/Term? | **No** — save only `BulkCostRun` / `BulkCostLine` snapshot | Prevent master DB bloat and keep quotation work independent |
+| Phase 3A | Save creates Draft Item/Term? | **Yes, draft snapshots only** — save `BulkCostRun` + `DraftItem` + `DraftTerm`; do not write master `@POITM` / `@PITM1` | Prevent master DB bloat and keep quotation work independent |
 | AXON hints | แสดงให้ sales confirm ไหม? | **Hidden only** | Persist `UniqueLineID`, `MatchMethod`, `MatchConfidence` for system/reverse mapping |
 | Doc fee basis | Per Each or By Lot / Batch? | **Per Each enters OP1; By Lot / Batch becomes a new line item** | Affects extraction, CAL, UI review, and reverse mapping |
 
@@ -307,14 +309,15 @@ After CAL succeeds, Save Draft does this only:
 
 | Condition | System action |
 |---|---|
-| Any selected line | Insert one `BulkCostLine` snapshot under one `BulkCostRun` |
+| Any selected line | Insert one `DraftItem` snapshot and one related `DraftTerm` snapshot under one `BulkCostRun` |
 | `matchType = "existing"` | Store existing item/term hints only; do not create or update `@PITM1` |
 | `matchType = "new_item"` | Store new item candidate snapshot only; do not generate ItemCode yet |
 | AXON matching hints | Persist hidden `UniqueLineID`, `MatchMethod`, `MatchConfidence` if provided |
 | By Lot / Batch document fee | Store as a separate new-line candidate; do not fold into product OP1 |
 | Sales manual document-fee edit | Allow add/edit/delete/redistribute before Awarded reverse mapping |
 
-No Draft Item/Term is created in Phase 3A. Awarded reverse mapping is a later
+No master Item/Term is created in Phase 3A. DraftItem/DraftTerm are only AIX
+draft snapshots. Awarded reverse mapping is a later
 phase and must decide whether existing item terms are INSERTed as new terms or
 UPDATEd over existing terms before any endpoint is implemented.
 
