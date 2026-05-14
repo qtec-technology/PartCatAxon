@@ -92,6 +92,54 @@ improve the `AUTO_ACCEPT` count. Any future API comparison should be run as a
 separate labeled trial that records prompt version, provider/model, input text,
 JSON response, and human-verified correctness.
 
+## Simulated API Fallback
+
+Command:
+
+```bash
+npm.cmd --prefix ai-services run report:cweight:api-sim
+```
+
+This simulation uses Codex/local deterministic matching as a stand-in for a
+future production API. It runs only after the local module returns `NOT_FOUND`
+for description-only inputs. No network call and no API key are used.
+
+Compared methods:
+
+- `verified_catalog_match`: stricter token coverage and ambiguity rejection,
+  representing an API response that can cite a verified product source.
+- `broad_catalog_match`: looser matching, representing a more eager API-style
+  suggestion.
+
+Measured results:
+
+| Scenario | Method | Local NOT_FOUND eligible | REVIEW_SUGGESTION | NOT_FOUND | Precision | Recall vs local NOT_FOUND |
+|---|---|---:|---:|---:|---:|---:|
+| short description only | verified_catalog_match | 810 | 7 | 803 | 0.857143 | 0.007407 |
+| short description only | broad_catalog_match | 810 | 110 | 700 | 0.890909 | 0.120988 |
+| noisy description only | verified_catalog_match | 691 | 0 | 691 | 0.000000 | 0.000000 |
+| noisy description only | broad_catalog_match | 691 | 119 | 572 | 0.974790 | 0.167873 |
+
+Interpretation:
+
+- Broad simulated matching improves review coverage, but it still produces
+  wrong matches on product variants such as motors, fittings, PEX tubing,
+  micrometers, and circuit breakers.
+- Conservative verified matching avoids most ambiguous cases but has very low
+  recall in this simulation.
+- The best production direction is not "let API estimate weights"; it is "let
+  API search for a verifiable product source, then return a review-only
+  candidate if the source is unambiguous."
+
+Production API gate:
+
+- Run only after local `NOT_FOUND`.
+- Require cited/verified product source evidence.
+- Keep max decision as `REVIEW_SUGGESTION`.
+- Return `NOT_FOUND` for ambiguity, missing source evidence, or variant
+  conflict.
+- Never use API output to write master data automatically.
+
 ## Decision Policy
 
 ### AUTO_ACCEPT
@@ -137,10 +185,11 @@ Executed on 2026-05-14:
 npm.cmd --prefix ai-services test -- --run
 npm.cmd --prefix ai-services run build
 npm.cmd --prefix ai-services run report:cweight:policy
+npm.cmd --prefix ai-services run report:cweight:api-sim
 ```
 
 Result:
 
-- 11 test files passed.
-- 40 tests passed.
+- 12 test files passed.
+- 42 tests passed.
 - TypeScript build passed.

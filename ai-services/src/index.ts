@@ -92,3 +92,13 @@ export {
   buildCWeightPolicyEvaluationReport,
   loadDefaultCWeightPolicyEvaluationReport,
 } from "./scripts/cweight-policy-evaluation-report.js";
+export type {
+  CWeightApiSimulationMethod,
+  CWeightApiSimulationReport,
+  CWeightApiSimulationSample,
+  CWeightApiSimulationScenarioResult,
+} from "./scripts/cweight-api-simulation-report.js";
+export {
+  buildCWeightApiSimulationReport,
+  loadDefaultCWeightApiSimulationReport,
+} from "./scripts/cweight-api-simulation-report.js";
