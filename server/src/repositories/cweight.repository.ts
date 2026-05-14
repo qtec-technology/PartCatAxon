@@ -10,15 +10,16 @@ export interface GraingerCWeightLookupInput {
 
 type GraingerMatchMethod = 'grainger_order_code' | 'manufacturer_part_no_brand' | 'manufacturer_part_no';
 
-interface GraingerWeightDataRow {
-    GraingerOrderCode: string | null;
-    ManufacturerPartNo: string | null;
-    ManufacturerName: string | null;
-    ItemWeightKg: number | string | null;
-    LengthCm: number | string | null;
-    WidthCm: number | string | null;
-    HeightCm: number | string | null;
-    DimWeightKg: number | string | null;
+export interface GraingerCWeightRow {
+    GraingerNo: string | null;
+    MfgPartNo: string | null;
+    MfgName: string | null;
+    SellPackWeightKg: number | string | null;
+    VolumetricWeightKg: number | string | null;
+    ChargeableWeightKg: number | string | null;
+    SWeight: number | string | null;
+    VWeight: number | string | null;
+    CWeight: number | string | null;
     MatchMethod: GraingerMatchMethod;
 }
 
@@ -34,52 +35,52 @@ export async function findGraingerCWeightExactMatch(
     }
 
     const pool = await getPool();
-    const table = dbObjects.tables.qtec.graingerWeightData;
+    const table = dbObjects.tables.grainger.cweight;
     const request = pool.request();
     request.input('GraingerOrderCode', sql.NVarChar(50), supplierOrderCode);
     request.input('ManufacturerPartNo', sql.NVarChar(100), manufacturerPartNo);
     request.input('ManufacturerName', sql.NVarChar(150), manufacturerName);
 
-    const result = await request.query<GraingerWeightDataRow>(`
+    const result = await request.query<GraingerCWeightRow>(`
         SELECT TOP (1)
-            GraingerOrderCode,
-            ManufacturerPartNo,
-            ManufacturerName,
-            ItemWeightKg,
-            LengthCm,
-            WidthCm,
-            HeightCm,
-            DimWeightKg,
+            [GRAINGER_NO] AS GraingerNo,
+            [MFG_PART_NO] AS MfgPartNo,
+            [MFG_NAME] AS MfgName,
+            [Sell_Pack_Weight_kgs] AS SellPackWeightKg,
+            [Volumetric_Weight_kgs] AS VolumetricWeightKg,
+            [Chargeable_Weight_kgs] AS ChargeableWeightKg,
+            [SWeight],
+            [VWeight],
+            [CWeight],
             CASE
-                WHEN @GraingerOrderCode IS NOT NULL AND GraingerOrderCode = @GraingerOrderCode
+                WHEN @GraingerOrderCode IS NOT NULL AND LTRIM(RTRIM([GRAINGER_NO])) = @GraingerOrderCode
                     THEN 'grainger_order_code'
-                WHEN @ManufacturerName IS NOT NULL AND ManufacturerPartNo = @ManufacturerPartNo AND ManufacturerName = @ManufacturerName
+                WHEN @ManufacturerName IS NOT NULL AND LTRIM(RTRIM([MFG_PART_NO])) = @ManufacturerPartNo AND LTRIM(RTRIM([MFG_NAME])) = @ManufacturerName
                     THEN 'manufacturer_part_no_brand'
                 ELSE 'manufacturer_part_no'
             END AS MatchMethod
         FROM ${table}
-        WHERE IsActive = 1
-          AND (
-            (@GraingerOrderCode IS NOT NULL AND GraingerOrderCode = @GraingerOrderCode)
-            OR (@ManufacturerPartNo IS NOT NULL AND ManufacturerPartNo = @ManufacturerPartNo)
-          )
+        WHERE (
+            (@GraingerOrderCode IS NOT NULL AND LTRIM(RTRIM([GRAINGER_NO])) = @GraingerOrderCode)
+            OR (@ManufacturerPartNo IS NOT NULL AND LTRIM(RTRIM([MFG_PART_NO])) = @ManufacturerPartNo)
+        )
         ORDER BY
             CASE
-                WHEN @GraingerOrderCode IS NOT NULL AND GraingerOrderCode = @GraingerOrderCode THEN 1
-                WHEN @ManufacturerName IS NOT NULL AND ManufacturerPartNo = @ManufacturerPartNo AND ManufacturerName = @ManufacturerName THEN 2
+                WHEN @GraingerOrderCode IS NOT NULL AND LTRIM(RTRIM([GRAINGER_NO])) = @GraingerOrderCode THEN 1
+                WHEN @ManufacturerName IS NOT NULL AND LTRIM(RTRIM([MFG_PART_NO])) = @ManufacturerPartNo AND LTRIM(RTRIM([MFG_NAME])) = @ManufacturerName THEN 2
                 ELSE 3
-            END,
-            WeightDataID DESC
+            END
     `);
 
     const row = result.recordset[0];
     return row ? toCWeightLocalResearchMatch(row) : null;
 }
 
-export function toCWeightLocalResearchMatch(row: GraingerWeightDataRow): CWeightLocalResearchMatch | null {
-    const itemWeightKg = positiveOrNull(row.ItemWeightKg);
-    const dimWeightKg = positiveOrNull(row.DimWeightKg);
-    const chargeableWeightKg = maxPositive(itemWeightKg, dimWeightKg);
+export function toCWeightLocalResearchMatch(row: GraingerCWeightRow): CWeightLocalResearchMatch | null {
+    const itemWeightKg = positiveOrNull(row.SWeight) ?? positiveOrNull(row.SellPackWeightKg);
+    const dimWeightKg = positiveOrNull(row.VWeight) ?? positiveOrNull(row.VolumetricWeightKg);
+    const chargeableWeightKg =
+        positiveOrNull(row.ChargeableWeightKg) ?? positiveOrNull(row.CWeight) ?? maxPositive(itemWeightKg, dimWeightKg);
 
     if (chargeableWeightKg === null) {
         return null;
@@ -89,10 +90,10 @@ export function toCWeightLocalResearchMatch(row: GraingerWeightDataRow): CWeight
         decision: 'AUTO_ACCEPT',
         chargeableWeightKg,
         itemWeightKg,
-        dimensionL: positiveOrNull(row.LengthCm),
-        dimensionW: positiveOrNull(row.WidthCm),
-        dimensionH: positiveOrNull(row.HeightCm),
-        dimUnit: 'CM',
+        dimensionL: null,
+        dimensionW: null,
+        dimensionH: null,
+        dimUnit: null,
         source: 'local_exact_match',
         confidence: confidenceFor(row.MatchMethod),
         reason: reasonFor(row),
@@ -121,12 +122,12 @@ function confidenceFor(method: GraingerMatchMethod): number {
     return 0.9;
 }
 
-function reasonFor(row: GraingerWeightDataRow): string {
+function reasonFor(row: GraingerCWeightRow): string {
     if (row.MatchMethod === 'grainger_order_code') {
-        return `Resolved from local GraingerWeightData exact Grainger code match: ${row.GraingerOrderCode ?? ''}.`;
+        return `Resolved from local GRAINGER @GRAINGER_CWEIGHT exact Grainger code match: ${row.GraingerNo ?? ''}.`;
     }
     if (row.MatchMethod === 'manufacturer_part_no_brand') {
-        return `Resolved from local GraingerWeightData exact manufacturer part and brand match: ${row.ManufacturerPartNo ?? ''} / ${row.ManufacturerName ?? ''}.`;
+        return `Resolved from local GRAINGER @GRAINGER_CWEIGHT exact manufacturer part and brand match: ${row.MfgPartNo ?? ''} / ${row.MfgName ?? ''}.`;
     }
-    return `Resolved from local GraingerWeightData exact manufacturer part match: ${row.ManufacturerPartNo ?? ''}.`;
+    return `Resolved from local GRAINGER @GRAINGER_CWEIGHT exact manufacturer part match: ${row.MfgPartNo ?? ''}.`;
 }

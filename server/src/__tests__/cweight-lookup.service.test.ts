@@ -35,7 +35,7 @@ describe('cweight-lookup.service', () => {
             dimUnit: 'CM',
             source: 'local_exact_match',
             confidence: 0.97,
-            reason: 'Resolved from local GraingerWeightData exact Grainger code match: 5YR11.',
+            reason: 'Resolved from local GRAINGER @GRAINGER_CWEIGHT exact Grainger code match: 5YR11.',
         };
         const repository: CWeightLookupRepository = {
             findGraingerCWeightExactMatch: vi.fn(async () => match),
@@ -58,7 +58,7 @@ describe('cweight-lookup.service', () => {
             dimUnit: 'CM',
             source: 'local_exact_match',
             confidence: 0.97,
-            reason: 'Resolved from local GraingerWeightData exact Grainger code match: 5YR11.',
+            reason: 'Resolved from local GRAINGER @GRAINGER_CWEIGHT exact Grainger code match: 5YR11.',
         });
     });
 

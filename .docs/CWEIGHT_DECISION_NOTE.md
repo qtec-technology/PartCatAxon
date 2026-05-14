@@ -277,8 +277,12 @@ Current backend wrapper status:
 - Approved exact local matches can be passed through as `AUTO_ACCEPT`.
 - Local description/semantic matches remain `REVIEW_SUGGESTION`.
 - Missing or weak evidence returns `NOT_FOUND`.
-- `server/src/repositories/cweight.repository.ts` reads only local `GraingerWeightData`
-  exact matches by Grainger order code or manufacturer part number.
+- `server/src/repositories/cweight.repository.ts` reads the existing local
+  Grainger source `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` by exact Grainger code
+  or manufacturer part number.
+- Grainger rows use `Chargeable_Weight_kgs` / `CWeight` directly when present;
+  dimensions stay `null` because this source does not provide length, width, or
+  height columns.
 - `server/src/services/cweight-lookup.service.ts` composes direct formula first,
   then local Grainger exact lookup, and still returns `NOT_FOUND` rather than
   guessing when no usable local weight evidence exists.

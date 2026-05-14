@@ -11,12 +11,16 @@ const toQualifiedObject = (prefix: string, value: string | undefined, fallback: 
 
 export const QTEC_DB_PREFIX = `${toSqlIdentifier(env.DB_NAME_QTEC)}.[dbo]`;
 export const SAP_DB_PREFIX = `${toSqlIdentifier(env.DB_NAME_SAP)}.[dbo]`;
+export const GRAINGER_DB_PREFIX = `${toSqlIdentifier(process.env.DB_NAME_GRAINGER || 'GRAINGER')}.[dbo]`;
 
 const qtecObject = (envKey: string, fallback: string): string =>
     toQualifiedObject(QTEC_DB_PREFIX, process.env[envKey], fallback);
 
 const sapObject = (envKey: string, fallback: string): string =>
     toQualifiedObject(SAP_DB_PREFIX, process.env[envKey], fallback);
+
+const graingerObject = (envKey: string, fallback: string): string =>
+    toQualifiedObject(GRAINGER_DB_PREFIX, process.env[envKey], fallback);
 
 const qtecProcedure = (envKey: string, fallback: string): string =>
     normalizeName(process.env[envKey], fallback);
@@ -53,7 +57,9 @@ export const dbObjects = {
             draftItem: qtecObject('DB_TABLE_DRAFT_ITEM', 'DraftItem'),
             draftTerm: qtecObject('DB_TABLE_DRAFT_TERM', 'DraftTerm'),
             axonExtractionQueue: qtecObject('DB_TABLE_AXON_QUEUE', 'AxonExtractionQueue'),
-            graingerWeightData: qtecObject('DB_TABLE_GRAINGER_WEIGHT_DATA', 'GraingerWeightData'),
+        },
+        grainger: {
+            cweight: graingerObject('DB_TABLE_GRAINGER_CWEIGHT', '@GRAINGER_CWEIGHT'),
         },
     },
     views: {

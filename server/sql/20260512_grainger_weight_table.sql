@@ -1,6 +1,9 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- GraingerWeightData — Exported Grainger Product Weight / Dimension Data
 -- Target database: PART_CATALOG_AIX
+-- OBSOLETE for active CWeight lookup as of 2026-05-14.
+-- Active source: [GRAINGER].[dbo].[@GRAINGER_CWEIGHT].
+-- Do not deploy this staging table unless a separate cache/staging decision is approved.
 -- Purpose: Source table for CWeight (C1) lookup suggestions
 --   • Import ข้อมูลจาก Grainger export file (CSV/Excel) เป็น batch
 --   • ระบบจะ match supplierOrderCode / mfgPartNumber กับ GraingerOrderCode

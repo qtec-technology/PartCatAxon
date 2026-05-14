@@ -24,7 +24,7 @@
 | Viewport-locked layout | ✅ Done — `/bulk-cost` uses app-shell-locked layout (internal scroll matching `/partcatalog`) |
 | Backend API | ✅ Phase 3A Live — `POST /api/bulk-cost/runs` draft snapshot save, `GET /runs`, `GET /runs/:id`, `PATCH /runs/:id/status` |
 | DB persistence | ✅ Live — `BulkCostRun` / `BulkCostLine` / `AxonExtractionQueue` in `PART_CATALOG_AIX`; 13 seed rows in queue; mock fallbacks removed |
-| GraingerWeightData table | 🔲 Script ready — run `server/sql/20260512_grainger_weight_table.sql` via SSMS; defer until CWeight feature wired |
+| Grainger CWeight source | ✅ Existing DB source — use `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; AIX `GraingerWeightData` staging is obsolete for the active path |
 | CWeight / Weight module | 🚧 Scaffolded — `ai-services/weight-lookup.service.ts` Grainger path ready; next step is local pattern research/tests before endpoint wiring |
 | Real AXON data source | ❌ Not Started |
 
@@ -79,7 +79,7 @@ URL params `?supplier=CODE&supplierName=NAME` เก็บ supplier ที่เ
 | `server/sql/20260508_bulk_cost_draft_snapshot.sql` | `BulkCostRun` / `BulkCostLine` table creation |
 | `server/sql/20260512_axon_ai_tables.sql` | `AxonExtractionQueue` + AXON AI helper tables |
 | `server/sql/20260512_seed_mock_data.sql` | 13 seed rows for `AxonExtractionQueue` |
-| `server/sql/20260512_grainger_weight_table.sql` | `GraingerWeightData` + `GraingerWeightImportLog` — NOT YET deployed |
+| `server/sql/20260512_grainger_weight_table.sql` | Obsolete AIX staging script for `GraingerWeightData` + `GraingerWeightImportLog`; active CWeight source is `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` |
 | `ai-services/src/services/weight-lookup.service.ts` | C1: Grainger-first weight/dim lookup → Gemini AI fallback |
 
 ---
@@ -232,8 +232,8 @@ Flow:
 2. Collect missing golden-case data for ET/MT/MiscTax/SCC/STK, CWeight, and additional order-term variants
 3. คุย business owner เรื่อง UI acceptance + field confirmations + Golden Case verification สำหรับ document fee basis
 4. Build CWeight local research module/tests first: formula, divisor, rounding, ship mode, dim unit, matching fields
-5. Deploy `GraingerWeightData` table later: run `server/sql/20260512_grainger_weight_table.sql` via SSMS (requires sa/db_owner)
-6. Wire CWeight lookup endpoint later only after local pattern passes review: query GraingerWeightData → fallback `ai-services/weight-lookup.service.lookupWeight()`
+5. Keep Grainger CWeight lookup source as `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; do not deploy the obsolete AIX `GraingerWeightData` staging script for the active path
+6. Wire CWeight lookup endpoint later only after business approval: query `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` first, then review-only local semantic fallback if approved
 7. Connect real AXON data source แทน seed data
 8. ออกแบบ Awarded reverse mapping flow ก่อนสร้าง endpoint จริง
 9. ทำ E2E test สำหรับ full allocation → save snapshot flow

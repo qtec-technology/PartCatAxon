@@ -66,8 +66,8 @@
   By Lot / Batch document-fee line candidates
 - Real SQL Server `PART_CATALOG_AIX` DB: `BulkCostRun`, `BulkCostLine`, `AxonExtractionQueue` tables live; mock fallbacks removed
 - `ai-services/` package scaffolded: local CWeight formula, local lookup, sample analyzer, semantic evaluation reports/tests implemented; HS Code, Duty, Permit, Shelf Life are not Kim/Codex scope in the current phase
-- Backend CWeight wrapper exists at `server/src/services/cweight.service.ts`; backend-only exact `GraingerWeightData` lookup is available through `server/src/services/cweight-lookup.service.ts`; neither path is wired to an Express route or Next.js UI.
-- GraingerWeightData table: SQL script ready (`server/sql/20260512_grainger_weight_table.sql`), not yet deployed to DB (deferred until CWeight feature wired)
+- Backend CWeight wrapper exists at `server/src/services/cweight.service.ts`; backend-only exact `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` lookup is available through `server/src/services/cweight-lookup.service.ts`; neither path is wired to an Express route or Next.js UI.
+- AIX `GraingerWeightData` / `GraingerWeightImportLog` staging tables are obsolete for the active CWeight path; the real source is `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`.
 - AI extraction จากเอกสารหรือ quotation
 - AI prefill ใน Item/Term
 - Draft intake queue จาก AIX
@@ -141,7 +141,8 @@
 | วันที่ | Decision | เหตุผล |
 |---|---|---|
 | 2026-05-13 | Viewport-locked layout for `/bulk-cost`: extended `app-shell-locked` class to `/bulk-cost` paths in AppShell; added CSS classes `bulk-cost-page-root`, `bulk-cost-tabs-root`, `bulk-cost-tab-content`, `bulk-cost-workspace`, `bulk-cost-workspace-body`; toolbar fixed, body scrolls internally matching `/partcatalog` behaviour | `npm --prefix next-shell run typecheck` |
-| 2026-05-14 | Added backend-only CWeight exact lookup composition: direct formula still wins, then local `GraingerWeightData` exact code/part match can return `AUTO_ACCEPT`; no route, UI, external API, or API-key integration added | `npm --prefix server test -- --run`, `npm --prefix server run build` |
+| 2026-05-14 | Switched backend-only CWeight exact lookup from AIX staging to `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; Grainger rows use `Chargeable_Weight_kgs` / `CWeight` directly and leave dimensions null because the source has no length/width/height columns | `npm --prefix server test -- --run`, `npm --prefix server run build` |
+| 2026-05-14 | Added backend-only CWeight exact lookup composition: direct formula still wins, then local Grainger exact code/part match can return `AUTO_ACCEPT`; no route, UI, external API, or API-key integration added | `npm --prefix server test -- --run`, `npm --prefix server run build` |
 | 2026-05-13 | Added backend-only CWeight wrapper service: `resolveChargeableWeight(input)` returns `AUTO_ACCEPT`, `REVIEW_SUGGESTION`, or `NOT_FOUND` for direct formula/local research results; no route, UI, external API, or API-key integration added | `npm --prefix server test -- --run`, `npm --prefix server run build` |
 | 2026-05-14 | AXON `RawPayloadJson` contract updated and backend parser added: document-level supplier costs are extracted under `headerCosts` as reviewable Cost Bar suggestions (`pkh`, `soc`, `freight`, `customs`/`cc`, `wireTT`, insurance), separate from line items and By Lot / Batch document-fee candidates | `npm --prefix server test -- --run`, `npm --prefix server run build` |
 | 2026-05-13 | Removed all mock fallbacks from `bulk-cost.repository.ts`: deleted `MOCK_QUEUE_ITEMS`, `MOCK_RUNS`, `MOCK_RUN1_LINES`, `MOCK_RUN1_PREVIEW`, `applyMockFilters`, `isMissingTableError`; `listAxonQueueItems`, `listBulkCostRuns`, `loadBulkCostRun` now use real DB only | `npm --prefix server run build`, `npm --prefix server test -- --run` (83), `npm --prefix next-shell run typecheck` |
@@ -193,9 +194,9 @@
 
 - [x] Build CWeight local research module/tests: formula, divisor, rounding, ship mode, dim unit, matching fields
 - [x] Add backend-only CWeight wrapper service without route/UI integration
-- [x] Add backend-only local `GraingerWeightData` exact lookup composition without route/UI integration
-- [ ] Deploy `GraingerWeightData` table later: run `server/sql/20260512_grainger_weight_table.sql` via SSMS (requires sa/db_owner)
-- [ ] Wire CWeight lookup endpoint later: query GraingerWeightData → fallback ai-services lookupWeight()
+- [x] Add backend-only local `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` exact lookup composition without route/UI integration
+- [x] Confirm AIX `GraingerWeightData` staging table is not needed for the active CWeight path
+- [ ] Wire CWeight lookup endpoint later only after business approval; source should be `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
 - [ ] Connect real AXON data source (replace AxonExtractionQueue seed data with live AXON push)
 - [ ] Design Awarded reverse mapping flow before creating award/reverse-map endpoint
 - [ ] คุยกับผู้บริหารเรื่อง UI acceptance + Golden Case verification สำหรับ document fee basis
