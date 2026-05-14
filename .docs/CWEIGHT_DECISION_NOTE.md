@@ -293,6 +293,9 @@ Current backend wrapper status:
 - `POST /api/bulk-cost/cweight-prefill` resolves CWeight suggestions for draft
   Bulk Cost lines and returns review-only results with `prefillAllowed`; it does
   not save, write master data, or overwrite user edits.
+- Live validation confirmed the Bulk Cost prefill helper returns
+  `prefillAllowed: true` for usable Grainger matches, `prefillAllowed: false`
+  for `NOT_FOUND`, and `prefillAllowed: false` for locked/user-edited lines.
 - No Next.js integration, external API call, or API key path has been added.
 
 ## Technology Decision

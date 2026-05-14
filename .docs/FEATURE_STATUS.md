@@ -141,6 +141,7 @@
 | วันที่ | Decision | เหตุผล |
 |---|---|---|
 | 2026-05-13 | Viewport-locked layout for `/bulk-cost`: extended `app-shell-locked` class to `/bulk-cost` paths in AppShell; added CSS classes `bulk-cost-page-root`, `bulk-cost-tabs-root`, `bulk-cost-tab-content`, `bulk-cost-workspace`, `bulk-cost-workspace-body`; toolbar fixed, body scrolls internally matching `/partcatalog` behaviour | `npm --prefix next-shell run typecheck` |
+| 2026-05-14 | Validated compiled Bulk Cost CWeight prefill helper against live `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`: Grainger exact code and manufacturer part+brand return `AUTO_ACCEPT`, unknown returns `NOT_FOUND`, and locked/user-edited lines return `prefillAllowed: false` | `node -e` against `server/dist/services/bulk-cost-cweight.service.js` |
 | 2026-05-14 | Added backend-only Bulk Cost CWeight prefill helper and `POST /api/bulk-cost/cweight-prefill`; it maps draft line fields to the CWeight resolver and returns reviewable suggestions with `prefillAllowed`, without saving or overwriting user edits | `npm --prefix server test -- --run`, `npm --prefix server run build` |
 | 2026-05-14 | Validated compiled backend CWeight lookup against live `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`: `100G64` => `AUTO_ACCEPT` / `53.92`, `100FN6` => `AUTO_ACCEPT` / `0.09`, `1292G` + `LIBMAN` => `AUTO_ACCEPT` / `53.92`, unknown code => `NOT_FOUND` | `node -e` against `server/dist/services/cweight-lookup.service.js` |
 | 2026-05-14 | Added backend-only `POST /api/cweight/resolve` endpoint for one-line CWeight resolution; request schema is limited to weight/dimension and product identifiers, rejecting HS Code/other scope fields; no UI/Next.js integration added | `npm --prefix server test -- --run`, `npm --prefix server run build` |
@@ -200,6 +201,7 @@
 - [x] Add backend-only local `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` exact lookup composition without route/UI integration
 - [x] Add backend-only `POST /api/cweight/resolve` endpoint without UI/Next.js integration
 - [x] Add backend-only Bulk Cost CWeight prefill helper without save/UI/Next.js integration
+- [x] Validate compiled Bulk Cost CWeight prefill helper against live `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
 - [x] Validate compiled backend CWeight lookup against live `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
 - [x] Confirm AIX `GraingerWeightData` staging table is not needed for the active CWeight path
 - [ ] Wire CWeight lookup endpoint later only after business approval; source should be `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
