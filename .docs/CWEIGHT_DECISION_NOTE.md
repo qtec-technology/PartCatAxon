@@ -283,6 +283,8 @@ Current backend wrapper status:
 - Grainger rows use `Chargeable_Weight_kgs` / `CWeight` directly when present;
   dimensions stay `null` because this source does not provide length, width, or
   height columns.
+- Live DB validation confirmed `100G64`, `100FN6`, and `1292G` / `LIBMAN`
+  return `AUTO_ACCEPT`; an unknown Grainger code returns `NOT_FOUND`.
 - `server/src/services/cweight-lookup.service.ts` composes direct formula first,
   then local Grainger exact lookup, and still returns `NOT_FOUND` rather than
   guessing when no usable local weight evidence exists.
