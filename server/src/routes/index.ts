@@ -7,6 +7,7 @@ import attachmentRoutes from '#src/routes/attachment.routes.js';
 import authRoutes from '#src/routes/auth.routes.js';
 import referenceFileRoutes from '#src/routes/reference-file.routes.js';
 import bulkCostRoutes from '#src/routes/bulk-cost.routes.js';
+import cweightRoutes from '#src/routes/cweight.routes.js';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/attachments', attachmentRoutes);
 router.use('/auth', authRoutes);
 router.use('/reference-files', referenceFileRoutes);
 router.use('/bulk-cost', bulkCostRoutes);
+router.use('/cweight', cweightRoutes);
 
 export default router;

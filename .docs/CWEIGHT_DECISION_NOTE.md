@@ -286,7 +286,9 @@ Current backend wrapper status:
 - `server/src/services/cweight-lookup.service.ts` composes direct formula first,
   then local Grainger exact lookup, and still returns `NOT_FOUND` rather than
   guessing when no usable local weight evidence exists.
-- No Express route, Next.js integration, external API call, or API key path has been added.
+- `POST /api/cweight/resolve` exposes this backend-only resolver for one
+  quotation line at a time; it is not wired into any UI flow yet.
+- No Next.js integration, external API call, or API key path has been added.
 
 ## Technology Decision
 

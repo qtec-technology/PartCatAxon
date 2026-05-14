@@ -66,7 +66,7 @@
   By Lot / Batch document-fee line candidates
 - Real SQL Server `PART_CATALOG_AIX` DB: `BulkCostRun`, `BulkCostLine`, `AxonExtractionQueue` tables live; mock fallbacks removed
 - `ai-services/` package scaffolded: local CWeight formula, local lookup, sample analyzer, semantic evaluation reports/tests implemented; HS Code, Duty, Permit, Shelf Life are not Kim/Codex scope in the current phase
-- Backend CWeight wrapper exists at `server/src/services/cweight.service.ts`; backend-only exact `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` lookup is available through `server/src/services/cweight-lookup.service.ts`; neither path is wired to an Express route or Next.js UI.
+- Backend CWeight wrapper exists at `server/src/services/cweight.service.ts`; backend-only exact `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` lookup is available through `server/src/services/cweight-lookup.service.ts` and `POST /api/cweight/resolve`; it is not wired to Next.js UI.
 - AIX `GraingerWeightData` / `GraingerWeightImportLog` staging tables are obsolete for the active CWeight path; the real source is `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`.
 - AI extraction จากเอกสารหรือ quotation
 - AI prefill ใน Item/Term
@@ -141,6 +141,7 @@
 | วันที่ | Decision | เหตุผล |
 |---|---|---|
 | 2026-05-13 | Viewport-locked layout for `/bulk-cost`: extended `app-shell-locked` class to `/bulk-cost` paths in AppShell; added CSS classes `bulk-cost-page-root`, `bulk-cost-tabs-root`, `bulk-cost-tab-content`, `bulk-cost-workspace`, `bulk-cost-workspace-body`; toolbar fixed, body scrolls internally matching `/partcatalog` behaviour | `npm --prefix next-shell run typecheck` |
+| 2026-05-14 | Added backend-only `POST /api/cweight/resolve` endpoint for one-line CWeight resolution; request schema is limited to weight/dimension and product identifiers, rejecting HS Code/other scope fields; no UI/Next.js integration added | `npm --prefix server test -- --run`, `npm --prefix server run build` |
 | 2026-05-14 | Switched backend-only CWeight exact lookup from AIX staging to `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; Grainger rows use `Chargeable_Weight_kgs` / `CWeight` directly and leave dimensions null because the source has no length/width/height columns | `npm --prefix server test -- --run`, `npm --prefix server run build` |
 | 2026-05-14 | Added backend-only CWeight exact lookup composition: direct formula still wins, then local Grainger exact code/part match can return `AUTO_ACCEPT`; no route, UI, external API, or API-key integration added | `npm --prefix server test -- --run`, `npm --prefix server run build` |
 | 2026-05-13 | Added backend-only CWeight wrapper service: `resolveChargeableWeight(input)` returns `AUTO_ACCEPT`, `REVIEW_SUGGESTION`, or `NOT_FOUND` for direct formula/local research results; no route, UI, external API, or API-key integration added | `npm --prefix server test -- --run`, `npm --prefix server run build` |
@@ -195,6 +196,7 @@
 - [x] Build CWeight local research module/tests: formula, divisor, rounding, ship mode, dim unit, matching fields
 - [x] Add backend-only CWeight wrapper service without route/UI integration
 - [x] Add backend-only local `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` exact lookup composition without route/UI integration
+- [x] Add backend-only `POST /api/cweight/resolve` endpoint without UI/Next.js integration
 - [x] Confirm AIX `GraingerWeightData` staging table is not needed for the active CWeight path
 - [ ] Wire CWeight lookup endpoint later only after business approval; source should be `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
 - [ ] Connect real AXON data source (replace AxonExtractionQueue seed data with live AXON push)
