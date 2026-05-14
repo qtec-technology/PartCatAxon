@@ -14,7 +14,8 @@
     "report:cweight": "node dist/src/scripts/cweight-local-report.js",
     "report:cweight:incomplete": "node dist/src/scripts/cweight-incomplete-input-report.js",
     "report:cweight:semantic": "node dist/src/scripts/cweight-semantic-evaluation-report.js",
-    "report:cweight:policy": "node dist/src/scripts/cweight-policy-evaluation-report.js"
+    "report:cweight:policy": "node dist/src/scripts/cweight-policy-evaluation-report.js",
+    "report:cweight:api-sim": "node dist/src/scripts/cweight-api-simulation-report.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

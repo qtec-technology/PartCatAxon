@@ -194,6 +194,9 @@ Description matching:
 - Short description precision: about `94.9%`
 - Current measured noisy description precision: `98.9518%` with `57.3860%` recall.
 - Current measured short description precision: `94.9701%` with `48.2067%` recall.
+- Simulated API fallback showed broad matching can recover additional review
+  suggestions, but it still produces wrong variant matches; production API use
+  should require a verified source and remain review-only.
 
 Interpretation:
 
