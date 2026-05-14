@@ -1,5 +1,6 @@
 import { getPool, sql } from '#src/config/database.js';
 import { dbObjects } from '#src/config/db-objects.js';
+import { extractHeaderCostSuggestions } from '#src/services/axon-payload.service.js';
 import type {
     BulkCostRunSummary,
     BulkCostRunStatus,
@@ -317,6 +318,7 @@ interface AxonQueueRow {
     OpenedAt: Date | string | null;
     OpenedBy: string | null;
     RunID: number | null;
+    RawPayloadJson: string | null;
 }
 
 function toQueueItem(row: AxonQueueRow): AxonQueueItem {
@@ -339,6 +341,7 @@ function toQueueItem(row: AxonQueueRow): AxonQueueItem {
         openedAt: row.OpenedAt ? dateToIso(row.OpenedAt) : null,
         openedBy: nullableText(row.OpenedBy),
         runId: row.RunID !== null ? Number(row.RunID) : null,
+        headerCostSuggestions: extractHeaderCostSuggestions(row.RawPayloadJson),
     };
 }
 
@@ -348,7 +351,8 @@ export async function listAxonQueueItems(): Promise<AxonQueueItem[]> {
     const result = await pool.request().query<AxonQueueRow>(`
         SELECT QueueID, SourceFileId, SourceFileName, DocumentType, DocumentNo, DocumentDate,
                SupplierRawName, SupplierCodeHint, SupplierConfidence, Currency, PurchaseTerm,
-               TermLocation, TotalLines, Status, ReceivedAt, OpenedAt, OpenedBy, RunID
+               TermLocation, TotalLines, Status, ReceivedAt, OpenedAt, OpenedBy, RunID,
+               RawPayloadJson
         FROM ${queueTable}
         WHERE Status IN ('PENDING', 'OPENED')
         ORDER BY ReceivedAt DESC

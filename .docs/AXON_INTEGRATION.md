@@ -91,22 +91,95 @@ AXON ใช้ AI หลายตัว แบ่งเป็น Stage:
 
 ---
 
-### 4.2 Supplier-Level Costs
+### 4.2 Header-Level Costs in `RawPayloadJson`
 
-ค่าใช้จ่ายระดับ order — อาจไม่ได้อยู่ในเอกสาร supplier เสมอ (QTEC กรอกเอง)
+If a supplier quotation clearly states document-level costs, AXON should extract
+them into `RawPayloadJson.headerCosts`. These values are suggestions for the
+Bulk Cost Cost Bar; sales must still review/edit them before CAL.
 
-| Field | AXON ส่ง | User ทำอะไร |
-|---|---|---|
-| `freightTotal` | ถ้าเอกสารมี | ยืนยันหรือกรอกเอง |
-| `pkhTotal` (Packing & Handling) | ถ้ามี | ยืนยันหรือกรอกเอง |
-| `socTotal` (Stamp/Other Charge) | ถ้ามี | ยืนยันหรือกรอกเอง |
-| `wireTTTotal` | ถ้ามี | ยืนยันหรือกรอกเอง |
-| `customClearTotal` | ถ้ามี | ยืนยันหรือกรอกเอง |
-| `sccTotal` (Special Custom Clear) | ถ้ามี permit | ยืนยันหรือกรอกเอง |
-| `shipMode` | ถ้าระบุ | เลือก/แก้ในระบบ |
-| `freightType` | ถ้าระบุ | เลือก/แก้ในระบบ |
-| `insurancePercent` | ถ้าระบุ | ถ้าไม่มีใช้ default |
-| `exchangeRate` | ถ้าระบุ | ถ้าไม่มีระบบดึง default → user ยืนยัน |
+Keep these values separate from item lines. Product-specific fees stay on the
+line. By Lot / Batch document fees remain review candidates and must not be
+automatically allocated into OP1 unless a business rule is approved.
+
+Suggested JSON shape:
+
+```json
+{
+  "quote": {
+    "currency": "USD",
+    "purchaseTerm": "EXW",
+    "termLocation": "US"
+  },
+  "headerCosts": {
+    "packingHandling": {
+      "amount": 50,
+      "currency": "USD",
+      "basis": "HEADER_TOTAL",
+      "sourceText": "Packing & handling: USD 50",
+      "confidence": 0.92,
+      "needsReview": true
+    },
+    "supplierOutboundCost": {
+      "amount": 120,
+      "currency": "USD",
+      "basis": "HEADER_TOTAL",
+      "sourceText": "Freight to forwarder: USD 120",
+      "confidence": 0.88,
+      "needsReview": true
+    },
+    "freight": {
+      "amount": null,
+      "currency": null,
+      "basis": "UNKNOWN",
+      "sourceText": null,
+      "confidence": 0,
+      "needsReview": true
+    },
+    "customClearance": {
+      "amount": null,
+      "currency": null,
+      "basis": "UNKNOWN",
+      "sourceText": null,
+      "confidence": 0,
+      "needsReview": true
+    },
+    "wireTransferFee": {
+      "amount": null,
+      "currency": null,
+      "basis": "UNKNOWN",
+      "sourceText": null,
+      "confidence": 0,
+      "needsReview": true
+    },
+    "insurance": {
+      "amount": null,
+      "percent": null,
+      "currency": null,
+      "basis": "UNKNOWN",
+      "sourceText": null,
+      "confidence": 0,
+      "needsReview": true
+    },
+    "otherCharges": []
+  }
+}
+```
+
+| `headerCosts` field | Bulk Cost mapping |
+|---|---|
+| `packingHandling.amount` | Cost Bar `pkh` |
+| `supplierOutboundCost.amount` | Cost Bar `soc` |
+| `freight.amount` | Cost Bar `freight` |
+| `customClearance.amount` | Cost Bar `customs` / `cc` |
+| `wireTransferFee.amount` | Cost Bar `wireTT` |
+| `insurance.amount` / `insurance.percent` | Insurance input, if present |
+| `otherCharges[]` | Review-only until mapped |
+
+Allowed `basis` values:
+
+```text
+HEADER_TOTAL | PER_LINE | PER_UNIT | UNKNOWN
+```
 
 ---
 
@@ -259,7 +332,7 @@ Required before Save Draft:
 // POST /api/bulk-cost/extraction
 interface AXONExtractionPayload {
   header: DocumentHeader
-  supplierCosts: SupplierLevelCosts
+  headerCosts: HeaderCosts
   lines: ExtractionLine[]
   matchingHints: MatchingHints
 }

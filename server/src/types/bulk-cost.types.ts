@@ -1,3 +1,5 @@
+import type { HeaderCostSuggestions } from '#src/services/axon-payload.service.js';
+
 export const BULK_COST_RUN_STATUSES = ['DRAFT', 'QUOTED', 'AWARDED', 'REVERSE_MAPPED', 'LOST', 'ARCHIVED'] as const;
 
 export type BulkCostRunStatus = (typeof BULK_COST_RUN_STATUSES)[number];
@@ -24,6 +26,7 @@ export interface AxonQueueItem {
     openedAt: string | null;
     openedBy: string | null;
     runId: number | null;
+    headerCostSuggestions: HeaderCostSuggestions | null;
 }
 
 export interface BulkCostRunSummary {

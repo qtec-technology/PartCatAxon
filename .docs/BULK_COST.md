@@ -201,6 +201,7 @@ Flow:
 
 - **UOM ใน Bulk Cost** = `Stock UOM` ของ Item (field `InvntryUom` ใน `@POITM`)
 - **Currency / Order Term / Location** เป็น quote-level fields; ถ้า AXON/Excel ได้หลายค่าใน quote เดียว ต้อง split run หรือให้ user resolve ก่อน CAL
+- **AXON header-level costs**: if supplier quotation states document-level charges, AXON should place them in `RawPayloadJson.headerCosts` as reviewable suggestions for Cost Bar fields (`pkh`, `soc`, `freight`, `customs`/`cc`, `wireTT`, insurance). These are not final values until sales confirms/edits them.
 - **Delivery Lead Time** เป็น item-level field (อาจต่างกันใน quote เดียวกัน)
 - **ไม่มี** approval gate ใน prototype flow ปัจจุบัน (save ตรง)
 - **ItemCode** ไม่ใช่ user-entered field — ระบบ generate จาก ItemGroup prefix + SP
