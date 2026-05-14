@@ -349,13 +349,13 @@ export async function listAxonQueueItems(): Promise<AxonQueueItem[]> {
     const pool = await getPool();
     const queueTable = dbObjects.tables.qtec.axonExtractionQueue;
     const result = await pool.request().query<AxonQueueRow>(`
-        SELECT QueueID, SourceFileId, SourceFileName, DocumentType, DocumentNo, DocumentDate,
-               SupplierRawName, SupplierCodeHint, SupplierConfidence, Currency, PurchaseTerm,
-               TermLocation, TotalLines, Status, ReceivedAt, OpenedAt, OpenedBy, RunID,
-               RawPayloadJson
+        SELECT [QueueID], [SourceFileId], [SourceFileName], [DocumentType], [DocumentNo], [DocumentDate],
+               [SupplierRawName], [SupplierCodeHint], [SupplierConfidence], [Currency], [PurchaseTerm],
+               [TermLocation], [TotalLines], [Status], [ReceivedAt], [OpenedAt], [OpenedBy], [RunID],
+               [RawPayloadJson]
         FROM ${queueTable}
-        WHERE Status IN ('PENDING', 'OPENED')
-        ORDER BY ReceivedAt DESC
+        WHERE [Status] IN ('PENDING', 'OPENED')
+        ORDER BY [ReceivedAt] DESC
     `);
     return result.recordset.map(toQueueItem);
 }
@@ -411,16 +411,16 @@ export async function listBulkCostRuns(filters: {
     const conditions: string[] = [];
     if (filters.status) {
         request.input('Status', sql.NVarChar(20), filters.status);
-        conditions.push('Status = @Status');
+        conditions.push('[Status] = @Status');
     }
     if (filters.saleIncharge) {
         request.input('SaleIncharge', sql.NVarChar(255), filters.saleIncharge);
-        conditions.push('SaleIncharge = @SaleIncharge');
+        conditions.push('[SaleIncharge] = @SaleIncharge');
     }
     if (filters.search) {
         const like = `%${filters.search}%`;
         request.input('Search', sql.NVarChar(200), like);
-        conditions.push('(VendorName LIKE @Search OR VendorCode LIKE @Search OR ReferenceNo LIKE @Search OR CAST(RunID AS NVARCHAR) LIKE @Search)');
+        conditions.push('([VendorName] LIKE @Search OR [VendorCode] LIKE @Search OR [ReferenceNo] LIKE @Search OR CAST([RunID] AS NVARCHAR) LIKE @Search)');
     }
     request.input('StartRow', sql.Int, offset + 1);
     request.input('EndRow', sql.Int, offset + pageSize);
@@ -428,22 +428,22 @@ export async function listBulkCostRuns(filters: {
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const queryText = `
         SELECT
-            RunID, Status, VendorCode, VendorName, ReferenceNo,
-            TotalLines, TotalQty, TotalAmount, Currency,
-            SaleIncharge, UpdatedBy, UpdatedAt, CreatedAt,
-            TotalCount
+            [RunID], [Status], [VendorCode], [VendorName], [ReferenceNo],
+            [TotalLines], [TotalQty], [TotalAmount], [Currency],
+            [SaleIncharge], [UpdatedBy], [UpdatedAt], [CreatedAt],
+            [TotalCount]
         FROM (
             SELECT
-                RunID, Status, VendorCode, VendorName, ReferenceNo,
-                TotalLines, TotalQty, TotalAmount, Currency,
-                SaleIncharge, UpdatedBy, UpdatedAt, CreatedAt,
-                COUNT(*) OVER() AS TotalCount,
-                ROW_NUMBER() OVER (ORDER BY UpdatedAt DESC, RunID DESC) AS RowNum
+                [RunID], [Status], [VendorCode], [VendorName], [ReferenceNo],
+                [TotalLines], [TotalQty], [TotalAmount], [Currency],
+                [SaleIncharge], [UpdatedBy], [UpdatedAt], [CreatedAt],
+                COUNT(*) OVER() AS [TotalCount],
+                ROW_NUMBER() OVER (ORDER BY [UpdatedAt] DESC, [RunID] DESC) AS [RowNum]
             FROM ${table}
             ${where}
         ) AS PagedRuns
-        WHERE RowNum BETWEEN @StartRow AND @EndRow
-        ORDER BY RowNum
+        WHERE [RowNum] BETWEEN @StartRow AND @EndRow
+        ORDER BY [RowNum]
     `;
 
     try {
@@ -470,14 +470,14 @@ export async function updateBulkCostRunStatus(
 
     const result = await request.query(`
         UPDATE ${table}
-        SET Status = @Status, UpdatedBy = @UpdatedBy, UpdatedAt = GETDATE()
-        WHERE RunID = @RunID AND Status = 'DRAFT'
+        SET [Status] = @Status, [UpdatedBy] = @UpdatedBy, [UpdatedAt] = GETDATE()
+        WHERE [RunID] = @RunID AND [Status] = 'DRAFT'
     `);
 
     if (result.rowsAffected[0] === 0) {
         const checkResult = await pool.request()
             .input('RunID2', sql.BigInt, runId)
-            .query<{ RunID: number }>(`SELECT RunID FROM ${table} WHERE RunID = @RunID2`);
+            .query<{ RunID: number }>(`SELECT [RunID] FROM ${table} WHERE [RunID] = @RunID2`);
         if (checkResult.recordset.length === 0) {
             const err = new Error(`BulkCostRun #${runId} not found`) as Error & { statusCode?: number };
             err.statusCode = 404;
@@ -534,19 +534,19 @@ export async function loadBulkCostRun(runId: number): Promise<LoadedBulkCostRun 
     try {
         const [runResult, lineResult] = await Promise.all([
             runRequest.query<BulkCostRunDetailRow>(`
-                SELECT RunID, Status, VendorCode, VendorName, ReferenceNo,
-                       Currency, ExchangeRate, OrderTerm, Location, ShipModeNo,
-                       ContactPerson, SaleIncharge, Remark,
-                       U_PKH, U_SOC, U_Freight, U_Customs, U_WireTT,
-                       PreviewSnapshotJson
+                SELECT [RunID], [Status], [VendorCode], [VendorName], [ReferenceNo],
+                       [Currency], [ExchangeRate], [OrderTerm], [Location], [ShipModeNo],
+                       [ContactPerson], [SaleIncharge], [Remark],
+                       [U_PKH], [U_SOC], [U_Freight], [U_Customs], [U_WireTT],
+                       [PreviewSnapshotJson]
                 FROM ${runTable}
-                WHERE RunID = @RunID
+                WHERE [RunID] = @RunID
             `),
             lineRequest.query<DraftItemLineRow>(`
-                SELECT LineNo, LineKey, LatestSnapshotJson, OriginSnapshotJson
+                SELECT [LineNo], [LineKey], [LatestSnapshotJson], [OriginSnapshotJson]
                 FROM ${itemTable}
-                WHERE RunID = @RunIDL
-                ORDER BY LineNo
+                WHERE [RunID] = @RunIDL
+                ORDER BY [LineNo]
             `),
         ]);
 
