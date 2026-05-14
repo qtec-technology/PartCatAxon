@@ -25,7 +25,7 @@
 | Backend API | ✅ Phase 3A Live — `POST /api/bulk-cost/runs` draft snapshot save, `GET /runs`, `GET /runs/:id`, `PATCH /runs/:id/status` |
 | DB persistence | ✅ Live — `BulkCostRun` / `DraftItem` / `DraftTerm` / `AxonExtractionQueue` in `PART_CATALOG_AIX`; `BulkCostLine` removed from live Phase 3A schema; mock fallbacks removed |
 | Grainger CWeight source | ✅ Existing DB source — use `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; AIX `GraingerWeightData` staging is obsolete for the active path |
-| CWeight / Weight module | 🚧 Scaffolded — `ai-services/weight-lookup.service.ts` Grainger path ready; next step is local pattern research/tests before endpoint wiring |
+| CWeight / Weight module | 🚧 Evaluated — local-only CWeight policy report added; exact identifiers are `AUTO_ACCEPT`, description matches remain `REVIEW_SUGGESTION`, and any future API fallback is review-only after local `NOT_FOUND` |
 | Real AXON data source | ❌ Not Started |
 
 ---
@@ -232,7 +232,7 @@ Flow:
 1. Review `.docs/BULK_COST_TEST_DATA_AUDIT.md` with business/owner
 2. Collect missing golden-case data for ET/MT/MiscTax/SCC/STK, CWeight, and additional order-term variants
 3. คุย business owner เรื่อง UI acceptance + field confirmations + Golden Case verification สำหรับ document fee basis
-4. Build CWeight local research module/tests first: formula, divisor, rounding, ship mode, dim unit, matching fields
+4. Keep CWeight local research reports current: formula, divisor, rounding, ship mode, dim unit, matching fields, and `.docs/CWEIGHT_EVALUATION.md`
 5. Keep Grainger CWeight lookup source as `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; do not deploy the obsolete AIX `GraingerWeightData` staging script for the active path
 6. Use backend-only `POST /api/bulk-cost/cweight-prefill` for draft-line CWeight suggestions first; wire to Bulk Cost UI later only after separate UI approval
 7. Connect real AXON data source แทน seed data

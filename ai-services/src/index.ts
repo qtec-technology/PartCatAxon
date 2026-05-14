@@ -81,3 +81,14 @@ export {
   buildCWeightSemanticEvaluationReport,
   loadDefaultCWeightSemanticEvaluationReport,
 } from "./scripts/cweight-semantic-evaluation-report.js";
+export type {
+  CWeightApiAssistedComparison,
+  CWeightPolicyDecision,
+  CWeightPolicyEvaluationReport,
+  CWeightPolicyRule,
+  CWeightScenarioPolicyMetrics,
+} from "./scripts/cweight-policy-evaluation-report.js";
+export {
+  buildCWeightPolicyEvaluationReport,
+  loadDefaultCWeightPolicyEvaluationReport,
+} from "./scripts/cweight-policy-evaluation-report.js";

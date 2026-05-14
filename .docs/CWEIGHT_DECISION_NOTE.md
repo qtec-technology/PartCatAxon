@@ -171,6 +171,12 @@ The module must return `null` values instead of inventing weight.
 
 The current local research was tested against local sample data only.
 
+Current evaluation dataset:
+
+- 1000 Grainger CWeight rows from `.datatest/@GRAINGER_CWEIGHT.csv`
+- 645 de-duplicated legacy PITM1 rows from `.datatest/vw@PITM1*.csv`
+- 500 chargeable-weight rows from `.datatest/@CHARGEABLEWEIGHT.csv`
+
 Direct formula:
 
 - Legacy PITM1 inch sample matched expected dimensional and shipping weight behavior.
@@ -179,11 +185,15 @@ Direct formula:
 Exact lookup:
 
 - Exact supplier/code/catalog matching is safe enough for `AUTO_ACCEPT`.
+- Local evaluation returned 1126/1126 matches for supplier-code-only inputs.
+- Local evaluation returned 1645/1645 matches for manufacturer/catalog-only inputs.
 
 Description matching:
 
 - Noisy description precision: about `98.7%`
 - Short description precision: about `94.9%`
+- Current measured noisy description precision: `98.9518%` with `57.3860%` recall.
+- Current measured short description precision: `94.9701%` with `48.2067%` recall.
 
 Interpretation:
 
@@ -322,4 +332,8 @@ Approve the following direction:
 3. Treat description matches as `REVIEW_SUGGESTION`.
 4. Return `NOT_FOUND` when data is too weak.
 5. Do not integrate external AI or external APIs in this phase.
-6. After review, add a small backend CWeight service wrapper without changing the larger server architecture.
+6. If an API fallback is later approved, allow it only after local `NOT_FOUND`
+   and only as `REVIEW_SUGGESTION`; it must not increase `AUTO_ACCEPT`.
+7. After review, add a small backend CWeight service wrapper without changing the larger server architecture.
+
+Detailed evaluation: `.docs/CWEIGHT_EVALUATION.md`.
