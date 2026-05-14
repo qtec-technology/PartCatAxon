@@ -53,6 +53,7 @@ export const dbObjects = {
             draftItem: qtecObject('DB_TABLE_DRAFT_ITEM', 'DraftItem'),
             draftTerm: qtecObject('DB_TABLE_DRAFT_TERM', 'DraftTerm'),
             axonExtractionQueue: qtecObject('DB_TABLE_AXON_QUEUE', 'AxonExtractionQueue'),
+            graingerWeightData: qtecObject('DB_TABLE_GRAINGER_WEIGHT_DATA', 'GraingerWeightData'),
         },
     },
     views: {

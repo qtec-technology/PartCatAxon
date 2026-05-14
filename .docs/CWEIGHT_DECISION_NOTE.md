@@ -1,6 +1,6 @@
 # CWeight Decision Note
 
-Updated: 2026-05-13
+Updated: 2026-05-14
 
 ## Purpose
 
@@ -277,6 +277,11 @@ Current backend wrapper status:
 - Approved exact local matches can be passed through as `AUTO_ACCEPT`.
 - Local description/semantic matches remain `REVIEW_SUGGESTION`.
 - Missing or weak evidence returns `NOT_FOUND`.
+- `server/src/repositories/cweight.repository.ts` reads only local `GraingerWeightData`
+  exact matches by Grainger order code or manufacturer part number.
+- `server/src/services/cweight-lookup.service.ts` composes direct formula first,
+  then local Grainger exact lookup, and still returns `NOT_FOUND` rather than
+  guessing when no usable local weight evidence exists.
 - No Express route, Next.js integration, external API call, or API key path has been added.
 
 ## Technology Decision
