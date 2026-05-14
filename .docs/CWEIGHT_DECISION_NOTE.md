@@ -290,6 +290,9 @@ Current backend wrapper status:
   guessing when no usable local weight evidence exists.
 - `POST /api/cweight/resolve` exposes this backend-only resolver for one
   quotation line at a time; it is not wired into any UI flow yet.
+- `POST /api/bulk-cost/cweight-prefill` resolves CWeight suggestions for draft
+  Bulk Cost lines and returns review-only results with `prefillAllowed`; it does
+  not save, write master data, or overwrite user edits.
 - No Next.js integration, external API call, or API key path has been added.
 
 ## Technology Decision

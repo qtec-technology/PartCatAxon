@@ -22,6 +22,23 @@ const saveBulkCostLineSchema = z.object({
     axon: axonHintsSchema.optional(),
 }).strict();
 
+const nullableShipModeNo = z.union([z.string(), z.number(), z.null()]).optional();
+
+const cweightPrefillLineSchema = z.object({
+    lineKey: nonEmptyString,
+    latest: jsonObject,
+    lockedByUser: z.boolean().optional().default(false),
+}).strict();
+
+export const bulkCostCWeightPrefillBodySchema = z.object({
+    defaults: z.object({
+        shipModeNo: nullableShipModeNo,
+    }).strict().optional().default({}),
+    lines: z.array(cweightPrefillLineSchema).min(1, 'lines must contain at least one line'),
+}).strict();
+
+export type BulkCostCWeightPrefillBodyDTO = z.infer<typeof bulkCostCWeightPrefillBodySchema>;
+
 export const saveBulkCostRunBodySchema = z.object({
     supplierCode: nonEmptyString,
     supplierName: trimmedString.optional().default(''),

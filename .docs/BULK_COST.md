@@ -233,7 +233,7 @@ Flow:
 3. คุย business owner เรื่อง UI acceptance + field confirmations + Golden Case verification สำหรับ document fee basis
 4. Build CWeight local research module/tests first: formula, divisor, rounding, ship mode, dim unit, matching fields
 5. Keep Grainger CWeight lookup source as `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; do not deploy the obsolete AIX `GraingerWeightData` staging script for the active path
-6. Use backend-only `POST /api/cweight/resolve` for validation first; wire to Bulk Cost UI later only after separate UI approval
+6. Use backend-only `POST /api/bulk-cost/cweight-prefill` for draft-line CWeight suggestions first; wire to Bulk Cost UI later only after separate UI approval
 7. Connect real AXON data source แทน seed data
 8. ออกแบบ Awarded reverse mapping flow ก่อนสร้าง endpoint จริง
 9. ทำ E2E test สำหรับ full allocation → save snapshot flow
