@@ -34,14 +34,41 @@ Award/SAP reverse mapping. Add tests before changing formula behavior. Run
 npm run typecheck, npm test, and npm run build before commit.
 ```
 
+## Prompt For Copilot Temporary Takeover
+
+```text
+You are temporarily taking over PartCatalog work while Codex is unavailable.
+Start by reading AGENTS.md, CLAUDE.md, .github/copilot-instructions.md,
+.docs/AGENT_SITUATION.md, .docs/HANDOFF.md, .docs/TASKS.md,
+.docs/VALIDATION.md, .docs/BULK_COST.md, .docs/BULK_COST_CALCULATION.md,
+.docs/AXON_INTEGRATION.md, and .docs/FEATURE_STATUS.md.
+
+First run git status --short and git log --oneline -10. Latest known Codex
+commit is a0a10d0 fix: persist bulk cost draft term valid from. If the repo has
+changed, reconcile before editing.
+
+Safe scope: small display/test/doc changes in next-shell Bulk Cost only.
+Avoid formula/persistence/architecture changes unless explicitly assigned and
+covered by tests. Do not touch old client/, Award/SAP flow, @POITM, @PITM1, or
+reverse mapping.
+
+Before handoff back to Codex, write down:
+- commits you made
+- files changed
+- tests run and exact pass/fail counts
+- open risks
+- any assumptions or business questions
+- anything intentionally not done
+
+Run npm run typecheck, npm test, and npm run build before committing.
+```
+
 ## Emergency Prompt If Quota Ends Immediately
 
 ```text
 Continue from .docs/HANDOFF.md and .docs/TASKS.md. Do not assume prior chat
-memory. Inspect git status and recent commits first. Treat generated
-next-shell/next-env.d.ts churn as repo state to reconcile before committing.
-Only Ready for Copilot tasks are safe for Copilot. Formula, persistence,
-Valid From, backend/shared calculation, and Award/SAP-adjacent work are reserved
-for Codex.
+memory. Inspect git status and recent commits first. Latest known Codex commit
+is a0a10d0. Only Ready for Copilot tasks are safe for Copilot. Backend/shared
+calculation, Award/SAP-adjacent work, @POITM, @PITM1, and reverse mapping are
+reserved for Codex unless explicitly assigned with tests.
 ```
-
