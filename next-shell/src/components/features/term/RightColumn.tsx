@@ -300,7 +300,7 @@ export const RightColumn = memo(function RightColumn({
             />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-700">SPK + QOC</span>
+            <span className="text-xs text-gray-700">SPK (THB) + QOC (THB)</span>
             <div className="flex gap-1">
               <NumberInput
                 id={ids.spk}

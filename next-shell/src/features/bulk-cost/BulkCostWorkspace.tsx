@@ -1234,44 +1234,50 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           {/* PKH SOC */}
           <div className="cost-bar-cost-section cost-bar-cost-section-first">
             <div className="cost-bar-fields-row">
-              {COST_FIELDS.filter((f) => ['pkh', 'soc'].includes(f.key)).map(({ key, label }) => (
-                <label className="cost-bar-field cost-bar-cost-field" key={key}>
-                  <span>{label}</span>
-                  <FormattedNumberInput
-                    id={`bulk-cost-${key}`}
-                    name={`bulkCost.${key}`}
-                    value={costs[key]}
-                    focused={focusedCostInput === key}
-                    onBlur={() => setFocusedCostInput(null)}
-                    onChange={(event) => updateCost(key, event.target.value)}
-                    onFocus={() => setFocusedCostInput(key)}
-                    placeholder="0.00"
-                    aria-label={label}
-                  />
-                </label>
-              ))}
+              {COST_FIELDS.filter((f) => ['pkh', 'soc'].includes(f.key)).map(({ key, label }) => {
+                const displayLabel = `${label} (${costs.currency})`;
+                return (
+                  <label className="cost-bar-field cost-bar-cost-field" key={key}>
+                    <span>{displayLabel}</span>
+                    <FormattedNumberInput
+                      id={`bulk-cost-${key}`}
+                      name={`bulkCost.${key}`}
+                      value={costs[key]}
+                      focused={focusedCostInput === key}
+                      onBlur={() => setFocusedCostInput(null)}
+                      onChange={(event) => updateCost(key, event.target.value)}
+                      onFocus={() => setFocusedCostInput(key)}
+                      placeholder="0.00"
+                      aria-label={displayLabel}
+                    />
+                  </label>
+                );
+              })}
             </div>
           </div>
 
           {/* FR CC TT */}
           <div className="cost-bar-cost-section">
             <div className="cost-bar-fields-row">
-              {COST_FIELDS.filter((f) => ['freight', 'customs', 'wireTT'].includes(f.key)).map(({ key, label }) => (
-                <label className="cost-bar-field cost-bar-cost-field" key={key}>
-                  <span>{label}</span>
-                  <FormattedNumberInput
-                    id={`bulk-cost-${key}`}
-                    name={`bulkCost.${key}`}
-                    value={costs[key]}
-                    focused={focusedCostInput === key}
-                    onBlur={() => setFocusedCostInput(null)}
-                    onChange={(event) => updateCost(key, event.target.value)}
-                    onFocus={() => setFocusedCostInput(key)}
-                    placeholder="0.00"
-                    aria-label={label}
-                  />
-                </label>
-              ))}
+              {COST_FIELDS.filter((f) => ['freight', 'customs', 'wireTT'].includes(f.key)).map(({ key, label }) => {
+                const displayLabel = `${label} (${costs.currency})`;
+                return (
+                  <label className="cost-bar-field cost-bar-cost-field" key={key}>
+                    <span>{displayLabel}</span>
+                    <FormattedNumberInput
+                      id={`bulk-cost-${key}`}
+                      name={`bulkCost.${key}`}
+                      value={costs[key]}
+                      focused={focusedCostInput === key}
+                      onBlur={() => setFocusedCostInput(null)}
+                      onChange={(event) => updateCost(key, event.target.value)}
+                      onFocus={() => setFocusedCostInput(key)}
+                      placeholder="0.00"
+                      aria-label={displayLabel}
+                    />
+                  </label>
+                );
+              })}
             </div>
           </div>
 
@@ -1279,7 +1285,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           <div className="cost-bar-cost-section">
             <div className="cost-bar-fields-row">
               <label className="cost-bar-field cost-bar-currency-field">
-                <span>Currency</span>
+                <span>Quote Currency</span>
                 <select
                   id="bulk-cost-currency"
                   name="bulkCost.currency"
@@ -1317,7 +1323,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
         <div className="cost-bar-note">
           <Info size={16} aria-hidden="true" />
-          <span>Enter quote-level costs once. CAL allocates them to the selected item lines.</span>
+          <span>Enter Step 2 costs in the selected quote currency. CAL allocates them, then converts final values to THB using the exchange rate.</span>
         </div>
       </section>
 
@@ -2792,13 +2798,13 @@ function TermDraftPreview({
         <DraftPreviewField label="Ship Wt/Ea" value={fmt(finalResult.shipWeightCal)} />
         <DraftPreviewField label="Duty %" value={fmt(finalResult.importDutyPercent)} />
         <DraftPreviewField label="Insurance %" value={fmt(finalResult.insPercent)} />
-        <DraftPreviewField label="FR QTEC" value={fmt(finalResult.frQTEC)} />
+        <DraftPreviewField label="FR Actual (THB)" value={fmt(finalResult.frQTEC)} />
         <DraftPreviewField label="Zone Rate" value={fmt(finalResult.frZoneRate)} />
-        <DraftPreviewField label="TT" value={fmt(finalResult.wireTT)} />
-        <DraftPreviewField label="CC" value={fmt(finalResult.customClear)} />
+        <DraftPreviewField label="TT (THB)" value={fmt(finalResult.wireTT)} />
+        <DraftPreviewField label="CC (THB)" value={fmt(finalResult.customClear)} />
         <DraftPreviewField label="QLC" value={fmt(finalResult.qlc)} />
-        <DraftPreviewField label="SPK" value={fmt(finalResult.spk)} />
-        <DraftPreviewField label="QOC" value={fmt(finalResult.qocVal)} />
+        <DraftPreviewField label="SPK (THB)" value={fmt(finalResult.spk)} />
+        <DraftPreviewField label="QOC (THB)" value={fmt(finalResult.qocVal)} />
         <DraftPreviewField label="Total QLC" value={fmt(finalResult.totalQLC)} />
         <DraftPreviewField label="Markup" value={fmt(finalResult.markup)} />
       </DraftPreviewSection>

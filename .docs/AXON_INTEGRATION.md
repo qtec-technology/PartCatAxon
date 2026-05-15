@@ -175,6 +175,12 @@ Suggested JSON shape:
 | `insurance.amount` / `insurance.percent` | Insurance input, if present |
 | `otherCharges[]` | Review-only until mapped |
 
+Cost Bar amounts are interpreted in the run's selected quote currency and are
+converted to THB by the Bulk Cost exchange rate during final calculation. AXON
+should preserve the source currency for extracted header costs; mixed-currency
+freight/CC/TT charges must remain review-only until a user normalizes them or a
+backend/shared mixed-currency calculation path exists.
+
 Allowed `basis` values:
 
 ```text

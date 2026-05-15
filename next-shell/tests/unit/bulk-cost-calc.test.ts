@@ -289,6 +289,26 @@ describe('Final Result (OP1 → Round Up)', () => {
     }
   });
 
+  it('treats SPK as a THB amount added after QLC conversion, not a percentage', () => {
+    const lines = [makeLine({
+      unitPrice: 123,
+      qty: 1,
+      stockConversion: 1,
+      saleConversion: 1,
+      sspk: 5,
+      qoc: 2,
+      markupPercent: 0,
+      insPercent: 0,
+      importDutyPercent: 0,
+    })];
+    const costs = makeCosts({ pkh: 0, soc: 0, freight: 0, customs: 0, wireTT: 0, exchangeRate: 1 });
+    const result = calculateAllocationPreview(lines, costs);
+    const fr = result.lines[0].finalResult;
+
+    expect(fr.totalQLC).toBeCloseTo(fr.qlc + 5 + 2, 4);
+    expect(fr.totalQLC).not.toBeCloseTo(fr.qlc * 1.05 + 2, 4);
+  });
+
   it('should pass through doc fees from source line', () => {
     const lines = [makeLine({
       docFee: { coc: 1.50, millCert: 2.00, testCert: 0.75, coa: 0, coo: 0, anyOther: 3.00 },
@@ -564,7 +584,7 @@ describe('Golden Test Cases', () => {
       freight: 40000,
       customs: 8000,
       wireTT: 1500,
-      currency: 'THB',
+      currency: 'USD',
       exchangeRate: 33,
     });
 

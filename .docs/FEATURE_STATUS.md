@@ -81,6 +81,7 @@
 
 | วันที่ | การเปลี่ยนแปลง | Verification |
 |---|---|---|
+| 2026-05-15 | Clarified Bulk Cost currency display: Step 2 Cost Bar inputs now show the selected quote currency, the final AY-CP/Term preview output labels THB values for FR/CC/TT/SPK/QOC, and SPK/QOC remain fixed THB adders rather than percentages | `npm run typecheck`, `npm test` (server 104 + next-shell 65), `npm run build` |
 | 2026-05-15 | Split Bulk Cost freight display/persistence semantics: final AY-CA/`FR QTEC` and Term preview `Freight (FR)` use actual allocated freight for CIF/preQLC, while DraftTerm `U_FreightQTEC` and Term preview `Freight to QTEC WH` use the reference `ShipWeightCal * FreightRate` value | `npm run typecheck`, `npm test` (server 104 + next-shell 63), `npm run build` |
 | 2026-05-15 | Fixed Bulk Cost final-result display mapping for FR actual: AY-CA / `FR QTEC` now displays the allocated freight value used by CIF/preQLC instead of the reference `shipWeightCal * freightRate` value; formula path itself was unchanged | `npm.cmd --prefix next-shell test -- --run bulk-cost-calc bulk-cost-formula-audit` |
 | 2026-05-15 | Added Bulk Cost formula audit guard: per-line audit rows for OP source, OP1, OP2, INS, FR/CIF/DT actual-zone branches, ET/MT, preQLC, STK, QLC, QLC2, Total QLC, markup, and sales price; Formula view status now shows audit Pass/Warn/Fail; Excel workbook baseline was readable for AY-CP shape/formulas, while newer diagnostic values remain covered by module tests | `npm.cmd --prefix next-shell test -- --run bulk-cost-formula-audit bulk-cost-final-result` |

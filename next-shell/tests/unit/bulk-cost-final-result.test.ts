@@ -143,6 +143,18 @@ describe('Bulk Cost final result schema', () => {
     expect(BULK_COST_DIAGNOSTIC_COLUMNS.every((column) => !column.excelColumn)).toBe(true);
   });
 
+  it('labels THB final-result money fields explicitly', () => {
+    const labelsByKey = new Map(BULK_COST_AY_CP_COLUMNS.map((column) => [column.key, column.label]));
+
+    expect(labelsByKey.get('frQTEC')).toBe('FR Actual (THB)');
+    expect(labelsByKey.get('wireTT')).toBe('TT (THB)');
+    expect(labelsByKey.get('customClear')).toBe('CC (THB)');
+    expect(labelsByKey.get('ttFinal')).toBe('TT Final (THB)');
+    expect(labelsByKey.get('ccFinal')).toBe('CC Final (THB)');
+    expect(labelsByKey.get('spk')).toBe('SPK (THB)');
+    expect(labelsByKey.get('qocVal')).toBe('QOC (THB)');
+  });
+
   it('exports AY-CP rows by Excel column letter', () => {
     const row = toAyCpFinalResultRow(makeFinalResult());
 

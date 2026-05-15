@@ -161,6 +161,23 @@ because that is the value used by the Bulk Cost formula. DraftTerm persistence
 still writes the reference freight into `U_FreightQTEC` so the saved snapshot
 matches Term page semantics.
 
+Final-result labels intentionally include `(THB)` on allocated freight, CC, TT,
+SPK, and QOC fields. These values have already been converted or entered as Thai
+baht by the time they appear in the final AY-CP result.
+
+Currency is specified before calculation in Step 1/Step 2:
+
+- Step 1 line `Currency` is the supplier quote currency for unit price.
+- Step 2 `Quote Currency` is the currency for Cost Bar inputs such as PKH, SOC,
+  freight, CC, and TT.
+- Step 2 `Exchange Rate to THB` converts those Step 1/Step 2 source-currency
+  inputs into the final Thai baht calculation fields.
+
+The current frontend formula assumes one quote currency per run. If a supplier
+quote mixes THB freight/CC/TT with foreign-currency item prices, users must
+normalize the amounts before CAL, or the run must be split/held until a shared
+backend calculation path supports mixed-currency costs explicitly.
+
 ### ShipWeightCal Priority
 
 1. ใช้ `shippingWeightPerEach` (extracted จาก AXON) ก่อน

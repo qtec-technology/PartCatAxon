@@ -45,6 +45,16 @@ If AXON extracts mixed values, the run must be split or held until the user reso
 | Exchange Rate | One editable THB rate for the quote currency. |
 | Ship Mode | One selection per run (affects ExworkCase and DW divisor). |
 
+In the frontend Step 2 Cost Bar, PKH, SOC, freight, CC, and TT are entered in
+the selected quote currency. They are allocated first, then converted to THB by
+`Exchange Rate to THB` when final result fields such as OP1, FR actual, TT, CC,
+QLC, Total QLC, markup, and sales price are computed.
+
+Mixed currency inside one run is not currently modeled. If freight, CC, or TT
+arrives as a Thai baht charge while item prices are in a foreign currency, that
+amount must be normalized before CAL, or the run should be held until the
+backend/shared Bulk Cost calculation design supports mixed-currency inputs.
+
 Line-level fields remain per item: qty, unit price, document fees, dimensions,
 shipping weight, duty%, UOM, lead time, permit/shelf-life flags.
 
@@ -243,6 +253,10 @@ totalQLC = qlc3Base + SPK + QOC
 
 - `SPK` = selling packing cost per sale unit
 - `QOC` = quality/other charge per sale unit
+
+SPK and QOC are THB amount adders, not percentages. The backend Term engine and
+Bulk Cost frontend both apply them after QLC stock/sale conversion:
+`totalQLC = qlc3Base + SPK + QOC`.
 
 ### 4.13 Markup and Round-Up
 
