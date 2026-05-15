@@ -31,6 +31,12 @@ import type {
 } from './bulk-cost.types';
 import { EMPTY_BULK_COST_INPUT, ITEM_GROUP_OPTIONS, SHIP_MODE_LABELS, formatItemGroup, formatShipMode } from './bulk-cost.types';
 import { calculateAllocationPreview } from './bulk-cost.calc';
+import {
+  FINAL_RESULT_COLS,
+  FINAL_RESULT_COLS_BY_KEY,
+  type FinalResultColumnDefinition,
+  type FinalResultKey,
+} from './bulk-cost.final-result';
 import { buildBulkCostRunDraftPayload, loadBulkCostRun, saveBulkCostRunDraft, updateBulkCostRunStatus } from './bulk-cost.api';
 import { getDemoCostsForSupplier, getDemoLinesForSupplier } from './bulk-cost.mock';
 import { useResizableTableColumns, type ResizableTableColumn } from './useResizableTableColumns';
@@ -82,56 +88,6 @@ const ALLOC_COLS = [
   { key: 'ccPerEach', label: 'CC/Ea' },
   { key: 'wireTTPerEach', label: 'TT/Ea' },
 ] as const;
-
-type FinalResultKey = keyof FinalResultColumns;
-
-const FINAL_RESULT_COLS: { key: FinalResultKey; label: string; kind: 'text' | 'number'; editable?: boolean }[] = [
-  { key: 'supplierName', label: 'Supplier', kind: 'text' },
-  { key: 'purchaseOrderTerm', label: 'PO Term', kind: 'text' },
-  { key: 'termLocation', label: 'Location', kind: 'text' },
-  { key: 'productCost', label: 'PCS', kind: 'number', editable: true },
-  { key: 'pkh', label: 'PKH', kind: 'number', editable: true },
-  { key: 'soc', label: 'SOC', kind: 'number', editable: true },
-  { key: 'docCOC', label: 'COC', kind: 'number', editable: true },
-  { key: 'docMill', label: 'Mill', kind: 'number', editable: true },
-  { key: 'docTestCert', label: 'Test Cert', kind: 'number', editable: true },
-  { key: 'docCOO', label: 'COO/COA', kind: 'number', editable: true },
-  { key: 'docAnyOther', label: 'Any Other', kind: 'number', editable: true },
-  { key: 'currency', label: 'Curr', kind: 'text' },
-  { key: 'op1Source', label: 'OP1', kind: 'number', editable: true },
-  { key: 'rateExchange', label: 'EX.RATE', kind: 'number', editable: true },
-  { key: 'shipWeightCal', label: 'Ship Wt', kind: 'number', editable: true },
-  { key: 'insPercent', label: 'INS %', kind: 'number', editable: true },
-  { key: 'importDutyPercent', label: 'Duty %', kind: 'number', editable: true },
-  { key: 'purchaseUOM', label: 'Pur UOM', kind: 'text' },
-  { key: 'stockUOM', label: 'Stk UOM', kind: 'text' },
-  { key: 'saleUOM', label: 'Sale UOM', kind: 'text' },
-  { key: 'stockConversion', label: 'Stk Conv', kind: 'number', editable: true },
-  { key: 'saleConversion', label: 'Sale Conv', kind: 'number', editable: true },
-  { key: 'purchaseMOQ', label: 'MOQ', kind: 'number', editable: true },
-  { key: 'wireTT', label: 'TT', kind: 'number', editable: true },
-  { key: 'customClear', label: 'CC', kind: 'number', editable: true },
-  { key: 'op1', label: 'OP1 (THB)', kind: 'number', editable: true },
-  { key: 'exworkCase', label: 'Exwork', kind: 'number', editable: true },
-  { key: 'op2', label: 'OP2 (THB)', kind: 'number', editable: true },
-  { key: 'ins', label: 'INS', kind: 'number', editable: true },
-  { key: 'frQTEC', label: 'FR QTEC', kind: 'number', editable: true },
-  { key: 'frZoneRate', label: 'FR Zone/KG', kind: 'number', editable: true },
-  { key: 'frZoneCost', label: 'FR Zone', kind: 'number', editable: true },
-  { key: 'cifQTEC', label: 'CIF QTEC', kind: 'number', editable: true },
-  { key: 'cifZone', label: 'CIF Zone', kind: 'number', editable: true },
-  { key: 'dtQTEC', label: 'DT QTEC', kind: 'number', editable: true },
-  { key: 'dtZone', label: 'DT Zone', kind: 'number', editable: true },
-  { key: 'selectedDuty', label: 'Final DT', kind: 'number', editable: true },
-  { key: 'ttFinal', label: 'TT Final', kind: 'number', editable: true },
-  { key: 'ccFinal', label: 'CC Final', kind: 'number', editable: true },
-  { key: 'qlc', label: 'QLC', kind: 'number', editable: true },
-  { key: 'spk', label: 'SPK', kind: 'number', editable: true },
-  { key: 'qocVal', label: 'QOC', kind: 'number', editable: true },
-  { key: 'totalQLC', label: 'Total QLC', kind: 'number', editable: true },
-  { key: 'markup', label: 'Markup', kind: 'number', editable: true },
-  { key: 'roundUp', label: 'Round Up', kind: 'number', editable: true },
-];
 
 const getDocFeeColumnKey = (key: keyof DocumentFees) => `doc-${key}`;
 const getFinalResultColumnKey = (key: FinalResultKey) => `final-${key}`;
@@ -365,7 +321,7 @@ const FORMULA_RESULT_KEYS: FinalResultKey[] = [
   'roundUp',
 ];
 
-const FINAL_RESULT_COL_BY_KEY = new Map(FINAL_RESULT_COLS.map((column) => [column.key, column]));
+const FINAL_RESULT_COL_BY_KEY = FINAL_RESULT_COLS_BY_KEY;
 
 const BASE_REVIEW_RESULT_COLUMNS: ResizableTableColumn[] = [
   { key: 'rowNo', defaultWidth: 58, minWidth: 48 },
@@ -2916,7 +2872,7 @@ function FinalResultCell({
   onEdit,
 }: {
   lineKey: string;
-  column: { key: FinalResultKey; label: string; kind: 'text' | 'number'; editable?: boolean };
+  column: FinalResultColumnDefinition;
   value: FinalResultColumns[FinalResultKey];
   onEdit: (lineKey: string, key: FinalResultKey, raw: string) => void;
 }) {

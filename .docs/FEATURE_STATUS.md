@@ -52,8 +52,9 @@
 - Live preview calculation (pure frontend, mock data)
 - Per-line document fees, editable final result
 - Pure document-fee basis helper/tests: Per Each, item-total normalization, By Lot / Batch service-line candidates
+- AY-CP final-result schema module: full final CAL table is locked to exactly 44 Excel columns (AY-CP); formula diagnostics stay separate; Term preview now receives ET/MT/preQLC/STK/QLC2 instead of zeros
 - Item/Term preview via localStorage bridge
-- 44 next-shell unit tests ผ่าน (allocation, rounding, warnings, Excel golden regression, document-fee basis, item API mapping, lookup cache/sub-location regressions)
+- 55 next-shell unit tests ผ่าน (allocation, rounding, warnings, Excel golden regression, document-fee basis, AY-CP final-result schema, Term preview mapping, item API mapping, lookup cache/sub-location regressions)
 - 83 server unit tests ผ่าน (45 calc engine + 28 golden-case + 10 exact parity vs production CSV)
 
 ---

@@ -65,6 +65,7 @@ URL params `?supplier=CODE&supplierName=NAME` เก็บ supplier ที่เ
 | `src/features/bulk-cost/BulkCostWorkspace.tsx` | Main workspace UI (~2000 lines) |
 | `src/features/bulk-cost/bulk-cost.types.ts` | TypeScript interfaces ทั้งหมด |
 | `src/features/bulk-cost/bulk-cost.calc.ts` | Pure calculation function |
+| `src/features/bulk-cost/bulk-cost.final-result.ts` | AY-CP final-result schema and diagnostic-column separation |
 | `src/features/bulk-cost/bulk-cost.document-fees.ts` | Pure document-fee basis helper: Per Each, item-total normalization, By Lot / Batch line candidates |
 | `src/features/bulk-cost/bulk-cost.api.ts` | Build/save `BulkCostRun` draft snapshot payload |
 | `src/features/bulk-cost/bulk-cost.mock.ts` | Mock data (Grainger + 12 quotes) — frontend only |
@@ -94,8 +95,14 @@ AllocationPreview       // ผลลัพธ์รวมทั้งหมด (
 AllocationWarning       // คำเตือน (missing weight, rounding residual, etc.)
 SeparateLineItem        // ค่าที่แยกออกจากการ allocate (เช่น freight ต่อ each)
 AllocationRun           // Context ของการ CAL 1 ครั้ง (costs + selectedLines)
-FinalResultColumns      // คอลัมน์ผลลัพธ์สุดท้าย (AY-CP ตาม Excel spec)
+FinalResultColumns      // คอลัมน์ผลลัพธ์สุดท้าย (AY-CP + diagnostic fields)
 ```
+
+`bulk-cost.final-result.ts` is the display/export contract for the CAL final
+table. `BULK_COST_AY_CP_COLUMNS` is exactly Excel AY-CP (44 columns).
+Diagnostic fields such as `op1Source`, `et`, `mt`, `miscTaxVal`, `scc`,
+`preQLC`, and `stk` remain available for formula review, but they are not part
+of the AY-CP table.
 
 ---
 

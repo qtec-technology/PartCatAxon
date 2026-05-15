@@ -283,6 +283,16 @@ Bulk STK       = STK% × preQLC
 Bulk QLC       = CEILING(preQLC + STK, 0.01)
 ```
 
+Implementation ownership as of 2026-05-15:
+
+- Bulk Cost allocation/CAL currently runs in the Next.js frontend pure function
+  `next-shell/src/features/bulk-cost/bulk-cost.calc.ts`.
+- Term calculation remains backend source of truth in
+  `server/src/services/calculation.service.ts`.
+- Before Awarded automation or SAP writes, Bulk Cost should be promoted to a
+  backend/shared calculation source of truth so preview, save, automation, and
+  reverse mapping cannot drift.
+
 ---
 
 ## 6. Source Fields From Excel
@@ -298,6 +308,12 @@ Source lines map to Excel Part 1:
 | AK | import duty % | duty calculation |
 | AM–AW | allocated costs | PKH/SOC/FR/CC/TT per line |
 | AY–CP | final result | Term-style output columns |
+
+The UI final-result table uses `BULK_COST_AY_CP_COLUMNS` from
+`bulk-cost.final-result.ts`, which locks the final CAL display to exactly 44
+Excel columns from AY through CP. Formula diagnostics (`op1Source`, ET/MT
+components, MiscTax, SCC, preQLC, STK) are intentionally separate from AY-CP and
+should be shown only in formula-check or audit views.
 
 Document fee normalisation: only item-specific non-per-each document fees may be
 normalized to per each before CAL (`itemLineDocFee / qty`). Any document fee

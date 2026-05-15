@@ -146,6 +146,8 @@ export function mapBulkCostToTermCalcResults(
   source: AllocationLineSource,
   finalResult: FinalResultColumns,
 ): TermCalcResults {
+  const qlc2 = finalResult.stockConversion > 0 ? finalResult.qlc / finalResult.stockConversion : 0;
+
   return {
     OP1: finalResult.op1Source,
     OP1_THB: finalResult.op1,
@@ -160,12 +162,12 @@ export function mapBulkCostToTermCalcResults(
     DT: Math.max(finalResult.dtQTEC, finalResult.dtZone),
     DT_FR: finalResult.dtQTEC,
     DT_ZONE: finalResult.dtZone,
-    ET: 0,
-    MT: 0,
-    PRE_QLC: 0,
-    STK: 0,
+    ET: finalResult.et,
+    MT: finalResult.mt,
+    PRE_QLC: finalResult.preQLC,
+    STK: finalResult.stk,
     QLC: finalResult.qlc,
-    QLC2: 0,
+    QLC2: qlc2,
     QLC3: finalResult.totalQLC,
     TOTAL_PRICE: finalResult.totalQLC,
     MK_THB: finalResult.markup,
