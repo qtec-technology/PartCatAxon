@@ -201,6 +201,10 @@ The Step 3 Review table is mapped toward the Term calculation layout:
 `Exwork` remains available in Formula/Audit diagnostics but is not shown in the
 Step 3 Review table.
 
+Bulk Cost DraftTerm save now writes `U_ValidFrom` using the server save date so
+every saved draft term has a validity start date. `U_ValidTo` remains null until
+an explicit business rule is confirmed.
+
 ### ShipWeightCal Priority
 
 1. ใช้ `shippingWeightPerEach` (extracted จาก AXON) ก่อน

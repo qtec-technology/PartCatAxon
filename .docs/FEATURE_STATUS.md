@@ -81,6 +81,7 @@
 
 | วันที่ | การเปลี่ยนแปลง | Verification |
 |---|---|---|
+| 2026-05-15 | Bulk Cost DraftTerm save now persists `U_ValidFrom` with the server save date so every saved draft term has a Valid From value; `U_ValidTo` remains unset until business default is confirmed | `npm run typecheck`, `npm test` (server 106 + next-shell 66), `npm run build` |
 | 2026-05-15 | Mapped Bulk Cost Step 3 display closer to Term: Review now shows document-fee total, Currency, `OP1 (PSC)`, and `FR QTEC`; Exwork is hidden from Review but kept in Formula/Audit; Step 2 weight view adds read-only `Chargeable Wt/Ea`; Term preview always supplies `Valid From`; backend Term calculation accepts optional document fees defaulting to zero | `npm run typecheck`, `npm test` (server 105 + next-shell 66), `npm run build` |
 | 2026-05-15 | Clarified Bulk Cost currency display: Step 2 Cost Bar inputs now show the selected quote currency, the final AY-CP/Term preview output labels THB values for FR/CC/TT/SPK/QOC, and SPK/QOC remain fixed THB adders rather than percentages | `npm run typecheck`, `npm test` (server 104 + next-shell 65), `npm run build` |
 | 2026-05-15 | Split Bulk Cost freight display/persistence semantics: final AY-CA/`FR QTEC` and Term preview `Freight (FR)` use actual allocated freight for CIF/preQLC, while DraftTerm `U_FreightQTEC` and Term preview `Freight to QTEC WH` use the reference `ShipWeightCal * FreightRate` value | `npm run typecheck`, `npm test` (server 104 + next-shell 63), `npm run build` |

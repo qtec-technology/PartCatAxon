@@ -78,6 +78,11 @@ function dateToIso(value: Date | string): string {
     return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
 }
 
+function todayDateOnly(): Date {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
 function json(value: unknown): string {
     return JSON.stringify(value ?? null);
 }
@@ -273,6 +278,7 @@ export async function createBulkCostRun(
             termRequest.input('NumInSale', sql.Decimal(19, 6), numberValue(latest.saleConversion, 1));
             termRequest.input('U_MOQ', sql.NVarChar(50), nullableText(latest.moq));
             termRequest.input('LeadTime', sql.NVarChar(5), nullableText(latest.deliveryLeadTime));
+            termRequest.input('U_ValidFrom', sql.Date, todayDateOnly());
             termRequest.input('Updatedby', sql.NVarChar(50), actorName);
             // calculated columns from CAL engine
             termRequest.input('U_OP', sql.Decimal(19, 6), numberValue(finalResult.op1Source, 0));

@@ -43,7 +43,7 @@ These are architecture, formula, persistence, or high-risk tasks.
 - [x] Reserved for Codex: Rename `FR Actual (THB)` to `FR QTEC` across final
   result, DraftTerm preview, persistence semantics, and formula audit without
   reintroducing the earlier `U_FR` vs `U_FreightQTEC` confusion.
-- [ ] Reserved for Codex: Make `Valid From` mandatory for Bulk Cost DraftTerm
+- [x] Reserved for Codex: Make `Valid From` mandatory for Bulk Cost DraftTerm
   preview/save, including defaulting rules and database mapping.
 - [ ] Reserved for Codex: Design the best preview/save path that uses the
   backend Term formula source of truth instead of duplicating Term logic in the

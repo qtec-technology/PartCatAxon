@@ -18,11 +18,11 @@ approves.
 
 ## Last Known Full Verification
 
-For the latest Bulk Cost Step 3 mapping pass before commit:
+For the latest Bulk Cost DraftTerm Valid From persistence pass before commit:
 
 ```text
 npm run typecheck: passed
-npm test: passed, server 105 + next-shell 66
+npm test: passed, server 106 + next-shell 66
 npm run build: passed
 ```
 

@@ -305,6 +305,9 @@ input. The value defaults to zero, so existing Term rows and golden cases keep
 their historical behavior until the Term UI/API/DraftTerm persistence path
 passes `U_DocFees` explicitly.
 
+Bulk Cost DraftTerm persistence always writes `U_ValidFrom` with the server save
+date. This is a snapshot validity default, not part of the numeric formula.
+
 Implementation ownership as of 2026-05-15:
 
 - Bulk Cost allocation/CAL currently runs in the Next.js frontend pure function

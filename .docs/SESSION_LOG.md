@@ -46,6 +46,17 @@ Updated: 2026-05-15
 - Browser check was attempted again through the in-app browser against
   `http://127.0.0.1:3010/bulk-cost?...`; the browser environment blocked the
   local page with `net::ERR_BLOCKED_BY_CLIENT`.
+- Continued with DraftTerm save parity:
+  - `server/src/repositories/bulk-cost.repository.ts` now binds `U_ValidFrom`
+    as the server save date.
+  - `server/src/queries/domains/bulk-cost/bulk-cost.write.ts` inserts
+    `U_ValidFrom` into DraftTerm.
+  - Added `server/src/__tests__/bulk-cost-write-sql.test.ts`.
+  - Focused verification passed:
+    `npm.cmd --prefix server test -- --run bulk-cost-write-sql calculation.service`.
+  - Full verification passed:
+    `npm.cmd run typecheck`, `npm.cmd test` with server 106 + next-shell 66,
+    and `npm.cmd run build`.
 
 ## Browser Note
 
