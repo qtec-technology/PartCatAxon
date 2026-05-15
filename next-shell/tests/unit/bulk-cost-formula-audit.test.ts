@@ -155,6 +155,18 @@ describe('Bulk Cost formula audit', () => {
     expect(rowValue(audit.rows, 'qlc2', 'actualValue')).toBeCloseTo(expectedQlc2, 6);
   });
 
+  it('fails FR actual when the displayed final result does not match allocated freight used by the formula', () => {
+    const { allocationLine, line } = auditLine();
+    const overridden: FinalResultColumns = {
+      ...allocationLine.finalResult,
+      frQTEC: 999999,
+    };
+    const audit = buildBulkCostFormulaAudit(line, makeCosts(), overridden, { allocationLine });
+
+    expect(audit.status).toBe('fail');
+    expect(audit.rows.find((row) => row.stepKey === 'fr-actual')?.status).toBe('fail');
+  });
+
   it('audits Total QLC as QLC2 times saleConversion plus SPK and QOC', () => {
     const { allocationLine, audit } = auditLine();
 

@@ -584,6 +584,7 @@ describe('Golden Test Cases', () => {
     expect(firstLine.freightPerEach).toBeCloseTo(10740.768, 3);
     expect(firstLine.wireTTPerEach).toBeCloseTo(217.604, 3);
     expect(firstLine.ccPerEach).toBeCloseTo(2148.154, 3);
+    expect(firstLine.finalResult.frQTEC).toBeCloseTo(firstLine.freightPerEach * costs.exchangeRate, 3);
     expect(firstLine.finalResult.shipWeightCal).toBeCloseTo(52.21, 2);
 
     expect(result.lines.reduce((sum, line) => sum + line.pkhPerItem, 0)).toBeCloseTo(75, 6);

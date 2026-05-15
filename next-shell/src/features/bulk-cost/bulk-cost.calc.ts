@@ -279,9 +279,6 @@ function computeFinalResult(
     ? line.shippingWeightPerEach
     : ceilTo(Math.max(dw, iw), 0.5);
 
-  // ── Freight calculations ──────────────────────────────────────────────────
-  const frQTEC = round6(swCal * line.freightRate);
-
   // FR Zone
   let frZoneRate = 0;
   let frZoneCost = 0;
@@ -297,6 +294,7 @@ function computeFinalResult(
 
   // ── Freight per each (allocated) — use the allocated value ────────────────
   const frEachTHB = round6(freightEach * exRate);
+  const frQTEC = frEachTHB;
 
   // ── CIF ───────────────────────────────────────────────────────────────────
   let cifQTEC = 0;

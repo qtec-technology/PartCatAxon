@@ -89,7 +89,7 @@ export function buildBulkCostFormulaAudit(
     ? round6(options.allocationLine.freightPerEach * costs.exchangeRate)
     : finalResult.frQTEC;
   const frActualNote = options.allocationLine
-    ? 'Compared against allocated freight per each converted to THB.'
+    ? 'Visible FR actual must match the allocated freight value used by CIF/preQLC.'
     : 'No allocation result supplied; using final FR value as the audit baseline.';
   const frZoneRateExpected = isFcaOrExwork && costs.shipModeNo === 6 ? source.zoneRate : 0;
   const frZoneExpected = round6(
@@ -193,7 +193,7 @@ export function buildBulkCostFormulaAudit(
     expectedValue: frActualExpected,
     actualValue: finalResult.frQTEC,
     note: frActualNote,
-    mismatchStatus: options.allocationLine ? 'warn' : 'pass',
+    mismatchStatus: options.allocationLine ? 'fail' : 'pass',
   });
   addNumericRow(rows, tolerance, {
     stepKey: 'fr-zone',

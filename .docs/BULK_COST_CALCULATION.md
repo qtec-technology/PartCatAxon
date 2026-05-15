@@ -181,10 +181,12 @@ swCal = shippingWeightPerEach   if provided and > 0
 frEachTHB = freightEach (allocated, source currency) × exchangeRate
 ```
 
+The visible final-result `FR QTEC` / AY-CA value displays this allocated
+`frEachTHB` value, because it is the same value used in CIF actual and preQLC.
+
 Separately, QTEC zone freight is also computed for reference (used in CIF Zone):
 
 ```text
-frQTEC    = swCal × freightRate            (per-each, THB)
 frZoneCost = 0.1 × OP2                    if Exwork/FCA + shipModeNo=3
            = MAX(DW, itemWeight) × zoneRate if Exwork/FCA + shipModeNo=6
            = 0                             otherwise
@@ -382,7 +384,7 @@ quotation run should be calculated for one supplier and one currency.
 | INS | line 264 |
 | DW calc | `calcDW` helper, lines 396–407 |
 | swCal | lines 269–271 |
-| FR (allocated, THB) | line 290 |
+| FR (allocated/displayed, THB) | line 290 |
 | frZoneCost | lines 277–287 |
 | CIF / CIF Zone | lines 293–302 |
 | Duty Tax | lines 305–307 |
