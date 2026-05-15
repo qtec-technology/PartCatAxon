@@ -18,11 +18,11 @@ approves.
 
 ## Last Known Full Verification
 
-For commit `82007fc fix: clarify bulk cost currency display`:
+For the latest Bulk Cost Step 3 mapping pass before commit:
 
 ```text
 npm run typecheck: passed
-npm test: passed, server 104 + next-shell 65
+npm test: passed, server 105 + next-shell 66
 npm run build: passed
 ```
 
@@ -44,4 +44,3 @@ npm.cmd --prefix next-shell test -- --run bulk-cost-formula-audit bulk-cost-fina
   touches `@POITM` / `@PITM1`.
 - Browser verification is useful for Step 3 display changes, but do not rely on
   it as the only validation.
-

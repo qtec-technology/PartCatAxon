@@ -53,6 +53,11 @@ describe('Calculation Engine — calculate()', () => {
         expect(result.U_OP).toBe(130);
     });
 
+    it('OP includes optional document fees when provided', () => {
+        const result = calculate(makeInput({ productCost: 100, pkh: 20, soc: 10, docFees: 7 }));
+        expect(result.U_OP).toBe(137);
+    });
+
     it('OP_SUM = OP * exchangeRate', () => {
         const result = calculate(makeInput({ productCost: 100, pkh: 0, soc: 0, exchangeRate: 35 }));
         expect(result.U_OP_SUM).toBe(3500);

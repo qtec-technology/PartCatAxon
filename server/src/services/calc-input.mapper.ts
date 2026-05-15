@@ -19,6 +19,7 @@ export function toCalcInput(data: Record<string, any>): CalcInput {
         productCost: Number(data.U_ProdCost) || 0,
         pkh: Number(data.U_PKH) || 0,
         soc: Number(data.U_SOC) || 0,
+        docFees: Number(data.U_DocFees ?? data.U_FEES ?? data.U_Fees) || 0,
         exchangeRate: data.U_PurRate != null ? Number(data.U_PurRate) : 1,
 
         // ─── Freight to QTEC (FR) ───────────────────────────────────────

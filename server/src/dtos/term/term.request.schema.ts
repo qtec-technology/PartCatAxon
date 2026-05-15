@@ -42,6 +42,7 @@ const termBodyShape = {
     U_PurRate: zBodyNumber,
     U_PKH: zBodyOptionalNumber,
     U_SOC: zBodyOptionalNumber,
+    U_DocFees: zBodyOptionalNumber,
 
     U_ShipModeNo: zBodyOptionalInt,
     U_DimUnitNo: zBodyOptionalInt,

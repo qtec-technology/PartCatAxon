@@ -275,7 +275,7 @@ roundUp = totalQLC / denom                (if denom > 0)
 The existing Term engine in `server/src/services/calculation.service.ts` uses:
 
 ```text
-Term OP      = ProductCost + PKH + SOC
+Term OP      = ProductCost + PKH + SOC + Documents Fees
 Term OP_SUM  = Term OP × ExchangeRate
 Term OP_THB  = Term OP_SUM × 1.03   if Exwork/FCA/FAS/FOB + shipMode 3 or 6
 INS          = OP_THB × INS%
@@ -288,9 +288,8 @@ TotalPrice   = (QLC / NumInBuy × NumInSale) + SPK + QOC
 SalesPrice   = TotalPrice / (1 − Markup%)
 ```
 
-Bulk Cost is consistent with that sequence. The key difference is that Bulk Cost
-includes only Per Each / UOM By Each document fees in OP1 before the exchange
-rate:
+Bulk Cost is consistent with that sequence. Bulk Cost includes only Per Each /
+UOM By Each document fees in OP1 before the exchange rate:
 
 ```text
 Bulk OP source = productCost + allocatedPKH + allocatedSOC + docFeeTotal
@@ -300,6 +299,11 @@ Bulk preQLC    = OP1 + INS + FR + DT + ET + MT + MiscTax + TT + CC + SCC
 Bulk STK       = STK% × preQLC
 Bulk QLC       = CEILING(preQLC + STK, 0.01)
 ```
+
+The backend Term engine now accepts optional document fees in the calculation
+input. The value defaults to zero, so existing Term rows and golden cases keep
+their historical behavior until the Term UI/API/DraftTerm persistence path
+passes `U_DocFees` explicitly.
 
 Implementation ownership as of 2026-05-15:
 

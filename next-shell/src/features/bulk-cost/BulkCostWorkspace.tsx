@@ -121,6 +121,7 @@ const LINE_TABLE_COLUMNS = [
   { key: 'height', defaultWidth: 90, minWidth: 76 },
   { key: 'dimUnit', defaultWidth: 82, minWidth: 70 },
   { key: 'dimWeight', defaultWidth: 118, minWidth: 104 },
+  { key: 'chargeableWeight', defaultWidth: 140, minWidth: 118 },
   { key: 'shipWeight', defaultWidth: 122, minWidth: 108 },
   { key: 'supplierOrderCode', defaultWidth: 154, minWidth: 124, maxWidth: 320 },
   { key: 'importDuty', defaultWidth: 104, minWidth: 92 },
@@ -190,6 +191,7 @@ const LINE_COLUMN_PRESETS: Record<LineColumnPreset, string[]> = {
     'width',
     'height',
     'dimWeight',
+    'chargeableWeight',
     'shipWeight',
     'status',
   ],
@@ -260,6 +262,7 @@ const LINE_COLUMN_LABELS: Record<string, string> = {
   shelfLife: 'Shelf Life',
   itemWeight: 'Item Wt/Ea',
   dimWeight: 'Dim Wt/Ea',
+  chargeableWeight: 'Chargeable Wt/Ea',
   shipWeight: 'Ship Wt/Ea',
   length: 'Length',
   width: 'Width',
@@ -277,10 +280,11 @@ const REVIEW_RESULT_KEYS: FinalResultKey[] = [
   'productCost',
   'pkh',
   'soc',
+  'docFees',
+  'currency',
   'op1Source',
   'rateExchange',
   'op1',
-  'exworkCase',
   'op2',
   'shipWeightCal',
   'ins',
@@ -303,6 +307,7 @@ const FORMULA_RESULT_KEYS: FinalResultKey[] = [
   'docTestCert',
   'docCOO',
   'docAnyOther',
+  'docFees',
   'currency',
   'op1Source',
   'rateExchange',
@@ -451,6 +456,13 @@ const calcLineDimWeight = (line: AllocationLineSource): number => {
 };
 
 const ceilToHalf = (v: number): number => Math.ceil(v * 2) / 2;
+
+const getChargeableWeightPerEach = (line: AllocationLineSource): number | null => {
+  const hasDimWeight = line.dimensionWeightPerEach !== null;
+  const hasItemWeight = line.itemWeightPerEach !== null;
+  if (!hasDimWeight && !hasItemWeight) return null;
+  return round6(Math.max(line.dimensionWeightPerEach ?? 0, line.itemWeightPerEach ?? 0));
+};
 
 const recalcLineDerivedValues = (line: AllocationLineSource): AllocationLineSource => {
   const qty = Number.isFinite(Number(line.qty)) ? Number(line.qty) : 0;
@@ -1855,6 +1867,8 @@ function SourceLineCell({
       return <LineNullableNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'itemWeightPerEach')} columnKey="itemWeight" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.itemWeightPerEach} onChange={(value) => onNullableNumberChange(line.lineKey, 'itemWeightPerEach', value)} />;
     case 'dimWeight':
       return <LineNullableNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'dimensionWeightPerEach')} columnKey="dimWeight" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.dimensionWeightPerEach} onChange={(value) => onNullableNumberChange(line.lineKey, 'dimensionWeightPerEach', value)} />;
+    case 'chargeableWeight':
+      return <td {...tableSizing.getCellProps('chargeableWeight')} className="numeric-cell">{fmt(getChargeableWeightPerEach(line))}</td>;
     case 'shipWeight':
       return <LineNullableNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'shippingWeightPerEach')} columnKey="shipWeight" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.shippingWeightPerEach} onChange={(value) => onNullableNumberChange(line.lineKey, 'shippingWeightPerEach', value)} />;
     case 'dimUnit':
@@ -2786,7 +2800,7 @@ function TermDraftPreview({
         <DraftPreviewField label="Test Cert" value={fmt(finalResult.docTestCert)} />
         <DraftPreviewField label="COO/COA" value={fmt(finalResult.docCOO)} />
         <DraftPreviewField label="Any Other" value={fmt(finalResult.docAnyOther)} />
-        <DraftPreviewField label="OP1" value={fmt(finalResult.op1Source)} />
+        <DraftPreviewField label="OP1 (PSC)" value={fmt(finalResult.op1Source)} />
         <DraftPreviewField label="OP1 (THB)" value={fmt(finalResult.op1)} />
         <DraftPreviewField label="OP2 (THB)" value={fmt(finalResult.op2)} />
         <DraftPreviewField label="Round Up" value={fmt(finalResult.roundUp)} />
@@ -2795,10 +2809,11 @@ function TermDraftPreview({
       <DraftPreviewSection title="Weight, Duty, and QLC">
         <DraftPreviewField label="Item Wt/Ea" value={fmt(source.itemWeightPerEach)} />
         <DraftPreviewField label="Dim Wt/Ea" value={fmt(source.dimensionWeightPerEach)} />
+        <DraftPreviewField label="Chargeable Wt/Ea" value={fmt(getChargeableWeightPerEach(source))} />
         <DraftPreviewField label="Ship Wt/Ea" value={fmt(finalResult.shipWeightCal)} />
         <DraftPreviewField label="Duty %" value={fmt(finalResult.importDutyPercent)} />
         <DraftPreviewField label="Insurance %" value={fmt(finalResult.insPercent)} />
-        <DraftPreviewField label="FR Actual (THB)" value={fmt(finalResult.frQTEC)} />
+        <DraftPreviewField label="FR QTEC" value={fmt(finalResult.frQTEC)} />
         <DraftPreviewField label="Zone Rate" value={fmt(finalResult.frZoneRate)} />
         <DraftPreviewField label="TT (THB)" value={fmt(finalResult.wireTT)} />
         <DraftPreviewField label="CC (THB)" value={fmt(finalResult.customClear)} />

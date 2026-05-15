@@ -240,6 +240,7 @@ export interface FinalResultColumns {
   docTestCert: number;             // BG6
   docCOO: number;                  // BH6
   docAnyOther: number;             // BI6
+  docFees: number;                 // Diagnostic total: Documents Fees (FEES)
 
   currency: string;                // BJ6
   rateExchange: number;            // BK6

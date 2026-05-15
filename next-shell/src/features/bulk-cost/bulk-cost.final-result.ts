@@ -39,7 +39,7 @@ export const BULK_COST_AY_CP_COLUMNS: FinalResultColumnDefinition[] = [
   { excelColumn: 'BX', key: 'exworkCase', label: 'Exwork', kind: 'number', editable: true },
   { excelColumn: 'BY', key: 'op2', label: 'OP2 (THB)', kind: 'number', editable: true },
   { excelColumn: 'BZ', key: 'ins', label: 'INS', kind: 'number', editable: true },
-  { excelColumn: 'CA', key: 'frQTEC', label: 'FR Actual (THB)', kind: 'number', editable: true },
+  { excelColumn: 'CA', key: 'frQTEC', label: 'FR QTEC', kind: 'number', editable: true },
   { excelColumn: 'CB', key: 'frZoneRate', label: 'FR Zone/KG', kind: 'number', editable: true },
   { excelColumn: 'CC', key: 'frZoneCost', label: 'FR Zone', kind: 'number', editable: true },
   { excelColumn: 'CD', key: 'cifQTEC', label: 'CIF QTEC', kind: 'number', editable: true },
@@ -58,7 +58,8 @@ export const BULK_COST_AY_CP_COLUMNS: FinalResultColumnDefinition[] = [
 ];
 
 export const BULK_COST_DIAGNOSTIC_COLUMNS: FinalResultColumnDefinition[] = [
-  { key: 'op1Source', label: 'OP1 Src', kind: 'number', editable: true },
+  { key: 'docFees', label: 'Documents Fees (FEES)', kind: 'number', editable: true },
+  { key: 'op1Source', label: 'OP1 (PSC)', kind: 'number', editable: true },
   { key: 'et', label: 'ET', kind: 'number', editable: true },
   { key: 'mt', label: 'MT', kind: 'number', editable: true },
   { key: 'miscTaxVal', label: 'Misc Tax', kind: 'number', editable: true },

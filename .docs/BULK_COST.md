@@ -161,9 +161,10 @@ because that is the value used by the Bulk Cost formula. DraftTerm persistence
 still writes the reference freight into `U_FreightQTEC` so the saved snapshot
 matches Term page semantics.
 
-Final-result labels intentionally include `(THB)` on allocated freight, CC, TT,
-SPK, and QOC fields. These values have already been converted or entered as Thai
-baht by the time they appear in the final AY-CP result.
+Final-result labels intentionally include `(THB)` on CC, TT, SPK, and QOC
+fields. `FR QTEC` is also a Thai baht value, but keeps the Term/Excel label
+requested for Step 3 mapping. These values have already been converted or
+entered as Thai baht by the time they appear in the final AY-CP result.
 
 Currency is specified before calculation in Step 1/Step 2:
 
@@ -177,6 +178,28 @@ The current frontend formula assumes one quote currency per run. If a supplier
 quote mixes THB freight/CC/TT with foreign-currency item prices, users must
 normalize the amounts before CAL, or the run must be split/held until a shared
 backend calculation path supports mixed-currency costs explicitly.
+
+### Step 3 Term Mapping Display
+
+The Step 3 Review table is mapped toward the Term calculation layout:
+
+| Term area | Bulk Cost Step 3 display |
+|---|---|
+| Product Cost (PCS) | `PCS` |
+| Packing Handling (PKH) | `PKH` |
+| Supplier Outb Cost (SOC) | `SOC` |
+| Documents Fees (FEES) | `Documents Fees (FEES)` diagnostic total |
+| Order Price source | `OP1 (PSC)` diagnostic value before exchange rate |
+| Currency | `Currency` |
+| Exchange Rates | `EX.RATE` |
+| Order Price (THB) | `OP1 (THB)` |
+| Ship Mode / dimensions | Step 2 source columns and Term draft preview |
+| Chargeable W (KG) | `Chargeable Wt/Ea`, derived from max item/dim weight before ceiling |
+| Shipping Weight | `Ship Wt/Ea`, the rounded weight used by CAL |
+| Freight to QTEC WH | `FR QTEC` |
+
+`Exwork` remains available in Formula/Audit diagnostics but is not shown in the
+Step 3 Review table.
 
 ### ShipWeightCal Priority
 

@@ -364,6 +364,7 @@ function computeFinalResult(
     docTestCert: line.docFee.testCert,
     docCOO,
     docAnyOther: line.docFee.anyOther,
+    docFees: docFeeTotal,
     currency: line.currency,
     rateExchange: exRate,
     shipWeightCal: round6(swCal),

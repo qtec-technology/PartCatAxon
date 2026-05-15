@@ -27,6 +27,7 @@ function makeFinalResult(overrides: Partial<FinalResultColumns> = {}): FinalResu
     docTestCert: 0,
     docCOO: 0,
     docAnyOther: 0,
+    docFees: 0,
     currency: 'USD',
     rateExchange: 35,
     shipWeightCal: 1.5,
@@ -139,14 +140,23 @@ describe('Bulk Cost final result schema', () => {
     const ayCpKeys = new Set(BULK_COST_AY_CP_COLUMNS.map((column) => column.key));
 
     expect(ayCpKeys.has('op1Source')).toBe(false);
+    expect(ayCpKeys.has('docFees')).toBe(false);
     expect(BULK_COST_DIAGNOSTIC_COLUMNS.map((column) => column.key)).toContain('op1Source');
+    expect(BULK_COST_DIAGNOSTIC_COLUMNS.map((column) => column.key)).toContain('docFees');
     expect(BULK_COST_DIAGNOSTIC_COLUMNS.every((column) => !column.excelColumn)).toBe(true);
   });
 
-  it('labels THB final-result money fields explicitly', () => {
+  it('labels OP1 source diagnostics for Term mapping', () => {
+    const labelsByKey = new Map(BULK_COST_DIAGNOSTIC_COLUMNS.map((column) => [column.key, column.label]));
+
+    expect(labelsByKey.get('docFees')).toBe('Documents Fees (FEES)');
+    expect(labelsByKey.get('op1Source')).toBe('OP1 (PSC)');
+  });
+
+  it('labels final-result money fields for Step 3 mapping', () => {
     const labelsByKey = new Map(BULK_COST_AY_CP_COLUMNS.map((column) => [column.key, column.label]));
 
-    expect(labelsByKey.get('frQTEC')).toBe('FR Actual (THB)');
+    expect(labelsByKey.get('frQTEC')).toBe('FR QTEC');
     expect(labelsByKey.get('wireTT')).toBe('TT (THB)');
     expect(labelsByKey.get('customClear')).toBe('CC (THB)');
     expect(labelsByKey.get('ttFinal')).toBe('TT Final (THB)');
@@ -201,6 +211,7 @@ describe('Bulk Cost Term preview mapping', () => {
     const calcResults = mapBulkCostToTermCalcResults(source, finalResult);
 
     expect(formData.fr).toBe(200);
+    expect(formData.validFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(calcResults.FR_QTEC).toBe(1080);
   });
 });

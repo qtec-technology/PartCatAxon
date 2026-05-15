@@ -98,6 +98,7 @@ function makeFinalResult(overrides: Partial<FinalResultColumns> = {}): FinalResu
     docTestCert: 0,
     docCOO: 0,
     docAnyOther: 0,
+    docFees: 0,
     currency: 'USD',
     rateExchange: 35,
     shipWeightCal: 1,

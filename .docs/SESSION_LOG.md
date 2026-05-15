@@ -27,6 +27,25 @@ Updated: 2026-05-15
   - Update only documentation/instructions necessary for safe handoff.
 - Repo inspection found one generated uncommitted file:
   - `next-shell/next-env.d.ts`.
+- Continued after quota warning because the owner asked to keep going.
+- Implemented the safe Bulk Cost Step 3 mapping pass:
+  - Review includes document-fee total, Currency, `OP1 (PSC)`, and `FR QTEC`.
+  - Exwork is hidden from Review and remains in Formula/Audit.
+  - Step 2 weight preset includes read-only `Chargeable Wt/Ea`.
+  - Term preview form data supplies a default `Valid From`.
+  - Backend Term calculation accepts optional `U_DocFees` / `U_FEES` /
+    `U_Fees`, defaulting to zero.
+- Focused verification passed:
+  - `npm.cmd --prefix next-shell test -- --run bulk-cost-final-result bulk-cost-calc bulk-cost-api`
+  - `npm.cmd --prefix next-shell run typecheck`
+  - `npm.cmd --prefix server test -- --run calculation.service` (outside sandbox after config access denial)
+- Full verification passed:
+  - `npm.cmd run typecheck`
+  - `npm.cmd test` with server 105 + next-shell 66
+  - `npm.cmd run build`
+- Browser check was attempted again through the in-app browser against
+  `http://127.0.0.1:3010/bulk-cost?...`; the browser environment blocked the
+  local page with `net::ERR_BLOCKED_BY_CLIENT`.
 
 ## Browser Note
 
@@ -34,4 +53,3 @@ During the previous implementation, the in-app browser automation connected but
 opening `http://localhost:3010/bulk-cost` was blocked by the browser environment
 with `net::ERR_BLOCKED_BY_CLIENT`. Tests/build passed, but no browser visual
 confirmation was completed.
-

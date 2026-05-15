@@ -14,6 +14,7 @@ export interface CalcInput {
     productCost: number;            // Product Cost (PCS)
     pkh: number;                    // Packing Handling (PKH)
     soc: number;                    // Supplier Outbound Cost (SOC)
+    docFees?: number;               // Documents Fees (FEES)
     exchangeRate: number;           // Exchange Rate
 
     // ─── Freight to QTEC (FR) ───────────────────────────────────────────────
@@ -90,7 +91,7 @@ export interface CalcResult {
 // ─────────────────────────────────────────────────────────────────────────────
 export function calculate(input: CalcInput): CalcResult {
     const {
-        productCost, pkh, soc, exchangeRate, orderTerm, shipModeNo,
+        productCost, pkh, soc, docFees = 0, exchangeRate, orderTerm, shipModeNo,
         dimUnit, length, width, height, itemWeight, freightRate, freight,
         insPercent, zoneRate, dtPercent, etPercent, miscTax,
         wtt, cc, scc, stkPercent, sspk, qoc,
@@ -98,8 +99,8 @@ export function calculate(input: CalcInput): CalcResult {
     } = input;
 
     // ─── Order Price (OP) ───────────────────────────────────────────────────
-    // OP = Product Cost + PKH + SOC
-    const op = calcOP(productCost, pkh, soc);
+    // OP = Product Cost + PKH + SOC + Documents Fees
+    const op = calcOP(productCost, pkh, soc, docFees);
 
     // ─── Order Price THB ────────────────────────────────────────────────────
     // OP_SUM = OP * ExRate (ค่า base)
@@ -194,9 +195,9 @@ export function calculate(input: CalcInput): CalcResult {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── 4.2.1 Order Price (OP) ────────────────────────────────────────────────
-// สูตร: OP = ProductCost + PKH + SOC
-function calcOP(productCost: number, pkh: number, soc: number): number {
-    return productCost + pkh + soc;
+// สูตร: OP = ProductCost + PKH + SOC + Documents Fees
+function calcOP(productCost: number, pkh: number, soc: number, docFees = 0): number {
+    return productCost + pkh + soc + docFees;
 }
 
 // ─── 4.2.2 OP_SUM (THB Base) ───────────────────────────────────────────────

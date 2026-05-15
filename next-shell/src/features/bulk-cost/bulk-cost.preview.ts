@@ -95,6 +95,7 @@ export function mapBulkCostToTermFormData(
     // Supplier / context
     supplier: source.vendorCode,
     suppOrderCode: source.supplierOrderCode,
+    validFrom: todayIsoDate(),
     // Pricing
     prodCost: finalResult.productCost,
     currency: costs.currency,
@@ -173,6 +174,10 @@ export function mapBulkCostToTermCalcResults(
     MK_THB: finalResult.markup,
     SALES_PRICE: finalResult.roundUp,
   };
+}
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function calcFreightQtecReference(source: AllocationLineSource, finalResult: FinalResultColumns): number {
