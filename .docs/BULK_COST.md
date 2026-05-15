@@ -18,7 +18,7 @@
 | Mark Awarded / Lost | ✅ Done — buttons in Workspace toolbar after Save Draft |
 | Item/Term preview banner | ✅ Done — banner stays in normal flow so it never covers form headers while scrolling |
 | Manual quote numeric input UX | ✅ Done — zero values clear on focus; non-zero values select all for quick overwrite |
-| Calculation engine (frontend) | ✅ Done — 42 next-shell unit tests ผ่าน |
+| Calculation engine (frontend) | ✅ Done — pure frontend CAL with formula audit guard; 61 next-shell unit tests ผ่าน |
 | Mock data | ✅ Done — Grainger baseline + 12 supplier quotes (frontend only; no server mock fallbacks) |
 | Item/Term preview | ✅ Done — localStorage bridge → `/item/preview`, `/term/preview` |
 | Viewport-locked layout | ✅ Done — `/bulk-cost` uses app-shell-locked layout (internal scroll matching `/partcatalog`) |
@@ -65,6 +65,7 @@ URL params `?supplier=CODE&supplierName=NAME` เก็บ supplier ที่เ
 | `src/features/bulk-cost/BulkCostWorkspace.tsx` | Main workspace UI (~2000 lines) |
 | `src/features/bulk-cost/bulk-cost.types.ts` | TypeScript interfaces ทั้งหมด |
 | `src/features/bulk-cost/bulk-cost.calc.ts` | Pure calculation function |
+| `src/features/bulk-cost/bulk-cost.formula-audit.ts` | Temporary formula audit guard comparing frontend CAL output to Term/Excel-style expected steps |
 | `src/features/bulk-cost/bulk-cost.final-result.ts` | AY-CP final-result schema and diagnostic-column separation |
 | `src/features/bulk-cost/bulk-cost.document-fees.ts` | Pure document-fee basis helper: Per Each, item-total normalization, By Lot / Batch line candidates |
 | `src/features/bulk-cost/bulk-cost.api.ts` | Build/save `BulkCostRun` draft snapshot payload |
@@ -132,6 +133,20 @@ Sales users must still be able to add, edit, delete, or redistribute these
 document-fee line candidates manually before final quotation work is accepted.
 
 Detailed review doc: `.docs/BULK_COST_CALCULATION.md`.
+
+### Formula Audit Guard
+
+`bulk-cost.formula-audit.ts` builds per-line audit rows for OP source, OP1,
+OP2, INS, FR/CIF/DT actual and zone branches, ET/MT, preQLC, STK, QLC, QLC2,
+Total QLC, markup, and sales price. The Formula view uses this guard to show
+`Pass` / `Warn` / `Fail` status for the current frontend result.
+
+This audit is temporary. Bulk Cost CAL still runs in the Next.js frontend, while
+the production Term calculation source of truth is the Express backend service
+`server/src/services/calculation.service.ts`. Before Award/SAP automation or any
+`@POITM` / `@PITM1` write flow, Bulk Cost calculation should move to a
+backend/shared module so UI preview, draft save, automation, and reverse mapping
+use one authoritative calculation path.
 
 ### ShipWeightCal Priority
 
@@ -242,9 +257,10 @@ Flow:
 4. Keep CWeight local research reports current: formula, divisor, rounding, ship mode, dim unit, matching fields, and `.docs/CWEIGHT_EVALUATION.md`
 5. Keep Grainger CWeight lookup source as `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; do not deploy the obsolete AIX `GraingerWeightData` staging script for the active path
 6. Use backend-only `POST /api/bulk-cost/cweight-prefill` for draft-line CWeight suggestions first; wire to Bulk Cost UI later only after separate UI approval
-7. Connect real AXON data source แทน seed data
-8. ออกแบบ Awarded reverse mapping flow ก่อนสร้าง endpoint จริง
-9. ทำ E2E test สำหรับ full allocation → save snapshot flow
+7. Promote Bulk Cost calculation from frontend-only to backend/shared source of truth before Award/SAP automation
+8. Connect real AXON data source แทน seed data
+9. ออกแบบ Awarded reverse mapping flow ก่อนสร้าง endpoint จริง
+10. ทำ E2E test สำหรับ full allocation → save snapshot flow
 
 ---
 

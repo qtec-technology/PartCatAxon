@@ -2097,7 +2097,8 @@ button:disabled {
 }
 
 .table-ok,
-.table-warning {
+.table-warning,
+.table-error {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -2110,6 +2111,10 @@ button:disabled {
 
 .table-warning {
   color: #9a5700;
+}
+
+.table-error {
+  color: #b42318;
 }
 
 /* ─── Spin animation ─────────────────────────────────────────────────────── */

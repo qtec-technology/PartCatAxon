@@ -53,9 +53,10 @@
 - Per-line document fees, editable final result
 - Pure document-fee basis helper/tests: Per Each, item-total normalization, By Lot / Batch service-line candidates
 - AY-CP final-result schema module: full final CAL table is locked to exactly 44 Excel columns (AY-CP); formula diagnostics stay separate; Term preview now receives ET/MT/preQLC/STK/QLC2 instead of zeros
+- Formula audit guard: `bulk-cost.formula-audit.ts` compares frontend Bulk Cost output to Term/Excel-style formula steps and the Formula view shows Pass/Warn/Fail status
 - Item/Term preview via localStorage bridge
-- 55 next-shell unit tests ผ่าน (allocation, rounding, warnings, Excel golden regression, document-fee basis, AY-CP final-result schema, Term preview mapping, item API mapping, lookup cache/sub-location regressions)
-- 83 server unit tests ผ่าน (45 calc engine + 28 golden-case + 10 exact parity vs production CSV)
+- 61 next-shell unit tests ผ่าน (allocation, rounding, warnings, Excel golden regression, document-fee basis, formula audit, AY-CP final-result schema, Term preview mapping, item API mapping, lookup cache/sub-location regressions)
+- 102 server unit tests ผ่าน (calculation engine, golden-case/parity, CWeight, AXON payload, Bulk Cost schemas, attachment/auth/item regressions)
 
 ---
 
@@ -80,6 +81,7 @@
 
 | วันที่ | การเปลี่ยนแปลง | Verification |
 |---|---|---|
+| 2026-05-15 | Added Bulk Cost formula audit guard: per-line audit rows for OP source, OP1, OP2, INS, FR/CIF/DT actual-zone branches, ET/MT, preQLC, STK, QLC, QLC2, Total QLC, markup, and sales price; Formula view status now shows audit Pass/Warn/Fail; Excel workbook baseline was readable for AY-CP shape/formulas, while newer diagnostic values remain covered by module tests | `npm.cmd --prefix next-shell test -- --run bulk-cost-formula-audit bulk-cost-final-result` |
 | 2026-05-11 | Allocation List footer UX: Allocations now always renders the same table footer pattern as SupplierSelection (visible horizontal scrollbar, `Showing X-Y of Z records`, Prev/current/Next buttons, `400 per page`) instead of collapsing to plain text on a single page | `npm --prefix next-shell run typecheck` |
 | 2026-05-11 | Fixed Bulk Cost run-list mock fallback blocker on older SQL Server compatibility levels: replaced `OFFSET ... FETCH NEXT` pagination with `ROW_NUMBER()` paging so missing `BulkCostRun` table reaches the intended mock fallback instead of throwing "Invalid usage of the option NEXT" | `npm --prefix server run build`, `npm --prefix server test -- --run` (83), manual GET `/api/bulk-cost/runs?page=1&pageSize=400` via ports 3010 and 3001 |
 | 2026-05-11 | Completed pending Bulk Cost Allocation List work from interrupted agent: fixed TypeScript syntax in list query schema/repository mock restore, added server-side 400-row pagination metadata for `GET /api/bulk-cost/runs`, split Supplier and Vendor Code columns, enabled resizable/double-click autofit columns, kept rows visible with refresh overlay on filter changes, and populated mock Run #1 with source lines + preview so opening it shows Step 3 results | `npm --prefix server run build`, `npm --prefix server test -- --run` (83), `npm --prefix next-shell run typecheck`, `npm --prefix next-shell test -- --run` (51), `npm --prefix next-shell run build` |
@@ -141,6 +143,7 @@
 
 | วันที่ | Decision | เหตุผล |
 |---|---|---|
+| 2026-05-15 | Bulk Cost formula audit is a temporary frontend guard only; target architecture is backend/shared Bulk Cost calculation before Award/SAP automation | Term calculation source of truth is already backend; keeping Bulk Cost CAL frontend-only during automation/reverse mapping would create drift risk |
 | 2026-05-13 | Viewport-locked layout for `/bulk-cost`: extended `app-shell-locked` class to `/bulk-cost` paths in AppShell; added CSS classes `bulk-cost-page-root`, `bulk-cost-tabs-root`, `bulk-cost-tab-content`, `bulk-cost-workspace`, `bulk-cost-workspace-body`; toolbar fixed, body scrolls internally matching `/partcatalog` behaviour | `npm --prefix next-shell run typecheck` |
 | 2026-05-14 | Tightened local CWeight semantic-search numeric matching so extra or missing quote size tokens reject unsafe description matches before any review suggestion is returned | `npm.cmd --prefix ai-services test -- --run`, `npm.cmd --prefix ai-services run build` |
 | 2026-05-14 | Added local CWeight policy evaluation report from `.datatest`: exact supplier/manufacturer/catalog keys are `AUTO_ACCEPT`; description-only remains `REVIEW_SUGGESTION` or `NOT_FOUND`; future API fallback is designed as review-only after local `NOT_FOUND` with no API key used in Scope 1 | `npm.cmd --prefix ai-services test -- --run`, `npm.cmd --prefix ai-services run build`, `npm.cmd --prefix ai-services run report:cweight:policy` |
@@ -209,6 +212,8 @@
 - [x] Validate compiled Bulk Cost CWeight prefill helper against live `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
 - [x] Validate compiled backend CWeight lookup against live `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
 - [x] Confirm AIX `GraingerWeightData` staging table is not needed for the active CWeight path
+- [x] Add temporary Bulk Cost formula audit guard in frontend Formula view
+- [ ] Move Bulk Cost calculation to backend/shared source of truth before Award/SAP automation
 - [ ] Wire CWeight lookup endpoint later only after business approval; source should be `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
 - [ ] Connect real AXON data source (replace AxonExtractionQueue seed data with live AXON push)
 - [ ] Design Awarded reverse mapping flow before creating award/reverse-map endpoint

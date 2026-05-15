@@ -31,6 +31,7 @@ import type {
 } from './bulk-cost.types';
 import { EMPTY_BULK_COST_INPUT, ITEM_GROUP_OPTIONS, SHIP_MODE_LABELS, formatItemGroup, formatShipMode } from './bulk-cost.types';
 import { calculateAllocationPreview } from './bulk-cost.calc';
+import { buildBulkCostFormulaAudit } from './bulk-cost.formula-audit';
 import {
   FINAL_RESULT_COLS,
   FINAL_RESULT_COLS_BY_KEY,
@@ -1665,6 +1666,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             </div>
 
             <ResultTable
+              costs={costs}
               fullTableSizing={fullTableSizing}
               formulaTableSizing={formulaTableSizing}
               getFinalResultForLine={getFinalResultForLine}
@@ -2268,6 +2270,7 @@ function FormattedNumberInput({
 }
 
 function ResultTable({
+  costs,
   fullTableSizing,
   formulaTableSizing,
   getFinalResultForLine,
@@ -2278,6 +2281,7 @@ function ResultTable({
   reviewTableSizing,
   selectedLines,
 }: {
+  costs: BulkCostInput;
   fullTableSizing: ResizableTableSizing;
   formulaTableSizing: ResizableTableSizing;
   getFinalResultForLine: (line: AllocationLineResult) => FinalResultColumns;
@@ -2416,6 +2420,7 @@ function ResultTable({
                   index={index}
                   result={result}
                   source={source}
+                  costs={costs}
                   tableSizing={formulaTableSizing}
                   onEdit={onEdit}
                 />
@@ -2543,6 +2548,7 @@ function ReviewResultRow({
 }
 
 function FormulaResultRow({
+  costs,
   index,
   source,
   result,
@@ -2550,6 +2556,7 @@ function FormulaResultRow({
   onEdit,
   tableSizing,
 }: {
+  costs: BulkCostInput;
   index: number;
   source: AllocationLineSource;
   result: AllocationLineResult;
@@ -2557,8 +2564,15 @@ function FormulaResultRow({
   onEdit: (lineKey: string, key: FinalResultKey, raw: string) => void;
   tableSizing: ResizableTableSizing;
 }) {
+  const audit = buildBulkCostFormulaAudit(source, costs, finalResult, { allocationLine: result });
+  const rowClass = audit.status === 'fail' || result.status === 'error'
+    ? 'row-error'
+    : audit.status === 'warn' || result.status === 'warning'
+      ? 'row-warning'
+      : '';
+
   return (
-    <tr className={result.status === 'error' ? 'row-error' : result.status === 'warning' ? 'row-warning' : ''}>
+    <tr className={rowClass}>
       <td {...tableSizing.getCellProps('rowNo')} className="center-cell">{String(index + 1).padStart(2, '0')}</td>
       <td {...tableSizing.getCellProps('itemGroup')} className="center-cell">{formatItemGroup(source.itemGroup)}</td>
       <td {...tableSizing.getCellProps('supplierOrderCode')} className="text-left-cell">{source.supplierOrderCode}</td>
@@ -2581,7 +2595,7 @@ function FormulaResultRow({
         );
       })}
       <td {...tableSizing.getCellProps('status')} className="center-cell">
-        <StatusCell result={result} />
+        <FormulaAuditStatusCell audit={audit} />
       </td>
     </tr>
   );
@@ -2919,9 +2933,44 @@ function StatusCell({ result }: { result: AllocationLineResult }) {
   );
 }
 
+function FormulaAuditStatusCell({ audit }: { audit: ReturnType<typeof buildBulkCostFormulaAudit> }) {
+  const title = audit.rows
+    .filter((row) => row.status !== 'pass')
+    .map((row) => `${row.label}: expected ${fmtAuditValue(row.expectedValue)}, actual ${fmtAuditValue(row.actualValue)}${row.note ? ` - ${row.note}` : ''}`)
+    .join('\n');
+
+  if (audit.status === 'fail') {
+    return (
+      <span className="table-error" title={title || 'Formula audit failed'}>
+        <XCircle size={14} aria-hidden="true" />
+        Fail ({audit.failCount})
+      </span>
+    );
+  }
+  if (audit.status === 'warn') {
+    return (
+      <span className="table-warning" title={title || 'Formula audit has warnings'}>
+        <AlertTriangle size={14} aria-hidden="true" />
+        Warn ({audit.warnCount})
+      </span>
+    );
+  }
+  return (
+    <span className="table-ok" title="Formula audit passed">
+      <CheckCircle2 size={14} aria-hidden="true" />
+      Pass
+    </span>
+  );
+}
+
 function fmt(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '-';
   return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtAuditValue(value: number | string | null): string {
+  if (typeof value === 'number') return fmt(value);
+  return value ?? '-';
 }
 
 function fmtPlain(value: number | null | undefined): string {

@@ -289,9 +289,37 @@ Implementation ownership as of 2026-05-15:
   `next-shell/src/features/bulk-cost/bulk-cost.calc.ts`.
 - Term calculation remains backend source of truth in
   `server/src/services/calculation.service.ts`.
+- `next-shell/src/features/bulk-cost/bulk-cost.formula-audit.ts` is a
+  temporary guard that compares frontend Bulk Cost output against Term/Excel
+  formula steps for each line. It does not replace the source of truth.
 - Before Awarded automation or SAP writes, Bulk Cost should be promoted to a
   backend/shared calculation source of truth so preview, save, automation, and
   reverse mapping cannot drift.
+
+### 5.1 Temporary Formula Audit
+
+The Formula view calls `buildBulkCostFormulaAudit(...)` with
+`AllocationLineSource`, `BulkCostInput`, and `FinalResultColumns` plus the
+allocation result when available. Each audit row contains the step key, label,
+formula name, input values, expected value, actual value, status
+(`pass` / `warn` / `fail`), and note.
+
+Covered steps:
+
+```text
+OP source -> OP1 THB -> OP2 -> INS
+FR actual / FR zone -> CIF actual / CIF zone
+DT actual / DT zone / selected duty
+ET -> MT -> preQLC -> STK -> QLC -> QLC2
+Total QLC / Total Price -> Markup -> Sales price
+```
+
+`AXON_Extraction_Calculation.xlsx` was readable during this audit. It confirms
+the legacy AY-CP workbook shape, row range, and formulas for the visible final
+result columns. The workbook does not expose the newer diagnostic values
+(`ET`, `MT`, `preQLC`, `STK`, `QLC2`) as separate AY-CP columns, so those are
+guarded by module tests against the frontend formula implementation and Term
+formula sequence instead of direct workbook cell parity.
 
 ---
 
