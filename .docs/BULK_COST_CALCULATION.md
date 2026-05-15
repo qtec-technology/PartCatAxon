@@ -184,7 +184,9 @@ frEachTHB = freightEach (allocated, source currency) × exchangeRate
 The visible final-result `FR QTEC` / AY-CA value displays this allocated
 `frEachTHB` value, because it is the same value used in CIF actual and preQLC.
 
-Separately, QTEC zone freight is also computed for reference (used in CIF Zone):
+Separately, Term reference freight is computed as `ShipWeightCal * FreightRate`
+and persisted/displayed only where the Term page expects `U_FreightQTEC`
+(`Freight to QTEC WH`). QTEC zone freight is also computed for CIF Zone:
 
 ```text
 frZoneCost = 0.1 × OP2                    if Exwork/FCA + shipModeNo=3

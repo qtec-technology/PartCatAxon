@@ -5,7 +5,7 @@ import {
   FINAL_RESULT_COLS,
   toAyCpFinalResultRow,
 } from '@/features/bulk-cost/bulk-cost.final-result';
-import { mapBulkCostToTermCalcResults } from '@/features/bulk-cost/bulk-cost.preview';
+import { mapBulkCostToTermCalcResults, mapBulkCostToTermFormData } from '@/features/bulk-cost/bulk-cost.preview';
 import type { AllocationLineSource, FinalResultColumns } from '@/features/bulk-cost/bulk-cost.types';
 
 const AY_CP_COLUMNS = [
@@ -112,7 +112,7 @@ function makeSource(): AllocationLineSource {
     moq: 1,
     insPercent: 0.5,
     shipModeNo: 1,
-    freightRate: 0,
+    freightRate: 720,
     dimUnit: 1,
     length: 1,
     width: 1,
@@ -164,5 +164,31 @@ describe('Bulk Cost Term preview mapping', () => {
     expect(termResults.QLC2).toBe(2044.4);
     expect(termResults.QLC3).toBe(2059.4);
     expect(termResults.TOTAL_PRICE).toBe(2059.4);
+  });
+
+  it('splits actual Freight FR from Freight to QTEC WH reference in Term preview', () => {
+    const source = makeSource();
+    const finalResult = makeFinalResult({ frQTEC: 200, shipWeightCal: 1.5 });
+
+    const formData = mapBulkCostToTermFormData(source, {
+      pkh: 0,
+      soc: 0,
+      freight: 0,
+      customs: 0,
+      wireTT: 0,
+      currency: 'USD',
+      exchangeRate: 35,
+      referenceNo: '',
+      remark: '',
+      orderTerm: 'FCA',
+      location: 'TH',
+      shipModeNo: 1,
+      contactPerson: '',
+      saleIncharge: '',
+    }, finalResult);
+    const calcResults = mapBulkCostToTermCalcResults(source, finalResult);
+
+    expect(formData.fr).toBe(200);
+    expect(calcResults.FR_QTEC).toBe(1080);
   });
 });

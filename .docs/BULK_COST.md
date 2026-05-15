@@ -148,6 +148,19 @@ the production Term calculation source of truth is the Express backend service
 backend/shared module so UI preview, draft save, automation, and reverse mapping
 use one authoritative calculation path.
 
+### Freight Display / Persistence Mapping
+
+Keep these two Term fields separate:
+
+- `U_FR` / `Freight (FR)` = actual allocated freight used by CIF and preQLC.
+- `U_FreightQTEC` / `Freight to QTEC WH` = reference value
+  `ShipWeightCal * FreightRate`.
+
+Bulk Cost final result AY-CA (`FR QTEC`) displays the actual allocated freight
+because that is the value used by the Bulk Cost formula. DraftTerm persistence
+still writes the reference freight into `U_FreightQTEC` so the saved snapshot
+matches Term page semantics.
+
 ### ShipWeightCal Priority
 
 1. ใช้ `shippingWeightPerEach` (extracted จาก AXON) ก่อน

@@ -55,8 +55,8 @@
 - AY-CP final-result schema module: full final CAL table is locked to exactly 44 Excel columns (AY-CP); formula diagnostics stay separate; Term preview now receives ET/MT/preQLC/STK/QLC2 instead of zeros
 - Formula audit guard: `bulk-cost.formula-audit.ts` compares frontend Bulk Cost output to Term/Excel-style formula steps and the Formula view shows Pass/Warn/Fail status
 - Item/Term preview via localStorage bridge
-- 61 next-shell unit tests ผ่าน (allocation, rounding, warnings, Excel golden regression, document-fee basis, formula audit, AY-CP final-result schema, Term preview mapping, item API mapping, lookup cache/sub-location regressions)
-- 102 server unit tests ผ่าน (calculation engine, golden-case/parity, CWeight, AXON payload, Bulk Cost schemas, attachment/auth/item regressions)
+- 63 next-shell unit tests ผ่าน (allocation, rounding, warnings, Excel golden regression, document-fee basis, formula audit, AY-CP final-result schema, Term preview mapping, item API mapping, lookup cache/sub-location regressions)
+- 104 server unit tests ผ่าน (calculation engine, golden-case/parity, CWeight, AXON payload, Bulk Cost schemas, DraftTerm freight mapping, attachment/auth/item regressions)
 
 ---
 
@@ -81,6 +81,7 @@
 
 | วันที่ | การเปลี่ยนแปลง | Verification |
 |---|---|---|
+| 2026-05-15 | Split Bulk Cost freight display/persistence semantics: final AY-CA/`FR QTEC` and Term preview `Freight (FR)` use actual allocated freight for CIF/preQLC, while DraftTerm `U_FreightQTEC` and Term preview `Freight to QTEC WH` use the reference `ShipWeightCal * FreightRate` value | `npm run typecheck`, `npm test` (server 104 + next-shell 63), `npm run build` |
 | 2026-05-15 | Fixed Bulk Cost final-result display mapping for FR actual: AY-CA / `FR QTEC` now displays the allocated freight value used by CIF/preQLC instead of the reference `shipWeightCal * freightRate` value; formula path itself was unchanged | `npm.cmd --prefix next-shell test -- --run bulk-cost-calc bulk-cost-formula-audit` |
 | 2026-05-15 | Added Bulk Cost formula audit guard: per-line audit rows for OP source, OP1, OP2, INS, FR/CIF/DT actual-zone branches, ET/MT, preQLC, STK, QLC, QLC2, Total QLC, markup, and sales price; Formula view status now shows audit Pass/Warn/Fail; Excel workbook baseline was readable for AY-CP shape/formulas, while newer diagnostic values remain covered by module tests | `npm.cmd --prefix next-shell test -- --run bulk-cost-formula-audit bulk-cost-final-result` |
 | 2026-05-11 | Allocation List footer UX: Allocations now always renders the same table footer pattern as SupplierSelection (visible horizontal scrollbar, `Showing X-Y of Z records`, Prev/current/Next buttons, `400 per page`) instead of collapsing to plain text on a single page | `npm --prefix next-shell run typecheck` |

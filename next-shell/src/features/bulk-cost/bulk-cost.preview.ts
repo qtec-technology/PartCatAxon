@@ -116,7 +116,7 @@ export function mapBulkCostToTermFormData(
     weight: source.shippingWeightPerEach ?? source.itemWeightPerEach ?? 0,
     // Rate inputs
     freightRate: source.freightRate,
-    fr: 0, // disabled in read-only mode; FR_QTEC shown from calcResults
+    fr: finalResult.frQTEC,
     insPercent: source.insPercent,
     zoneRate: source.zoneRate,
     dutyPercent: source.importDutyPercent,
@@ -155,7 +155,7 @@ export function mapBulkCostToTermCalcResults(
     DIM_WEIGHT: source.dimensionWeightPerEach ?? 0,
     SHP_WEIGHT: finalResult.shipWeightCal,
     INS: finalResult.ins,
-    FR_QTEC: finalResult.frQTEC,
+    FR_QTEC: calcFreightQtecReference(source, finalResult),
     FR_ZONE: finalResult.frZoneCost,
     CIF: finalResult.cifQTEC,
     CIF_ZONE: finalResult.cifZone,
@@ -173,6 +173,14 @@ export function mapBulkCostToTermCalcResults(
     MK_THB: finalResult.markup,
     SALES_PRICE: finalResult.roundUp,
   };
+}
+
+function calcFreightQtecReference(source: AllocationLineSource, finalResult: FinalResultColumns): number {
+  return round6(finalResult.shipWeightCal * source.freightRate);
+}
+
+function round6(value: number): number {
+  return Math.round(value * 1000000) / 1000000;
 }
 
 /** Maps AllocationLineSource to ItemData for display in the Item preview. */

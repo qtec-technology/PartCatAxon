@@ -1,6 +1,7 @@
 import { getPool, sql } from '#src/config/database.js';
 import { dbObjects } from '#src/config/db-objects.js';
 import { extractHeaderCostSuggestions } from '#src/services/axon-payload.service.js';
+import { mapDraftTermFreightFields } from '#src/services/bulk-cost-draft-term.mapper.js';
 import type {
     BulkCostRunSummary,
     BulkCostRunStatus,
@@ -193,6 +194,7 @@ export async function createBulkCostRun(
             const latest = asRecord(line.latest);
             const result = asRecord(line.result);
             const finalResult = finalResultFrom(result);
+            const freightFields = mapDraftTermFreightFields({ latest, finalResult });
 
             // ── Insert DraftItem ─────────────────────────────────────────────
             const itemRequest = new sql.Request(transaction);
@@ -252,7 +254,7 @@ export async function createBulkCostRun(
             termRequest.input('U_Weight', sql.Decimal(19, 6), numberValue(latest.itemWeightPerEach, 0));
             termRequest.input('U_CWeight', sql.Decimal(19, 6), numberValue(latest.dimensionWeightPerEach, 0));
             termRequest.input('U_FreightRate', sql.Decimal(19, 6), numberValue(latest.freightRate, 0));
-            termRequest.input('U_FR', sql.Decimal(19, 6), numberValue(finalResult.frQTEC, 0));
+            termRequest.input('U_FR', sql.Decimal(19, 6), freightFields.uFr);
             termRequest.input('INS_Percent', sql.Decimal(19, 6), numberValue(latest.insPercent, 0));
             termRequest.input('U_ZoneRate', sql.Decimal(19, 6), numberValue(latest.zoneRate, 0));
             termRequest.input('U_DT_Percent', sql.Decimal(19, 6), numberValue(latest.importDutyPercent, 0));
@@ -281,7 +283,7 @@ export async function createBulkCostRun(
             termRequest.input('U_ET', sql.Decimal(19, 6), numberValue(finalResult.et, 0));
             termRequest.input('U_MT', sql.Decimal(19, 6), numberValue(finalResult.mt, 0));
             termRequest.input('U_ShipWeightCal', sql.Decimal(19, 6), numberValue(finalResult.shipWeightCal, 0));
-            termRequest.input('U_FreightQTEC', sql.Decimal(19, 6), numberValue(finalResult.frQTEC, 0));
+            termRequest.input('U_FreightQTEC', sql.Decimal(19, 6), freightFields.uFreightQtec);
             termRequest.input('U_preQLC', sql.Decimal(19, 6), numberValue(finalResult.preQLC, 0));
             termRequest.input('U_STK', sql.Decimal(19, 6), numberValue(finalResult.stk, 0));
             termRequest.input('U_QLC', sql.Decimal(19, 6), numberValue(finalResult.qlc, 0));
