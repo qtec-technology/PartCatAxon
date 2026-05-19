@@ -45,15 +45,15 @@ If AXON extracts mixed values, the run must be split or held until the user reso
 | Exchange Rate | One editable THB rate for the quote currency. |
 | Ship Mode | One selection per run (affects ExworkCase and DW divisor). |
 
-In the frontend Step 2 Cost Bar, PKH, SOC, freight, CC, and TT are entered in
-the selected quote currency. They are allocated first, then converted to THB by
-`Exchange Rate to THB` when final result fields such as OP1, FR actual, TT, CC,
-QLC, Total QLC, markup, and sales price are computed.
+In the frontend Step 2 Cost Bar, PKH and SOC are entered in the selected quote
+currency and are converted to THB by `Exchange Rate to THB` inside OP1.
+Freight (FR), Customs Clearance (CC), and Wire TT are entered as Thai baht
+amounts and bypass the exchange rate — they flow into preQLC at face value.
 
-Mixed currency inside one run is not currently modeled. If freight, CC, or TT
-arrives as a Thai baht charge while item prices are in a foreign currency, that
-amount must be normalized before CAL, or the run should be held until the
-backend/shared Bulk Cost calculation design supports mixed-currency inputs.
+Mixed-currency inputs (e.g. freight in a foreign currency while item prices are
+THB) are not modeled. If that situation arises the user must normalize to THB
+before CAL, or the run must be held until the backend/shared Bulk Cost
+calculation design supports mixed-currency inputs explicitly.
 
 Line-level fields remain per item: qty, unit price, document fees, dimensions,
 shipping weight, duty%, UOM, lead time, permit/shelf-life flags.
@@ -188,11 +188,16 @@ swCal = shippingWeightPerEach   if provided and > 0
 ### 4.7 Freight per Each in THB (FR)
 
 ```text
-frEachTHB = freightEach (allocated, source currency) × exchangeRate
+frEachTHB = freightEach (allocated, already in THB — no exchange rate)
 ```
 
-The visible final-result `FR QTEC` / AY-CA value displays this allocated
+FR, CC, and TT are all entered as Thai baht in the Cost Bar and bypass the
+exchange rate. Only PCS/PKH/SOC/doc fees (source currency items) are multiplied
+by `exchangeRate` inside OP1.
+
+The visible final-result `FR` / AY-CA value displays this allocated
 `frEachTHB` value, because it is the same value used in CIF actual and preQLC.
+It aligns with Term's `Freight (FR)` input (`U_FR`).
 
 Separately, Term reference freight is computed as `ShipWeightCal * FreightRate`
 and persisted/displayed only where the Term page expects `U_FreightQTEC`
@@ -228,8 +233,8 @@ Duty selection options available in UI: tariffDuty, tariffExempt, BOI (maps to t
 ### 4.10 Wire TT and Custom Clear in THB
 
 ```text
-ttFinal = ttEach (allocated, source currency) × exchangeRate
-ccFinal = ccEach (allocated, source currency) × exchangeRate
+ttFinal = ttEach (allocated, already in THB — no exchange rate)
+ccFinal = ccEach (allocated, already in THB — no exchange rate)
 ```
 
 ### 4.11 QLC
@@ -308,17 +313,24 @@ passes `U_DocFees` explicitly.
 Bulk Cost DraftTerm persistence always writes `U_ValidFrom` with the server save
 date. This is a snapshot validity default, not part of the numeric formula.
 
-Implementation ownership as of 2026-05-15:
+Implementation ownership as of 2026-05-19:
 
-- Bulk Cost allocation/CAL currently runs in the Next.js frontend pure function
-  `next-shell/src/features/bulk-cost/bulk-cost.calc.ts`.
+- Bulk Cost draft save now recalculates the authoritative allocation snapshot in
+  `server/src/services/bulk-cost-calculation.service.ts` before persistence.
+  The service reuses backend Term `calculate()` for line-level formula parity,
+  enforces one supplier/currency per run as calculation errors, supports
+  included/excluded lines, last-line residual rounding, and VAT as a diagnostic
+  post-sale-price amount.
+- The Next.js frontend pure function `next-shell/src/features/bulk-cost/bulk-cost.calc.ts`
+  remains the interactive preview path until UI CAL is wired to a backend
+  calculate endpoint.
 - Term calculation remains backend source of truth in
   `server/src/services/calculation.service.ts`.
 - `next-shell/src/features/bulk-cost/bulk-cost.formula-audit.ts` is a
   temporary guard that compares frontend Bulk Cost output against Term/Excel
   formula steps for each line. It does not replace the source of truth.
-- Before Awarded automation or SAP writes, Bulk Cost should be promoted to a
-  backend/shared calculation source of truth so preview, save, automation, and
+- Before Awarded automation or SAP writes, UI preview should be switched to call
+  the backend Bulk Cost calculation path so preview, save, automation, and
   reverse mapping cannot drift.
 
 ### 5.1 Temporary Formula Audit
@@ -432,9 +444,9 @@ and By Lot / Batch fees that generate PartCatalog add-item candidates.
 Confirmed 2026-05-08 for Phase 3A:
 
 1. Bulk Cost persistence lives in `PART_CATALOG_AIX`.
-2. Save draft creates `BulkCostRun` plus `DraftItem` and `DraftTerm` snapshot
-   records. `BulkCostLine` is no longer used in the live Phase 3A schema, and
-   draft save still does not write to `@POITM` / `@PITM1`.
+2. Manual save revision creates a new `BulkCostRun` revision plus
+   `BulkCostLine` line snapshots. It does not create `DraftItem` / `DraftTerm`,
+   and it still does not write to `@POITM` / `@PITM1`.
 3. Normal authenticated domain/catalog users can save `DRAFT` runs. No manager
    approval gate is required before draft snapshot save.
 4. AXON matching hints such as `UniqueLineID`, `MatchMethod`, and

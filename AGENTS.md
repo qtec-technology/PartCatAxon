@@ -21,8 +21,8 @@ next-shell (3010) -> /api/* -> Express server (3001) -> SQL Server
 ```
 
 `next-shell/` is the active frontend. `server/` remains the backend API.
-
-Read `.docs/CLIENT_RETIREMENT_PLAN.md` before deleting `client/`.
+`client/` was retired on 2026-05-07; do not reintroduce it into normal
+dev/build/deploy workflows.
 
 ## Key Directories
 
@@ -42,7 +42,7 @@ server/src/
 
 - Root workflow is `server + next-shell`; never reintroduce `client` into normal dev/build/deploy scripts.
 - Term calculation = backend source of truth.
-- Bulk Cost Phase 3A may persist only `BulkCostRun` / `BulkCostLine` draft snapshots in `PART_CATALOG_AIX`.
+- Bulk Cost Phase 3A may persist only `BulkCostRun` / `DraftItem` / `DraftTerm` draft snapshots in `PART_CATALOG_AIX`.
 - Do not overwrite `@POITM` / `@PITM1` or create Draft Item/Term from Bulk Cost until Awarded reverse mapping is designed.
 - Run `npm run typecheck`, `npm test`, and `npm run build` before handing off.
 
@@ -50,8 +50,9 @@ server/src/
 
 | Work | Read |
 |---|---|
-| General work | `.github/copilot-instructions.md` + `.docs/FEATURE_STATUS.md` |
+| General work | `.github/copilot-instructions.md` + `.docs/FEATURE_STATUS.md` + `.docs/EXECUTIVE_ALIGNMENT.md` |
 | Architecture decision | `.docs/ARCHITECTURE.md` |
+| AXON handoff | `.docs/AXON_HANDOFF_CONTRACT.md` |
 | Bulk Cost | `.docs/BULK_COST.md` + `.docs/BULK_COST_CALCULATION.md` + `.docs/AXON_INTEGRATION.md` |
 | Roadmap / Phase | `.docs/ROADMAP.md` |
 | AI service tasks (Codex scope) | `.docs/CODEX_BRIEFING.md` |
@@ -62,5 +63,5 @@ server/src/
 |---|---|
 | Bug fix / feature | `.docs/FEATURE_STATUS.md` |
 | Architecture decision | `.docs/ARCHITECTURE.md` + `.docs/FEATURE_STATUS.md` |
-| Client retirement progress | `.docs/CLIENT_RETIREMENT_PLAN.md` + `.docs/ROADMAP.md` |
+| Cleanup / dead code | `.docs/CLEANUP_INVENTORY.md` + `.docs/ROADMAP.md` |
 | Bulk Cost | `.docs/BULK_COST.md` + `.docs/BULK_COST_CALCULATION.md` + `.docs/AXON_INTEGRATION.md` |

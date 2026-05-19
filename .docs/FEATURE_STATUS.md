@@ -1,6 +1,6 @@
 # FEATURE_STATUS.md — Workstream Status & Decision Log
 
-ปรับปรุงล่าสุด: 13 พฤษภาคม 2026 (updated)
+ปรับปรุงล่าสุด: 19 พฤษภาคม 2026 (architecture reset started)
 **Agent: อัปเดตไฟล์นี้หลังทำงานเสร็จทุกครั้ง**
 
 ---
@@ -19,9 +19,10 @@
 | Next.js Phase 2 (native pages) | ✅ Done | Item, Term, PartCatalog native แล้ว |
 | Bulk Cost UI + DB live | ✅ Active | UI พร้อม, DB connected (mock fallbacks removed), next-shell 51 tests, server 83 tests |
 | Bulk Cost Run List + Status | ✅ Done | 2 tabs (Allocations / New Allocation), GET /runs, GET /runs/:id, PATCH /runs/:id/status, restore saved run, saleIncharge filter |
-| Bulk Cost backend API + DB | ✅ Phase 3A Live | `BulkCostRun` / `DraftItem` / `DraftTerm` tables in `PART_CATALOG_AIX`; `BulkCostLine` removed from live schema; POST /api/bulk-cost/runs, mock fallbacks removed; AxonExtractionQueue seeded (13 rows) |
+| Bulk Cost backend API + DB | ✅ Phase 3A Live | Manual Bulk Cost save/load uses `BulkCostRun` / `DraftItem` / `DraftTerm` snapshots with `BulkCostRun` revision metadata; POST /api/bulk-cost/calculate + POST /api/bulk-cost/runs revision save, mock fallbacks removed; legacy `AxonExtractionQueue` queue route removed from active surface |
 | Bulk Cost viewport-locked layout | ✅ Done | `/bulk-cost` pages use app-shell-locked layout (internal scroll, no page scroll) matching `/partcatalog` |
-| AI-assisted workflow | 🚧 In Progress | CWeight / Weight & Dimension local research and backend-only wrapper are current Kim/Codex scope; HS Code, Duty, Permit, Shelf Life are AXON/team scope |
+| Architecture Stabilization | 🔄 Active | Reset boundary around AXON owner/PartCatalogAxon consumer, `ChainId` handoff, Nginx/NSSM deploy, module boundaries, and automation-ready operation layer |
+| AI-assisted workflow | ⏸ Out of active architecture | `ai-services/` research is not part of the current PartCatalogAxon runtime; HS Code, Duty, Permit, Shelf Life are AXON/team scope |
 | Executive requirement collection | 🔄 Active | ใช้ `10.Excutive Questions.md` |
 | AIX intake automation | ❌ Not Started | |
 | client/ retirement | ✅ Done | ลบ 2026-05-07 — all smoke tests passed |
@@ -49,11 +50,11 @@
 - SupplierSelection table (400 records per page, resizable columns, expandable item preview)
 - BulkCostWorkspace: Steps 1-3 (Cost Bar → Source Lines → Result Review)
 - Origin / Latest / Changes views
-- Live preview calculation (pure frontend, mock data)
+- Live preview calculation now calls backend `POST /api/bulk-cost/calculate`; active New Allocation starts from a blank manual workspace; mock fixtures are tests/demo only
 - Per-line document fees, editable final result
 - Pure document-fee basis helper/tests: Per Each, item-total normalization, By Lot / Batch service-line candidates
 - AY-CP final-result schema module: full final CAL table is locked to exactly 44 Excel columns (AY-CP); formula diagnostics stay separate; Term preview now receives ET/MT/preQLC/STK/QLC2 instead of zeros
-- Formula audit guard: `bulk-cost.formula-audit.ts` compares frontend Bulk Cost output to Term/Excel-style formula steps and the Formula view shows Pass/Warn/Fail status
+- Formula audit guard: `bulk-cost.formula-audit.ts` compares backend-returned Bulk Cost output to Term/Excel-style formula steps and the Formula view shows Pass/Warn/Fail status
 - Item/Term preview via localStorage bridge
 - 63 next-shell unit tests ผ่าน (allocation, rounding, warnings, Excel golden regression, document-fee basis, formula audit, AY-CP final-result schema, Term preview mapping, item API mapping, lookup cache/sub-location regressions)
 - 104 server unit tests ผ่าน (calculation engine, golden-case/parity, CWeight, AXON payload, Bulk Cost schemas, DraftTerm freight mapping, attachment/auth/item regressions)
@@ -66,8 +67,8 @@
 - Bulk Cost master write flow to Item/Term after Awarded
 - Real AXON/UI/API persistence for explicit `DocumentFeeBasis` and generated
   By Lot / Batch document-fee line candidates
-- Real SQL Server `PART_CATALOG_AIX` DB: `BulkCostRun`, `DraftItem`, `DraftTerm`, `AxonExtractionQueue` tables live; `BulkCostLine` removed from live schema; mock fallbacks removed
-- `ai-services/` package scaffolded: local CWeight formula, local lookup, sample analyzer, semantic evaluation reports/tests implemented; HS Code, Duty, Permit, Shelf Life are not Kim/Codex scope in the current phase
+- Real SQL Server `PART_CATALOG_AIX` DB: Manual Bulk Cost requires `BulkCostRun` revision metadata plus `DraftItem` / `DraftTerm` snapshots; `server/sql/20260519_bulk_cost_manual_revision.sql` adds only revision metadata
+- `ai-services/` package scaffolded historically, but not part of active PartCatalogAxon runtime architecture
 - Backend CWeight wrapper exists at `server/src/services/cweight.service.ts`; backend-only exact `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` lookup is available through `server/src/services/cweight-lookup.service.ts`, `POST /api/cweight/resolve`, and review-only Bulk Cost prefill endpoint `POST /api/bulk-cost/cweight-prefill`; it is not wired to Next.js UI.
 - AIX `GraingerWeightData` / `GraingerWeightImportLog` staging tables are obsolete for the active CWeight path; the real source is `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`.
 - AI extraction จากเอกสารหรือ quotation
@@ -81,6 +82,21 @@
 
 | วันที่ | การเปลี่ยนแปลง | Verification |
 |---|---|---|
+| 2026-05-19 | Reworked Manual Bulk Cost save/recalculate flow to `Create Run -> Add/Edit Lines -> Calculate -> Save Revision -> Recalculate`: frontend sends `sourceRunId`, Allocation list/workspace show revision numbers, backend saves each revision as a new `BulkCostRun` with `DraftItem` / `DraftTerm` snapshots, and Manual save still does not write `@POITM` / `@PITM1` | `npm.cmd --prefix server run build`, `npm.cmd --prefix next-shell run typecheck`, `npm.cmd --prefix next-shell test -- --run bulk-cost-api`; focused server Vitest blocked by sandbox config access and escalation quota |
+| 2026-05-19 | Wired Manual Bulk Cost workspace CAL to backend `POST /api/bulk-cost/calculate`, added calculate request schema/controller/route, preserved include/exclude selected-line behavior, and sent `sourceRunId` on save so recalculating a restored run creates the next explicit revision snapshot | `npm.cmd --prefix server run build`, `npm.cmd --prefix next-shell run typecheck`, `npm.cmd run build`; `npm.cmd test` blocked by sandbox Vitest config access and escalation quota |
+| 2026-05-19 | Tightened AXON handoff read model against the read-only AXON copy: expanded comparison source identity (`SourceRfqId`, brand group, supplier RFQ, quote item, RFQ line), added proposed AXON-side header/line SQL view contract, and changed backend loading so omitted `revision` resolves from the newest header before reading lines | Focused Vitest blocked by sandbox config access; server build currently blocked by unrelated dirty Bulk Cost errors |
+| 2026-05-19 | Promoted Bulk Cost draft save to backend calculation source of truth: added/finished `bulk-cost-calculation.service.ts` authoritative preview builder, operation-layer recalculation before repository save, calculation-error guard for mixed supplier/currency/zero qty, include/exclude line support, VAT diagnostics, revision metadata SQL wiring, and DraftTerm persistence fixes for selected duty and OP2 | `npm.cmd --prefix server run build`; focused Vitest blocked by sandbox access to `vitest.config.ts` |
+| 2026-05-19 | Cleaned remaining non-Pi-Jo-blocked legacy assumptions: added AXON handoff view env placeholders to `server/.env.example`; marked `20260512_seed_mock_data.sql` as demo-only and not production; clarified Bulk Cost mock data is dev/demo-only until AXON `ChainId` handoff replaces it; updated next-shell README test counts | `npm run typecheck` |
+| 2026-05-19 | Stabilized active Bulk Cost entry path: removed legacy `/api/bulk-cost/queue` route and `AxonExtractionQueue` read path from active code; changed New Allocation to select supplier from vendor master and open a blank manual PartCatalog workspace; removed standalone `ai-services/` from the active repo/runtime shape | `npm run typecheck`, `npm test` (server 110 + next-shell 70), `npm run build` |
+| 2026-05-19 | Captured 2026-05-18 meeting rule for repeated Bulk Cost calculations: supplier/customer conditions can change, so saved calculations must be revision/snapshot based; do not use Job ID, job name, or `ChainId` as a single locked primary key for calculation history | Docs-only |
+| 2026-05-19 | Scaffolded read-only `axon-handoff` backend module for the ChainId handoff: added types, SQL builders, repository, operation service, controller, route `GET /api/axon-handoff/comparisons/:chainId`, and query-shape tests. Endpoint is env-gated by `DB_VIEW_AXON_FINAL_COMPARISON_HEADER` and `DB_VIEW_AXON_FINAL_COMPARISON_LINES`; returns 501 until Pi-Jo confirms view names | `npm run typecheck`, `npm test` (server 110 + next-shell 70), `npm run build` |
+| 2026-05-19 | Added first code-level operation boundary for automation readiness: `bulk-cost-operation.service.ts` now wraps current Bulk Cost queue/list/load/save/status repository operations and introduces `OperationActor` (`human/service/ai_assistant`); controller now calls operation service instead of repository directly; added `OPERATION_LAYER_DESIGN.md` for next slices (`loadAxonComparison`, `cloneAxonComparison`, backend/shared `calculateBulkCost`) | `npm run typecheck`, `npm.cmd --prefix server test -- --run bulk-cost` (11) |
+| 2026-05-19 | Added automation-readiness plan based on Pi-Jo feedback that future automation requires module separation: documented UI → operation layer → domain services → repositories, target operations (`loadAxonComparison`, `cloneAxonComparison`, `calculateBulkCost`, etc.), actor/audit requirements, and reset scope; reframed `AXON_INTEGRATION.md` so API extraction payload sections are legacy reference and current target is `ChainId` shared DB/view/module handoff | `npm run typecheck` |
+| 2026-05-19 | Installed curated Codex skills for future stabilization sessions (`security-ownership-map`, `security-best-practices`, `playwright`; restart Codex to activate); added `CLEANUP_INVENTORY.md`; cleaned stale `client/` retirement references from `AGENTS.md`, `CLAUDE.md`, and `README.md`; updated `.github/copilot-instructions.md` to require reset docs before feature work | Docs-only; `npm run typecheck`, `npm test`, `npm run build` already passed earlier in reset |
+| 2026-05-19 | Started Architecture Stabilization reset from executive meeting notes: added `EXECUTIVE_ALIGNMENT.md`, `AXON_HANDOFF_CONTRACT.md`, `DEPLOYMENT_RUNBOOK.md`, and `MODULE_BOUNDARIES.md`; clarified AXON is Pi-Jo side, PartCatalogAxon consumes final comparison by `ChainId`; ported deploy-proven Item/Term `UpdatedDate` SQL writes to `GETDATE()` with regression test | `npm run typecheck`, `npm test` (server 108 + next-shell 70), `npm run build` |
+| 2026-05-18 | Fixed Bulk Cost FR/CC/TT currency conversion bug: FR (freight), CC (customs clearance), and TT (wire fee) Cost Bar inputs are Thai baht amounts and must not be multiplied by `exchangeRate`; removed `× exRate` from `frEachTHB`, `ttFinal`, and `ccFinal` in `bulk-cost.calc.ts`; updated `bulk-cost.formula-audit.ts` audit baseline and `bulk-cost-calc.test.ts` assertion to match; updated `BULK_COST_CALCULATION.md` section 4.7 and 4.10 | `npm run typecheck`, `npm test` (server 106 + next-shell 70), `npm run build` |
+| 2026-05-18 | Renamed Bulk Cost Step 3 column `FR QTEC` → `FR` to align with Term's `Freight (FR)` / `U_FR` input label; `frQTEC` key and formula unchanged; test updated | `npm run test` (server 106 + next-shell 70) |
+| 2026-05-18 | Investigated Bulk Cost Step 3 column architecture: documented REVIEW_RESULT_KEYS (19 keys), FORMULA_RESULT_KEYS (26 keys), BULK_COST_AY_CP_COLUMNS (44 Excel AY–CP), and BULK_COST_DIAGNOSTIC_COLUMNS (8 keys) with labels and visibility split. Added 4 new label-assertion tests in `bulk-cost-final-result.test.ts` covering OP1 section labels (PCS/PKH/SOC/OP1 THB/Curr/EX.RATE), freight+result labels (Exwork/Final DT/QLC/Total QLC), all diagnostic column labels (ET/MT/Misc Tax/SCC/Pre QLC/STK), and coverage that all 19 Review view keys resolve to a label via FINAL_RESULT_COLS_BY_KEY. No formula math changed. | `npm run typecheck`, `npm test` (server 106 + next-shell 70), `npm run build` |
 | 2026-05-15 | Bulk Cost DraftTerm save now persists `U_ValidFrom` with the server save date so every saved draft term has a Valid From value; `U_ValidTo` remains unset until business default is confirmed | `npm run typecheck`, `npm test` (server 106 + next-shell 66), `npm run build` |
 | 2026-05-15 | Mapped Bulk Cost Step 3 display closer to Term: Review now shows document-fee total, Currency, `OP1 (PSC)`, and `FR QTEC`; Exwork is hidden from Review but kept in Formula/Audit; Step 2 weight view adds read-only `Chargeable Wt/Ea`; Term preview always supplies `Valid From`; backend Term calculation accepts optional document fees defaulting to zero | `npm run typecheck`, `npm test` (server 105 + next-shell 66), `npm run build` |
 | 2026-05-15 | Clarified Bulk Cost currency display: Step 2 Cost Bar inputs now show the selected quote currency, the final AY-CP/Term preview output labels THB values for FR/CC/TT/SPK/QOC, and SPK/QOC remain fixed THB adders rather than percentages | `npm run typecheck`, `npm test` (server 104 + next-shell 65), `npm run build` |
@@ -110,7 +126,7 @@
 | 2026-05-08 | Updated Bulk Cost formula implementation/tests: split `MIXED_VENDOR` and `MIXED_CURRENCY`, locked document-fee basis helper, and corrected Grainger mock to Excel internal shipping-weight total `194.43675` | Same verification as above |
 | 2026-05-08 | `.datatest` refreshed as CSV/XLSX exports: 500-row Term/Item/vendor synonym samples, 1000-brand sample, lookup CSVs, and `AXON_Extraction_Calculation.xlsx` exact baseline | Docs/data audit update |
 | 2026-05-07 | Prepared `client/` retirement: root scripts now run/build/test `server + next-shell`, CSRF/CORS dev origin moved to `3010` | `npm run typecheck`, `npm test` (`server` 37 + `next-shell` 33), `npm run build`, production smoke health/redirect/item-list pass |
-| 2026-05-08 | Implemented Bulk Cost Phase 3A draft snapshot save: `POST /api/bulk-cost/runs`, transactional draft snapshot inserts, Next Save Draft button, SQL creation script. Superseded 2026-05-14: live schema uses `DraftItem` / `DraftTerm`, not `BulkCostLine`. | `npm --prefix server run build`, `npm --prefix next-shell run typecheck`, server tests 40 pass, next-shell tests 34 pass |
+| 2026-05-08 | Implemented initial Bulk Cost Phase 3A draft snapshot save: `POST /api/bulk-cost/runs`, transactional draft snapshot inserts, Next Save Draft button, SQL creation script. Superseded 2026-05-19 for Manual flow: live manual revision save uses `BulkCostRun` revision metadata with `DraftItem` / `DraftTerm` snapshots. | `npm --prefix server run build`, `npm --prefix next-shell run typecheck`, server tests 40 pass, next-shell tests 34 pass |
 | 2026-05-08 | Updated Bulk Cost/AXON docs: Qty is AXON-suggested from `QuotedQty`/`RfqQty` then sales verifies/edits; existing SQL Agent sync target `PART_CATALOGSQL` is acceptable because `PART_CATALOG_AIX` exposes synonyms | Docs-only update |
 | 2026-05-08 | Updated Bulk Cost document-fee rule: Per Each / UOM By Each fees enter OP1; By Lot / Batch fees become separate new line items and require Golden Case verification before DB execution | Docs-only update |
 | 2026-05-08 | Updated Bulk Cost test data handoff for current `.datatest` CSV/XLSX exports; corrected `@PITM1_BRAND_VENDOR`, `@PITM1_VENDOR_BRAND`, and `@FULLTEXT` as synonyms, not views | Docs-only update |
@@ -218,9 +234,9 @@
 - [x] Validate compiled backend CWeight lookup against live `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
 - [x] Confirm AIX `GraingerWeightData` staging table is not needed for the active CWeight path
 - [x] Add temporary Bulk Cost formula audit guard in frontend Formula view
-- [ ] Move Bulk Cost calculation to backend/shared source of truth before Award/SAP automation
+- [x] Move Bulk Cost calculation to backend/shared source of truth before Award/SAP automation — UI preview calls backend calculate and draft save persists backend-returned snapshots
 - [ ] Wire CWeight lookup endpoint later only after business approval; source should be `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`
-- [ ] Connect real AXON data source (replace AxonExtractionQueue seed data with live AXON push)
+- [ ] Connect real AXON handoff source by `ChainId` after Pi-Jo confirms final comparison views
 - [ ] Design Awarded reverse mapping flow before creating award/reverse-map endpoint
 - [ ] คุยกับผู้บริหารเรื่อง UI acceptance + Golden Case verification สำหรับ document fee basis
 - [ ] E2E test: full allocation → save snapshot flow

@@ -292,8 +292,8 @@ function computeFinalResult(
     }
   }
 
-  // ── Freight per each (allocated) — use the allocated value ────────────────
-  const frEachTHB = round6(freightEach * exRate);
+  // ── Freight per each (allocated) — FR input is in THB, no exchange rate ──
+  const frEachTHB = freightEach;
   const frQTEC = frEachTHB;
 
   // ── CIF ───────────────────────────────────────────────────────────────────
@@ -313,9 +313,9 @@ function computeFinalResult(
   const dtZone = round6(cifZone * (line.importDutyPercent / 100));
   const selectedDuty = round6(Math.max(dtQTEC, dtZone));
 
-  // ── TT and CC per each in THB ─────────────────────────────────────────────
-  const ttFinal = round6(ttEach * exRate);
-  const ccFinal = round6(ccEach * exRate);
+  // ── TT and CC per each in THB — inputs are always THB, no exchange rate ───
+  const ttFinal = ttEach;
+  const ccFinal = ccEach;
 
   // ── Excise Tax (ET) — reverse formula, same as Term engine ───────────────
   // ET = (MAX(CIF, CIFZONE) + DT + MiscTax) * ET% / (1 - 1.1 * ET%/100)

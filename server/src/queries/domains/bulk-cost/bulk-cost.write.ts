@@ -1,6 +1,9 @@
 export function buildCreateBulkCostRunSql(tableName: string): string {
     return `
 INSERT INTO ${tableName} (
+    [RevisionGroupID],
+    [RevisionNo],
+    [RevisionSourceRunID],
     [Status],
     [VendorCode],
     [VendorName],
@@ -28,6 +31,9 @@ INSERT INTO ${tableName} (
 )
 OUTPUT
     INSERTED.[RunID],
+    INSERTED.[RevisionGroupID],
+    INSERTED.[RevisionNo],
+    INSERTED.[RevisionSourceRunID],
     INSERTED.[Status],
     INSERTED.[VendorCode],
     INSERTED.[VendorName],
@@ -46,6 +52,9 @@ OUTPUT
     INSERTED.[UpdatedBy],
     INSERTED.[UpdatedAt]
 VALUES (
+    @RevisionGroupID,
+    @RevisionNo,
+    @RevisionSourceRunID,
     @Status,
     @VendorCode,
     @VendorName,

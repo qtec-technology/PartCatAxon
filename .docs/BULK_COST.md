@@ -15,15 +15,15 @@
 | BulkCostWorkspace (Step 2-4) | ✅ Done — Source Lines, Cost Bar, Result Review |
 | Allocation Run List | ✅ Done — 2-tab page, search, status/saleIncharge filters, visible horizontal scrollbar + 400-row pager, resizable columns, split Supplier/Code |
 | Restore saved run | ✅ Done — opening run from list pre-loads CAL at Step 3 |
-| Mark Awarded / Lost | ✅ Done — buttons in Workspace toolbar after Save Draft |
+| Mark Awarded / Lost | ✅ Done — buttons in Workspace toolbar after Save Revision |
 | Item/Term preview banner | ✅ Done — banner stays in normal flow so it never covers form headers while scrolling |
 | Manual quote numeric input UX | ✅ Done — zero values clear on focus; non-zero values select all for quick overwrite |
-| Calculation engine (frontend) | ✅ Done — pure frontend CAL with formula audit guard; 61 next-shell unit tests ผ่าน |
-| Mock data | ✅ Done — Grainger baseline + 12 supplier quotes (frontend only; no server mock fallbacks) |
+| Calculation engine | ✅ Backend API source of truth — UI `CAL` calls `POST /api/bulk-cost/calculate`; draft save persists the returned snapshot |
+| Mock data | ⚠️ Tests/demo only — Grainger baseline + 12 supplier quotes remain for regression tests; active New Allocation no longer reads mock supplier rows |
 | Item/Term preview | ✅ Done — localStorage bridge → `/item/preview`, `/term/preview` |
 | Viewport-locked layout | ✅ Done — `/bulk-cost` uses app-shell-locked layout (internal scroll matching `/partcatalog`) |
-| Backend API | ✅ Phase 3A Live — `POST /api/bulk-cost/runs` draft snapshot save, `GET /runs`, `GET /runs/:id`, `PATCH /runs/:id/status` |
-| DB persistence | ✅ Live — `BulkCostRun` / `DraftItem` / `DraftTerm` / `AxonExtractionQueue` in `PART_CATALOG_AIX`; `BulkCostLine` removed from live Phase 3A schema; mock fallbacks removed |
+| Backend API | ✅ Phase 3A Live — `POST /api/bulk-cost/calculate`, `POST /api/bulk-cost/runs` revision snapshot save, `GET /runs`, `GET /runs/:id`, `PATCH /runs/:id/status` |
+| DB persistence | ✅ Live — Manual Bulk Cost save/load uses `BulkCostRun` / `DraftItem` / `DraftTerm` snapshots; it does not write `@POITM` / `@PITM1` |
 | Grainger CWeight source | ✅ Existing DB source — use `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; AIX `GraingerWeightData` staging is obsolete for the active path |
 | CWeight / Weight module | 🚧 Evaluated — local-only CWeight policy report added; exact identifiers are `AUTO_ACCEPT`, description matches remain `REVIEW_SUGGESTION`, and any future API fallback is review-only after local `NOT_FOUND` |
 | Real AXON data source | ❌ Not Started |
@@ -40,19 +40,50 @@
 │           └── Mark Awarded / Lost → toast + status badge
 └── Tab: New Allocation
     └── SupplierSelection
-        └── เลือก supplier → URL params อัปเดต (?supplier=CODE&supplierName=NAME)
-            └── BulkCostWorkspace รับ supplierCode + supplierName
+        └── เลือก supplier จาก vendor master → URL params อัปเดต (?supplier=CODE&supplierName=NAME)
+            └── BulkCostWorkspace รับ supplierCode + supplierName และเปิด blank workspace
                 ├── Cost Bar (Step 1 ใน workspace): กรอก order term, ship mode, costs
                 ├── Source Lines (Step 2): ดู/แก้ไข origin/latest lines, เลือก lines สำหรับ CAL
-                ├── [กด CAL] → calculateAllocationPreview() → setPreview()
+                ├── [กด CAL] → POST /api/bulk-cost/calculate → setPreview()
                 ├── Result Review (Step 3): ดู/แก้ไข final results, preview item/term draft
-                └── Save Draft → Awarded / Lost buttons ปรากฏ
+                └── Save Revision → Awarded / Lost buttons ปรากฏ
 ```
 
 ### Page Refresh Behavior
 
 URL params `?supplier=CODE&supplierName=NAME` เก็บ supplier ที่เลือก
 ถ้า refresh หน้า → restore กลับ workspace โดยอัตโนมัติ (ไม่กลับ SupplierSelection)
+
+### Recalculation / Revision Flow
+
+Bulk Cost must support repeated calculations because supplier quotation data can
+change while sales is still working. A new supplier may reply later, a better
+price may arrive the next day, or the customer may request payment/shipment
+conditions that change the allocation basis.
+
+Core rules from the 2026-05-18 meeting:
+
+- Do not make `JobId`, job name, or `ChainId` the only primary key for a saved
+  calculation.
+- Save each calculation as a separate revision/snapshot.
+- A saved revision must be reloadable for review.
+- Editing a saved working copy and recalculating must create or update an
+  explicit revision, not silently overwrite the historical snapshot.
+- The second calculation may have different supplier data, line items, costs,
+  payment split, or shipment split from the first calculation.
+
+Conceptual model:
+
+```text
+Business context / ChainId / manual supplier
+  -> BulkCostRun revision 1
+  -> BulkCostRun revision 2
+  -> BulkCostRun revision 3
+```
+
+For manual Bulk Cost, the context may be only supplier/reference information.
+For AXON handoff, the context includes `ChainId` and AXON comparison revision.
+Both flows must preserve calculation history instead of locking one fixed row.
 
 ---
 
@@ -61,15 +92,15 @@ URL params `?supplier=CODE&supplierName=NAME` เก็บ supplier ที่เ
 | ไฟล์ | บทบาท |
 |---|---|
 | `src/app/bulk-cost/page.tsx` | Orchestrator: URL state + SupplierSelection → Workspace |
-| `src/features/bulk-cost/SupplierSelection.tsx` | Step 1: ตารางเลือก supplier |
+| `src/features/bulk-cost/SupplierSelection.tsx` | Step 1: เลือก supplier จาก vendor master เพื่อเปิด blank workspace |
 | `src/features/bulk-cost/BulkCostWorkspace.tsx` | Main workspace UI (~2000 lines) |
 | `src/features/bulk-cost/bulk-cost.types.ts` | TypeScript interfaces ทั้งหมด |
-| `src/features/bulk-cost/bulk-cost.calc.ts` | Pure calculation function |
-| `src/features/bulk-cost/bulk-cost.formula-audit.ts` | Temporary formula audit guard comparing frontend CAL output to Term/Excel-style expected steps |
+| `src/features/bulk-cost/bulk-cost.calc.ts` | Legacy/test calculation fixture; active UI must use backend calculate API |
+| `src/features/bulk-cost/bulk-cost.formula-audit.ts` | Temporary formula audit guard comparing returned CAL output to Term/Excel-style expected steps |
 | `src/features/bulk-cost/bulk-cost.final-result.ts` | AY-CP final-result schema and diagnostic-column separation |
 | `src/features/bulk-cost/bulk-cost.document-fees.ts` | Pure document-fee basis helper: Per Each, item-total normalization, By Lot / Batch line candidates |
-| `src/features/bulk-cost/bulk-cost.api.ts` | Build/save `BulkCostRun` draft snapshot payload |
-| `src/features/bulk-cost/bulk-cost.mock.ts` | Mock data (Grainger + 12 quotes) — frontend only |
+| `src/features/bulk-cost/bulk-cost.api.ts` | Backend API client for CAL, revision save, list/load/status |
+| `src/features/bulk-cost/bulk-cost.mock.ts` | Dev/demo mock data (Grainger + 12 quotes) — keep out of production handoff path |
 | `src/features/bulk-cost/bulk-cost.preview.ts` | localStorage bridge สำหรับ preview tabs |
 | `src/app/item/preview/page.tsx` | Read-only ItemForm (รับข้อมูลจาก localStorage) |
 | `src/app/term/preview/page.tsx` | Read-only TermPage (รับข้อมูลจาก localStorage) |
@@ -78,11 +109,10 @@ URL params `?supplier=CODE&supplierName=NAME` เก็บ supplier ที่เ
 | `next-shell/tests/unit/bulk-cost-api.test.ts` | Save payload unit test |
 | `server/src/routes/bulk-cost.routes.ts` | Express routes: save, list, get, patch status |
 | `server/src/repositories/bulk-cost.repository.ts` | Transactional insert/query — no mock fallbacks |
-| `server/sql/20260512_bulk_cost_full_schema.sql` | `BulkCostRun` / `DraftItem` / `DraftTerm` Phase 3A draft snapshot schema |
-| `server/sql/20260512_axon_ai_tables.sql` | `AxonExtractionQueue` + AXON AI helper tables |
-| `server/sql/20260512_seed_mock_data.sql` | 13 seed rows for `AxonExtractionQueue` |
+| `server/sql/20260519_bulk_cost_manual_revision.sql` | `BulkCostRun` revision metadata only; line snapshots remain in `DraftItem` / `DraftTerm` |
+| `server/sql/20260512_axon_ai_tables.sql` | Legacy AXON queue/helper tables; not used by active Bulk Cost route |
+| `server/sql/20260512_seed_mock_data.sql` | Demo-only seed rows for legacy `AxonExtractionQueue`; do not run in production |
 | `server/sql/20260512_grainger_weight_table.sql` | Obsolete AIX staging script for `GraingerWeightData` + `GraingerWeightImportLog`; active CWeight source is `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` |
-| `ai-services/src/services/weight-lookup.service.ts` | C1: Grainger-first weight/dim lookup → Gemini AI fallback |
 
 ---
 
@@ -107,7 +137,7 @@ of the AY-CP table.
 
 ---
 
-## 5. Calculation Engine (`bulk-cost.calc.ts`)
+## 5. Calculation Engine (`server/src/services/bulk-cost-calculation.service.ts`)
 
 ### หลักการ
 
@@ -141,12 +171,11 @@ OP2, INS, FR/CIF/DT actual and zone branches, ET/MT, preQLC, STK, QLC, QLC2,
 Total QLC, markup, and sales price. The Formula view uses this guard to show
 `Pass` / `Warn` / `Fail` status for the current frontend result.
 
-This audit is temporary. Bulk Cost CAL still runs in the Next.js frontend, while
-the production Term calculation source of truth is the Express backend service
-`server/src/services/calculation.service.ts`. Before Award/SAP automation or any
-`@POITM` / `@PITM1` write flow, Bulk Cost calculation should move to a
-backend/shared module so UI preview, draft save, automation, and reverse mapping
-use one authoritative calculation path.
+This audit is temporary and display-only. Active Bulk Cost CAL runs through
+`POST /api/bulk-cost/calculate`, backed by
+`server/src/services/bulk-cost-calculation.service.ts`, which delegates the
+per-line Term math to `server/src/services/calculation.service.ts`. The UI must
+not calculate authoritative Bulk Cost results locally.
 
 ### Freight Display / Persistence Mapping
 
@@ -156,14 +185,14 @@ Keep these two Term fields separate:
 - `U_FreightQTEC` / `Freight to QTEC WH` = reference value
   `ShipWeightCal * FreightRate`.
 
-Bulk Cost final result AY-CA (`FR QTEC`) displays the actual allocated freight
+Bulk Cost final result AY-CA (`FR`) displays the actual allocated freight
 because that is the value used by the Bulk Cost formula. DraftTerm persistence
 still writes the reference freight into `U_FreightQTEC` so the saved snapshot
 matches Term page semantics.
 
 Final-result labels intentionally include `(THB)` on CC, TT, SPK, and QOC
-fields. `FR QTEC` is also a Thai baht value, but keeps the Term/Excel label
-requested for Step 3 mapping. These values have already been converted or
+fields. `FR` is also a Thai baht value, aligning with Term's `Freight (FR)`
+input label for Step 3 mapping. These values have already been converted or
 entered as Thai baht by the time they appear in the final AY-CP result.
 
 Currency is specified before calculation in Step 1/Step 2:
@@ -196,7 +225,14 @@ The Step 3 Review table is mapped toward the Term calculation layout:
 | Ship Mode / dimensions | Step 2 source columns and Term draft preview |
 | Chargeable W (KG) | `Chargeable Wt/Ea`, derived from max item/dim weight before ceiling |
 | Shipping Weight | `Ship Wt/Ea`, the rounded weight used by CAL |
-| Freight to QTEC WH | `FR QTEC` |
+| Freight to QTEC WH | `FR` (maps to `U_FR` = Freight (FR) in Term) |
+
+Backend draft save now calls `buildAuthoritativeBulkCostDraft()` from
+`server/src/services/bulk-cost-calculation.service.ts` before repository writes.
+The saved `PreviewSnapshotJson` and per-line DraftTerm calculated fields are
+derived from the backend Term calculation sequence, not trusted from the client
+payload. Frontend `bulk-cost.calc.ts` remains a preview/formula-audit guard until
+the UI is wired to call a backend calculate endpoint.
 
 `Exwork` remains available in Formula/Audit diagnostics but is not shown in the
 Step 3 Review table.
@@ -213,6 +249,11 @@ an explicit business rule is confirmed.
 ---
 
 ## 6. Mock Data (`bulk-cost.mock.ts`)
+
+This data is dev/demo/test-only after the architecture reset. The production
+Bulk Cost entry point should be AXON final comparison by `ChainId` through
+`/api/axon-handoff/comparisons/:chainId`, then clone into PartCatalogAxon
+snapshots. Do not treat `bulk-cost.mock.ts` as the real AXON source.
 
 - **Grainger** — manager-provided Excel baseline (20 lines, qty 45, amount 10,650.08 USD, shipping weight 194.43675 kg from Excel internal values)
 - 12 supplier quotes เพิ่มเติมครอบคลุม:
@@ -284,9 +325,9 @@ Flow:
 - **Delivery Lead Time** เป็น item-level field (อาจต่างกันใน quote เดียวกัน)
 - **ไม่มี** approval gate ใน prototype flow ปัจจุบัน (save ตรง)
 - **ItemCode** ไม่ใช่ user-entered field — ระบบ generate จาก ItemGroup prefix + SP
-- **Save Draft Phase 3A** บันทึก `BulkCostRun` พร้อม `DraftItem` / `DraftTerm`
-  snapshot `DRAFT` ใน `PART_CATALOG_AIX`; `BulkCostLine` ถูกถอดออกจาก live
-  schema แล้ว และยังไม่เขียน `@POITM` / `@PITM1`
+- **Manual Save Revision** บันทึก `BulkCostRun` พร้อม `DraftItem` / `DraftTerm` line
+  snapshots ใน `PART_CATALOG_AIX` เท่านั้น; ไม่สร้าง `DraftItem` / `DraftTerm`
+  และยังไม่เขียน `@POITM` / `@PITM1`
 - **Document fee basis is mandatory**: Per Each / UOM By Each fees enter OP1;
   item-line totals must be normalized to per-each first; By Lot / Batch fees
   become separate new line items and must not be allocated into product OP1.
@@ -314,7 +355,7 @@ Flow:
 4. Keep CWeight local research reports current: formula, divisor, rounding, ship mode, dim unit, matching fields, and `.docs/CWEIGHT_EVALUATION.md`
 5. Keep Grainger CWeight lookup source as `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; do not deploy the obsolete AIX `GraingerWeightData` staging script for the active path
 6. Use backend-only `POST /api/bulk-cost/cweight-prefill` for draft-line CWeight suggestions first; wire to Bulk Cost UI later only after separate UI approval
-7. Promote Bulk Cost calculation from frontend-only to backend/shared source of truth before Award/SAP automation
+7. Wire UI CAL preview to the backend calculation service/API so preview and save use the same server result immediately
 8. Connect real AXON data source แทน seed data
 9. ออกแบบ Awarded reverse mapping flow ก่อนสร้าง endpoint จริง
 10. ทำ E2E test สำหรับ full allocation → save snapshot flow
@@ -338,6 +379,6 @@ Flow:
 |---|---|
 | `.docs/BULK_COST_CALCULATION.md` | สูตรคำนวณ Bulk Cost จาก Excel sample + reconciliation กับ Term engine |
 | `.docs/BULK_COST.md` | Feature guide และ decision log สรุปของ Bulk Cost |
-| `.docs/AXON_INTEGRATION.md` | AXON extraction contract และ BulkCostRun + DraftItem/DraftTerm snapshot flow |
+| `.docs/AXON_INTEGRATION.md` | AXON extraction contract และ BulkCostRun revision handoff flow |
 | `.docs/DATA_SCHEMA.md` | Item/Term schema และ calculation field mapping |
 | `.docs/FEATURE_STATUS.md` | สถานะล่าสุดและ decision log |

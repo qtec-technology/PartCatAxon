@@ -44,7 +44,7 @@ other agents.
 
 Bulk Cost Step 3 has been mapped closer to the Term page:
 
-- Review shows `Documents Fees (FEES)`, `Currency`, `OP1 (PSC)`, and `FR QTEC`.
+- Review shows `Documents Fees (FEES)`, `Currency`, `OP1 (PSC)`, and `FR` (Freight FR).
 - `Exwork` is hidden from Review but remains in Formula/Audit diagnostics.
 - Step 2 Weight view shows read-only `Chargeable Wt/Ea`.
 - Term preview supplies default `Valid From`.

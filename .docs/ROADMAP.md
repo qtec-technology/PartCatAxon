@@ -1,6 +1,6 @@
 # PartCatalog — Roadmap
 
-> อัปเดตล่าสุด: 2026-05-08  
+> อัปเดตล่าสุด: 2026-05-19
 > อ่านร่วมกับ `.docs/FEATURE_STATUS.md` (สถานะปัจจุบัน) และ `.docs/ARCHITECTURE.md`
 
 ---
@@ -8,12 +8,52 @@
 ## ภาพรวม Phase
 
 ```
+Phase 0 🔄  Architecture Stabilization (AXON handoff + deploy reset)
 Phase 1 ✅  Web Baseline (ใช้งานได้จริง)
 Phase 2 🔄  Next.js Native Migration (กำลังทำ)
 Phase 3 ⏳  Bulk Cost Backend + AXON Integration
 Phase 4 ⏳  Auth Migration → Better Auth
 Phase 5 ⏳  Full AI Automation
 ```
+
+---
+
+## Phase 0 — Architecture Stabilization 🔄
+
+หยุดเพิ่ม feature ใหม่ชั่วคราวเพื่อปรับฐานระบบก่อนเดินต่อ AXON handoff และ
+Bulk Cost production flow.
+
+อ่านเอกสาร reset:
+
+- `.docs/EXECUTIVE_ALIGNMENT.md`
+- `.docs/AXON_HANDOFF_CONTRACT.md`
+- `.docs/DEPLOYMENT_RUNBOOK.md`
+- `.docs/MODULE_BOUNDARIES.md`
+- `.docs/AUTOMATION_READINESS.md`
+- `.docs/OPERATION_LAYER_DESIGN.md`
+
+งานที่ต้องจบก่อนเริ่ม phase ถัดไป:
+
+- [x] Port Item/Term `UpdatedDate` fix จาก deploy-proven `repos2`: SQL Server
+      local `GETDATE()` แทน Node `new Date()` SQL parameter
+- [ ] Align deploy topology with AXON: Nginx, subdomain, internal CA, NSSM
+- [ ] Lock AXON handoff contract around `ChainId`, comparison revision,
+      supplier quote, and AXON line identity
+- [x] Draft AXON final comparison header/line SQL view contract from the
+      read-only AXON copy (`server/sql/20260519_axon_handoff_view_contract.sql`)
+- [x] Scaffold read-only AXON final comparison endpoint by `ChainId`
+      (`GET /api/axon-handoff/comparisons/:chainId`) with env-gated view names
+- [ ] Confirm real AXON final comparison view names/columns with Pi-Jo and set
+      `DB_VIEW_AXON_FINAL_COMPARISON_HEADER` / `DB_VIEW_AXON_FINAL_COMPARISON_LINES`
+- [x] Clean retired `client/` references from normal quick docs/scripts
+- [x] Document module boundaries and avoid browser-only business logic for
+      automation-critical workflows
+- [ ] Design next backend operation boundaries:
+      `cloneAxonComparison`, backend/shared `calculateBulkCost`
+- [x] Add first Bulk Cost operation service wrapper so controllers no longer
+      call repositories directly for current run/save/status operations
+- [x] Move Bulk Cost calculation toward backend/shared source of truth before
+      Award/SAP automation
 
 ---
 
@@ -99,10 +139,11 @@ Phase 5 ⏳  Full AI Automation
 - [x] Three-tier fallback สำหรับ CWeight: existing/export data → AI suggestion (ภายหลัง) → User manual (เสมอแก้ได้)
 - [x] Scope ล่าสุด: Kim/Codex ทำเฉพาะ CWeight / Weight & Dimension; HS Code, Duty, Permit, Shelf Life เป็น AXON/ทีมอื่น
 
-**งาน Claude Sonnet 4.6 (codebase owner):**
-- [ ] A2: SupplierSelection โหลดจาก real `@OCRD`
-- [ ] A3: `POST /api/bulk-cost/extraction` endpoint รับ AXON ExtractionPayload
-- [ ] B1: SQL `AxonExtractionQueue` + `AIRecommendCache` tables + repository
+**งาน codebase owner หลัง architecture reset:**
+- [ ] A2: SupplierSelection / AXON Chain inbox โหลดจาก real source
+- [ ] A3: Read-only AXON final comparison handoff by `ChainId`
+      (shared DB/view/module; do not start with public REST API)
+- [ ] B1: SQL read model / snapshot repository for AXON comparison clone
 - [ ] B2: Origin/Latest model ใน BulkCostWorkspace UI
 - [ ] B3: Item Group dropdown + 🪄 AI suggest indicator
 - [ ] B4: Supplier matching confirmation UI (AXON hint → user confirm/reject)
@@ -147,6 +188,10 @@ Phase 5 ⏳  Full AI Automation
 
 ## Phase 5 — Full AI Automation ⏳
 
+Automation requires module separation first. Read
+`.docs/AUTOMATION_READINESS.md`; do not automate browser clicks for core
+business logic.
+
 ระบบอัตโนมัติเต็มรูปแบบ:
 
 - [ ] AXON Email → SupplierReply → Quote Extraction pipeline ต่อตรงกับ Bulk Cost
@@ -168,7 +213,7 @@ Browser
     ├── Prisma ORM (30+ models → SQL Server 2022)
     └── /api/* → Express (legacy escape hatch)
 
-Python AXON Orchestrator (NSSM daemon)
+Python AXON Orchestrator (NSSM daemon, AXON side)
 ├── OpenAI / Gemini Vision / Claude CLI
 ├── Qdrant vector DB (192.168.2.54)
 └── POST → PartCatalog /api/bulk-cost/extraction

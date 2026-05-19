@@ -82,7 +82,8 @@ Browser
 | Next.js Phase 2 (native pages) | ✅ Done — Item/Term/PartCatalog native แล้ว |
 | Bulk Cost UI (interactive prototype) | ✅ Done — UI พร้อม, 33 unit tests ผ่าน |
 | Bulk Cost backend API + DB | 🚧 Phase 3A — API + SQL script ready; real DB smoke test pending |
-| AXON → Bulk Cost integration | ❌ Not Started — contract พร้อมใน `.docs/AXON_INTEGRATION.md` |
+| Architecture Stabilization | 🔄 Active — อ่าน `.docs/EXECUTIVE_ALIGNMENT.md`, `.docs/AXON_HANDOFF_CONTRACT.md`, `.docs/DEPLOYMENT_RUNBOOK.md`, `.docs/MODULE_BOUNDARIES.md` ก่อน feature ถัดไป |
+| AXON → Bulk Cost integration | ❌ Not Started — handoff contract หลักอยู่ใน `.docs/AXON_HANDOFF_CONTRACT.md`; `.docs/AXON_INTEGRATION.md` เป็นรายละเอียดเดิมที่ต้อง align |
 | Auth migration → Better Auth | ❌ Not Started — Phase 4 |
 | Full AI automation | ❌ Not Started — Phase 5 |
 
@@ -105,7 +106,7 @@ Browser
 | `app/term/[itemId]/page.tsx` | Native term page |
 | `app/api/[...path]/route.ts` | BFF proxy → Express |
 | `features/bulk-cost/BulkCostWorkspace.tsx` | Bulk Cost main UI (~2000 lines) |
-| `features/bulk-cost/SupplierSelection.tsx` | Step 1: เลือก Supplier |
+| `features/bulk-cost/SupplierSelection.tsx` | Step 1: เลือก Supplier จาก vendor master เพื่อเปิด blank workspace |
 | `features/bulk-cost/bulk-cost.calc.ts` | Pure calculation engine |
 | `features/bulk-cost/bulk-cost.types.ts` | TypeScript data contracts |
 | `features/bulk-cost/bulk-cost.mock.ts` | Mock data (Grainger + 12 suppliers) |
@@ -134,7 +135,7 @@ Browser
 | Item delete | ห้ามลบถ้ายังมี Term อยู่ |
 | New Term | สร้างได้จาก Item ที่มีอยู่เท่านั้น |
 | Attachment | เขียนไฟล์จริงไปที่ network share, metadata บันทึกใน DB |
-| Bulk Cost UI | Phase 3A ต่อ save draft snapshot ได้; SupplierSelection/AXON source ยังใช้ mock |
+| Bulk Cost UI | Phase 3A ต่อ save draft snapshot ได้; New Allocation เป็น manual PartCatalog workspace จาก vendor master; AXON `ChainId` handoff เป็น entry แยกในอนาคต |
 | Bulk Cost save | รอ schema design + business rule ยืนยันก่อน |
 
 ---
@@ -172,9 +173,10 @@ npm run build             # Build check — ต้องไม่มี error
 
 1. อ่านไฟล์นี้ทั้งหมด
 2. อ่าน `.docs/FEATURE_STATUS.md` เพื่อรู้สถานะล่าสุดและ decision log
-3. ถ้างานเกี่ยวกับ Bulk Cost → อ่าน `.docs/BULK_COST.md` + `.docs/BULK_COST_CALCULATION.md` + `.docs/AXON_INTEGRATION.md`
-4. ถ้างานเกี่ยวกับ Phase ถัดไป → อ่าน `.docs/ROADMAP.md`
-5. ถ้างานเกี่ยวกับ target architecture → อ่าน `.docs/ARCHITECTURE.md` section 12
+3. อ่าน reset docs ก่อนงาน feature ถัดไป: `.docs/EXECUTIVE_ALIGNMENT.md` + `.docs/AXON_HANDOFF_CONTRACT.md` + `.docs/DEPLOYMENT_RUNBOOK.md` + `.docs/MODULE_BOUNDARIES.md`
+4. ถ้างานเกี่ยวกับ Bulk Cost → อ่าน `.docs/BULK_COST.md` + `.docs/BULK_COST_CALCULATION.md` + `.docs/AXON_INTEGRATION.md`
+5. ถ้างานเกี่ยวกับ Phase ถัดไป → อ่าน `.docs/ROADMAP.md`
+6. ถ้างานเกี่ยวกับ target architecture → อ่าน `.docs/ARCHITECTURE.md`
 
 ### หลังทำงานเสร็จ — ต้องอัปเดตเอกสารเสมอ
 
@@ -182,6 +184,8 @@ npm run build             # Build check — ต้องไม่มี error
 |---|---|
 | แก้ bug / เพิ่ม feature | `.docs/FEATURE_STATUS.md` (Implementation Log + status) |
 | ตัดสินใจ architecture | `.docs/ARCHITECTURE.md` + `.docs/FEATURE_STATUS.md` (Decision Log) |
+| Architecture stabilization / cleanup | `.docs/CLEANUP_INVENTORY.md` + `.docs/ROADMAP.md` + `.docs/FEATURE_STATUS.md` |
+| AXON handoff | `.docs/AXON_HANDOFF_CONTRACT.md` + `.docs/AXON_INTEGRATION.md` + `.docs/FEATURE_STATUS.md` |
 | งาน Bulk Cost | `.docs/BULK_COST.md` + `.docs/BULK_COST_CALCULATION.md` + `.docs/AXON_INTEGRATION.md` + `.docs/FEATURE_STATUS.md` |
 | Phase เสร็จ / scope เปลี่ยน | `.docs/ROADMAP.md` + ไฟล์นี้ section 6 |
 | เปลี่ยน business rule | `.github/copilot-instructions.md` section 8 + `CLAUDE.md` |
@@ -207,6 +211,13 @@ npm run build             # Build check — ต้องไม่มี error
 | `.github/copilot-instructions.md` | ไฟล์นี้ | ทุก session (VS Code Copilot auto-load) |
 | `.docs/ARCHITECTURE.md` | Stack, DB, API, current vs target architecture | งาน infrastructure / architecture decision |
 | `.docs/FEATURE_STATUS.md` | Workstream status + decision log + implementation log | รู้สถานะปัจจุบัน / handoff |
+| `.docs/EXECUTIVE_ALIGNMENT.md` | Executive direction from meeting notes | ก่อน architecture/feature reset |
+| `.docs/AXON_HANDOFF_CONTRACT.md` | ChainId/shared-view handoff between AXON and PartCatalogAxon | งานเชื่อม AXON |
+| `.docs/DEPLOYMENT_RUNBOOK.md` | Nginx/NSSM/subdomain/internal CA deploy target | งาน deploy/runtime |
+| `.docs/MODULE_BOUNDARIES.md` | Server/Next module ownership and automation-ready operation layer | งาน cleanup/refactor |
+| `.docs/AUTOMATION_READINESS.md` | Operation-layer and audit requirements for future automation | งาน automation / agent-safe workflow |
+| `.docs/OPERATION_LAYER_DESIGN.md` | Code-level operation service plan and next slices | งานแยก module / operation layer |
+| `.docs/CLEANUP_INVENTORY.md` | Dead-code/stale-doc/risk cleanup list | งาน stabilization |
 | `.docs/BULK_COST.md` | Bulk Cost UI guide (flow, components, calc engine) | งาน Bulk Cost UI ทุกชนิด |
 | `.docs/BULK_COST_CALCULATION.md` | Bulk Cost formula review from Excel sample + Term engine reconciliation | งานสูตร Bulk Cost / CAL |
 | `.docs/AXON_INTEGRATION.md` | AXON → PartCatalog data contract | เริ่ม backend Bulk Cost / AXON integration |

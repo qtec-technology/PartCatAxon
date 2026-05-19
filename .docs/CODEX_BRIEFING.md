@@ -1,5 +1,10 @@
 # CODEX_BRIEFING.md — งานของ GPT 5.5 (Codex) ใน PartCatalog
 
+> Retired on 2026-05-19 during Architecture Stabilization.
+> The `ai-services/` package was removed from the active PartCatalogAxon
+> runtime/repo shape. Treat this file as historical CWeight research context,
+> not current implementation guidance.
+
 > อ่านไฟล์นี้ก่อนเริ่มงานทุกครั้ง  
 > อัปเดตล่าสุด: 2026-05-13
 > ไฟล์ที่ต้องอ่านเพิ่ม: `.docs/AXON_INTEGRATION.md`, `.docs/BULK_COST_CALCULATION.md`

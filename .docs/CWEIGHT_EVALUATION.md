@@ -2,6 +2,11 @@
 
 Updated: 2026-05-14
 
+> Historical note: the standalone `ai-services/` research package was removed
+> from the active PartCatalogAxon repo shape on 2026-05-19. The evaluation
+> remains useful as research evidence, but its commands are no longer part of
+> the active verification workflow.
+
 ## Scope
 
 This evaluation covers only CWeight / Weight & Dimension behavior in

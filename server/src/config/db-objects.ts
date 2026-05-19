@@ -56,7 +56,6 @@ export const dbObjects = {
             bulkCostRun: qtecObject('DB_TABLE_BULK_COST_RUN', 'BulkCostRun'),
             draftItem: qtecObject('DB_TABLE_DRAFT_ITEM', 'DraftItem'),
             draftTerm: qtecObject('DB_TABLE_DRAFT_TERM', 'DraftTerm'),
-            axonExtractionQueue: qtecObject('DB_TABLE_AXON_QUEUE', 'AxonExtractionQueue'),
         },
         grainger: {
             cweight: graingerObject('DB_TABLE_GRAINGER_CWEIGHT', '@GRAINGER_CWEIGHT'),

@@ -39,7 +39,15 @@ export const bulkCostCWeightPrefillBodySchema = z.object({
 
 export type BulkCostCWeightPrefillBodyDTO = z.infer<typeof bulkCostCWeightPrefillBodySchema>;
 
+export const calculateBulkCostBodySchema = z.object({
+    costs: jsonObject,
+    lines: z.array(jsonObject).min(1, 'lines must contain at least one line'),
+}).strict();
+
+export type CalculateBulkCostBodyDTO = z.infer<typeof calculateBulkCostBodySchema>;
+
 export const saveBulkCostRunBodySchema = z.object({
+    sourceRunId: z.coerce.number().int().positive().optional(),
     supplierCode: nonEmptyString,
     supplierName: trimmedString.optional().default(''),
     status: z.literal('DRAFT').default('DRAFT'),

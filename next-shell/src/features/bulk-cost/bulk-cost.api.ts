@@ -18,6 +18,9 @@ export interface LoadedBulkCostRunLine {
 
 export interface LoadedBulkCostRunResponse {
   runId: number;
+  revisionGroupId: number;
+  revisionNo: number;
+  revisionSourceRunId: number | null;
   status: AllocationRunStatus;
   vendorCode: string;
   vendorName: string;
@@ -28,6 +31,7 @@ export interface LoadedBulkCostRunResponse {
 }
 
 export interface SaveBulkCostRunRequest {
+  sourceRunId?: number;
   supplierCode: string;
   supplierName: string;
   status: Extract<AllocationRunStatus, 'DRAFT'>;
@@ -52,6 +56,9 @@ export interface SaveBulkCostRunLine {
 
 export interface SaveBulkCostRunResponse {
   runId: number;
+  revisionGroupId: number;
+  revisionNo: number;
+  revisionSourceRunId: number | null;
   status: AllocationRunStatus;
   supplierCode: string;
   supplierName: string;
@@ -73,6 +80,7 @@ export interface SaveBulkCostRunResponse {
 }
 
 interface BuildBulkCostRunDraftPayloadArgs {
+  sourceRunId?: number | null;
   supplierCode: string;
   supplierName: string;
   costs: BulkCostInput;
@@ -112,6 +120,7 @@ function getAxonHints(line: AllocationLineSource): SaveBulkCostRunLine['axon'] {
 }
 
 export function buildBulkCostRunDraftPayload({
+  sourceRunId,
   supplierCode,
   supplierName,
   costs,
@@ -141,6 +150,7 @@ export function buildBulkCostRunDraftPayload({
   });
 
   return {
+    ...(sourceRunId ? { sourceRunId } : {}),
     supplierCode,
     supplierName,
     status: 'DRAFT',
@@ -153,6 +163,17 @@ export function buildBulkCostRunDraftPayload({
     },
     lines,
   };
+}
+
+export async function calculateBulkCostPreview(payload: {
+  costs: BulkCostInput;
+  lines: AllocationLineSource[];
+}): Promise<AllocationPreview> {
+  const response = await requestJson<AllocationPreview>('/api/bulk-cost/calculate', {
+    method: 'POST',
+    body: payload,
+  });
+  return response.data;
 }
 
 export async function saveBulkCostRunDraft(payload: SaveBulkCostRunRequest): Promise<SaveBulkCostRunResponse> {
@@ -208,30 +229,4 @@ export async function updateBulkCostRunStatus(
     method: 'PATCH',
     body: { status },
   });
-}
-
-export interface AxonQueueItem {
-  queueId: number;
-  sourceFileId: string;
-  sourceFileName: string | null;
-  documentType: string | null;
-  documentNo: string | null;
-  documentDate: string | null;
-  supplierRawName: string;
-  supplierCodeHint: string | null;
-  supplierConfidence: number | null;
-  currency: string | null;
-  purchaseTerm: string | null;
-  termLocation: string | null;
-  totalLines: number;
-  status: 'PENDING' | 'OPENED';
-  receivedAt: string;
-  openedAt: string | null;
-  openedBy: string | null;
-  runId: number | null;
-}
-
-export async function listAxonQueue(): Promise<AxonQueueItem[]> {
-  const response = await requestJson<AxonQueueItem[]>('/api/bulk-cost/queue');
-  return response.data ?? [];
 }

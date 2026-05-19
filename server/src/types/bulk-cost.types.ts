@@ -1,36 +1,12 @@
-import type { HeaderCostSuggestions } from '#src/services/axon-payload.service.js';
-
 export const BULK_COST_RUN_STATUSES = ['DRAFT', 'QUOTED', 'AWARDED', 'REVERSE_MAPPED', 'LOST', 'ARCHIVED'] as const;
 
 export type BulkCostRunStatus = (typeof BULK_COST_RUN_STATUSES)[number];
 
-export const AXON_QUEUE_STATUSES = ['PENDING', 'OPENED', 'PROCESSED', 'REJECTED'] as const;
-export type AxonQueueStatus = (typeof AXON_QUEUE_STATUSES)[number];
-
-export interface AxonQueueItem {
-    queueId: number;
-    sourceFileId: string;
-    sourceFileName: string | null;
-    documentType: string | null;
-    documentNo: string | null;
-    documentDate: string | null;
-    supplierRawName: string;
-    supplierCodeHint: string | null;
-    supplierConfidence: number | null;
-    currency: string | null;
-    purchaseTerm: string | null;
-    termLocation: string | null;
-    totalLines: number;
-    status: AxonQueueStatus;
-    receivedAt: string;
-    openedAt: string | null;
-    openedBy: string | null;
-    runId: number | null;
-    headerCostSuggestions: HeaderCostSuggestions | null;
-}
-
 export interface BulkCostRunSummary {
     runId: number;
+    revisionGroupId: number;
+    revisionNo: number;
+    revisionSourceRunId: number | null;
     status: BulkCostRunStatus;
     vendorCode: string;
     vendorName: string;
@@ -54,6 +30,9 @@ export interface LoadedBulkCostRunLine {
 
 export interface LoadedBulkCostRun {
     runId: number;
+    revisionGroupId: number;
+    revisionNo: number;
+    revisionSourceRunId: number | null;
     status: BulkCostRunStatus;
     vendorCode: string;
     vendorName: string;
@@ -78,6 +57,7 @@ export interface SaveBulkCostDraftLineInput {
 }
 
 export interface SaveBulkCostRunInput {
+    sourceRunId?: number;
     supplierCode: string;
     supplierName?: string;
     status: 'DRAFT';
@@ -90,6 +70,9 @@ export interface SaveBulkCostRunInput {
 
 export interface SavedBulkCostRun {
     runId: number;
+    revisionGroupId: number;
+    revisionNo: number;
+    revisionSourceRunId: number | null;
     status: BulkCostRunStatus;
     supplierCode: string;
     supplierName: string;

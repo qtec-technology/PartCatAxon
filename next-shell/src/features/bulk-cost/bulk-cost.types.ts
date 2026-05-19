@@ -344,6 +344,9 @@ export type AllocationRunStatus = 'DRAFT' | 'QUOTED' | 'AWARDED' | 'REVERSE_MAPP
 
 export interface BulkCostRunSummary {
   runId: number;
+  revisionGroupId: number;
+  revisionNo: number;
+  revisionSourceRunId: number | null;
   status: AllocationRunStatus;
   vendorCode: string;
   vendorName: string;

@@ -191,6 +191,7 @@ describe('buildBulkCostRunDraftPayload', () => {
     };
 
     const payload = buildBulkCostRunDraftPayload({
+      sourceRunId: 41,
       supplierCode: 'V-001',
       supplierName: 'Vendor',
       costs: makeCosts(),
@@ -201,6 +202,7 @@ describe('buildBulkCostRunDraftPayload', () => {
     });
 
     expect(payload.status).toBe('DRAFT');
+    expect(payload.sourceRunId).toBe(41);
     expect(payload.lines).toHaveLength(1);
     expect(payload.lines[0].origin?.sapDescription).toBe('Origin description');
     expect(payload.lines[0].latest.sapDescription).toBe('Latest description');

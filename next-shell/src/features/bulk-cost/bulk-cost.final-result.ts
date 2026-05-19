@@ -39,7 +39,7 @@ export const BULK_COST_AY_CP_COLUMNS: FinalResultColumnDefinition[] = [
   { excelColumn: 'BX', key: 'exworkCase', label: 'Exwork', kind: 'number', editable: true },
   { excelColumn: 'BY', key: 'op2', label: 'OP2 (THB)', kind: 'number', editable: true },
   { excelColumn: 'BZ', key: 'ins', label: 'INS', kind: 'number', editable: true },
-  { excelColumn: 'CA', key: 'frQTEC', label: 'FR QTEC', kind: 'number', editable: true },
+  { excelColumn: 'CA', key: 'frQTEC', label: 'FR (THB)', kind: 'number', editable: true },
   { excelColumn: 'CB', key: 'frZoneRate', label: 'FR Zone/KG', kind: 'number', editable: true },
   { excelColumn: 'CC', key: 'frZoneCost', label: 'FR Zone', kind: 'number', editable: true },
   { excelColumn: 'CD', key: 'cifQTEC', label: 'CIF QTEC', kind: 'number', editable: true },

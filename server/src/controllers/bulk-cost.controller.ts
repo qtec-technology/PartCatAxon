@@ -1,20 +1,23 @@
 import type { Request, Response, NextFunction } from 'express';
 import { success } from '#src/utils/response.js';
 import { resolveUpdatedByFirstName } from '#src/utils/auth.js';
-import * as bulkCostRepo from '#src/repositories/bulk-cost.repository.js';
+import * as bulkCostOps from '#src/services/bulk-cost-operation.service.js';
+import { calculateBulkCostPreview } from '#src/services/bulk-cost-calculation.service.js';
 import { resolveBulkCostCWeightPrefill } from '#src/services/bulk-cost-cweight.service.js';
 import type {
+    CalculateBulkCostBodyDTO,
     BulkCostCWeightPrefillBodyDTO,
     ListBulkCostRunsQueryDTO,
     SaveBulkCostRunBodyDTO,
     UpdateBulkCostRunStatusBodyDTO,
 } from '#src/dtos/bulk-cost/bulk-cost.request.schema.js';
 
-/** GET /api/bulk-cost/queue */
-export async function getQueueItems(req: Request, res: Response, next: NextFunction): Promise<void> {
+/** POST /api/bulk-cost/calculate */
+export async function calculateBulkCost(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-        const items = await bulkCostRepo.listAxonQueueItems();
-        res.json(success(items, 'OK'));
+        const body = req.body as CalculateBulkCostBodyDTO;
+        const preview = calculateBulkCostPreview(body);
+        res.json(success(preview, 'OK'));
     } catch (err) {
         next(err);
     }
@@ -24,8 +27,8 @@ export async function getQueueItems(req: Request, res: Response, next: NextFunct
 export async function createBulkCostRun(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const body = req.body as SaveBulkCostRunBodyDTO;
-        const actorName = resolveUpdatedByFirstName(req);
-        const saved = await bulkCostRepo.createBulkCostRun(body, actorName);
+        const actor = bulkCostOps.humanActor(resolveUpdatedByFirstName(req));
+        const saved = await bulkCostOps.saveBulkCostDraft(body, actor);
         res.status(201).json(success(saved, 'Bulk Cost draft saved'));
     } catch (err) {
         next(err);
@@ -49,7 +52,7 @@ export async function getRunsList(req: Request, res: Response, next: NextFunctio
         const query = req.query as unknown as ListBulkCostRunsQueryDTO;
         const page = Number(query.page ?? 1);
         const pageSize = Number(query.pageSize ?? 400);
-        const { runs, total } = await bulkCostRepo.listBulkCostRuns({
+        const { runs, total } = await bulkCostOps.listBulkCostRuns({
             status: query.status,
             search: query.search,
             saleIncharge: query.saleIncharge,
@@ -74,7 +77,7 @@ export async function getRunById(req: Request, res: Response, next: NextFunction
             res.status(400).json({ success: false, message: 'Invalid run ID' });
             return;
         }
-        const run = await bulkCostRepo.loadBulkCostRun(runId);
+        const run = await bulkCostOps.loadBulkCostRun(runId);
         if (!run) {
             res.status(404).json({ success: false, message: `Run #${runId} not found` });
             return;
@@ -94,8 +97,8 @@ export async function updateRunStatus(req: Request, res: Response, next: NextFun
             return;
         }
         const body = req.body as UpdateBulkCostRunStatusBodyDTO;
-        const actorName = resolveUpdatedByFirstName(req);
-        await bulkCostRepo.updateBulkCostRunStatus(runId, body.status, actorName);
+        const actor = bulkCostOps.humanActor(resolveUpdatedByFirstName(req));
+        await bulkCostOps.markBulkCostRunStatus(runId, body.status, actor);
         res.json(success(null, `Run #${runId} marked as ${body.status}`));
     } catch (err) {
         next(err);

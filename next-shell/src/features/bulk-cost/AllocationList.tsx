@@ -8,7 +8,7 @@ import { useResizableTableColumns } from './useResizableTableColumns';
 import type { ResizableTableColumn } from './useResizableTableColumns';
 
 const ALLOCATION_TABLE_COLUMNS: ResizableTableColumn[] = [
-  { key: 'runId',       defaultWidth: 70,  minWidth: 50 },
+  { key: 'runId',       defaultWidth: 92,  minWidth: 72 },
   { key: 'supplier',    defaultWidth: 220, minWidth: 100 },
   { key: 'vendorCode',  defaultWidth: 100, minWidth: 60 },
   { key: 'lines',       defaultWidth: 60,  minWidth: 50 },
@@ -22,7 +22,7 @@ const ALLOCATION_TABLE_COLUMNS: ResizableTableColumn[] = [
 ];
 
 const COL_LABELS: Record<string, string> = {
-  runId: 'Run #', supplier: 'Supplier', vendorCode: 'Code', lines: 'Lines',
+  runId: 'Run / Rev', supplier: 'Supplier', vendorCode: 'Code', lines: 'Lines',
   amount: 'Total Amount', currency: 'Currency', updatedAt: 'Updated',
   updatedBy: 'Updated By', status: 'Status', referenceNo: 'Reference No.', action: '',
 };
@@ -245,7 +245,9 @@ export function AllocationList({ onOpen }: AllocationListProps) {
                       ))
                     : runs.map((run) => (
                         <tr key={run.runId} className="supplier-select-row" onDoubleClick={() => onOpen(run)}>
-                          <td className="center-cell allocation-list-run-id" {...tableSizing.getCellProps('runId')}>#{run.runId}</td>
+                          <td className="center-cell allocation-list-run-id" {...tableSizing.getCellProps('runId')}>
+                            #{run.runId} / R{run.revisionNo}
+                          </td>
                           <td className="text-left-cell" {...tableSizing.getCellProps('supplier')}>{run.vendorName || run.vendorCode}</td>
                           <td className="text-left-cell allocation-list-vendor-code-cell" {...tableSizing.getCellProps('vendorCode')}>{run.vendorCode}</td>
                           <td className="center-cell" {...tableSizing.getCellProps('lines')}>{run.totalLines}</td>

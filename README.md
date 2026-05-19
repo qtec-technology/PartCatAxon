@@ -13,9 +13,14 @@ Browser
               -> network file shares
 ```
 
-`next-shell/` is the active frontend. `server/` remains the backend API. `client/` is a legacy React/Vite frontend kept only as temporary reference during retirement and must not be part of normal dev or deploy.
+`next-shell/` is the active frontend. `server/` remains the backend API. `client/` was retired on 2026-05-07 and must not be reintroduced into normal dev or deploy.
 
-Read [.docs/CLIENT_RETIREMENT_PLAN.md](.docs/CLIENT_RETIREMENT_PLAN.md) before deleting `client/`.
+Architecture reset references:
+
+- [.docs/EXECUTIVE_ALIGNMENT.md](.docs/EXECUTIVE_ALIGNMENT.md)
+- [.docs/AXON_HANDOFF_CONTRACT.md](.docs/AXON_HANDOFF_CONTRACT.md)
+- [.docs/DEPLOYMENT_RUNBOOK.md](.docs/DEPLOYMENT_RUNBOOK.md)
+- [.docs/MODULE_BOUNDARIES.md](.docs/MODULE_BOUNDARIES.md)
 
 ## Project Structure
 
@@ -99,7 +104,7 @@ npm run build
 Current verified baseline:
 
 - `npm run typecheck` passes for `server` and `next-shell`
-- `npm test` passes: `server` 37 tests, `next-shell` 33 tests
+- `npm test` passes: `server` 108 tests, `next-shell` 70 tests
 - `npm run build` passes for `server` and `next-shell`
 - Production smoke passed:
   - `GET http://localhost:3001/api/health` -> `200`
@@ -110,7 +115,8 @@ Current verified baseline:
 
 ## Production Shape
 
-Run as two services:
+Target production deployment is documented in [.docs/DEPLOYMENT_RUNBOOK.md](.docs/DEPLOYMENT_RUNBOOK.md).
+Run as two services behind Nginx:
 
 ```powershell
 npm --prefix .\server run build
@@ -142,7 +148,7 @@ CORS_ALLOWED_ORIGINS=https://partcatalog.example.local
 ## Important Rules
 
 - Do not move `server/` into `next-shell/` during this cutover.
-- Do not deploy or run `client/` as the active frontend.
+- Do not reintroduce, deploy, or run `client/` as the active frontend.
 - Term calculation remains backend source of truth.
-- Bulk Cost backend persistence must wait for approved schema/rules in `.docs`.
+- Bulk Cost Phase 3A persistence is limited to `BulkCostRun` / `DraftItem` / `DraftTerm` snapshots until Awarded reverse mapping is designed.
 - Keep docs updated when architecture or workflow changes.

@@ -86,10 +86,10 @@ export function buildBulkCostFormulaAudit(
     ? source.shippingWeightPerEach
     : ceilTo(Math.max(dw, itemWeight), 0.5);
   const frActualExpected = options.allocationLine
-    ? round6(options.allocationLine.freightPerEach * costs.exchangeRate)
+    ? options.allocationLine.freightPerEach
     : finalResult.frQTEC;
   const frActualNote = options.allocationLine
-    ? 'Visible FR actual must match the allocated freight value used by CIF/preQLC.'
+    ? 'FR input is in THB. Visible FR must match allocated freightPerEach (no exchange rate).'
     : 'No allocation result supplied; using final FR value as the audit baseline.';
   const frZoneRateExpected = isFcaOrExwork && costs.shipModeNo === 6 ? source.zoneRate : 0;
   const frZoneExpected = round6(

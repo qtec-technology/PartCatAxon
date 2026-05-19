@@ -2,6 +2,11 @@
 
 Updated: 2026-05-14
 
+> Historical note: the standalone `ai-services/` research package was removed
+> from the active PartCatalogAxon repo shape on 2026-05-19. Keep this document
+> as research context only; active CWeight runtime work should live under
+> `server/` or `next-shell/` module boundaries.
+
 ## Purpose
 
 The CWeight module is intended to help PartCatalog find or suggest the weight used for freight calculation when supplier/product data is incomplete.

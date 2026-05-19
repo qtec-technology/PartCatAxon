@@ -3,6 +3,7 @@ import {
   BULK_COST_AY_CP_COLUMNS,
   BULK_COST_DIAGNOSTIC_COLUMNS,
   FINAL_RESULT_COLS,
+  FINAL_RESULT_COLS_BY_KEY,
   toAyCpFinalResultRow,
 } from '@/features/bulk-cost/bulk-cost.final-result';
 import { mapBulkCostToTermCalcResults, mapBulkCostToTermFormData } from '@/features/bulk-cost/bulk-cost.preview';
@@ -156,7 +157,7 @@ describe('Bulk Cost final result schema', () => {
   it('labels final-result money fields for Step 3 mapping', () => {
     const labelsByKey = new Map(BULK_COST_AY_CP_COLUMNS.map((column) => [column.key, column.label]));
 
-    expect(labelsByKey.get('frQTEC')).toBe('FR QTEC');
+    expect(labelsByKey.get('frQTEC')).toBe('FR (THB)');
     expect(labelsByKey.get('wireTT')).toBe('TT (THB)');
     expect(labelsByKey.get('customClear')).toBe('CC (THB)');
     expect(labelsByKey.get('ttFinal')).toBe('TT Final (THB)');
@@ -172,6 +173,52 @@ describe('Bulk Cost final result schema', () => {
     expect(row.BW).toBe(3605);
     expect(row.CP).toBe(2259.4);
     expect(row).not.toHaveProperty('op1Source');
+  });
+
+  it('labels OP1 section AY-CP columns for Step 3 Term mapping', () => {
+    const labelsByKey = new Map(BULK_COST_AY_CP_COLUMNS.map((c) => [c.key, c.label]));
+
+    expect(labelsByKey.get('productCost')).toBe('PCS');
+    expect(labelsByKey.get('pkh')).toBe('PKH');
+    expect(labelsByKey.get('soc')).toBe('SOC');
+    expect(labelsByKey.get('op1')).toBe('OP1 (THB)');
+    expect(labelsByKey.get('currency')).toBe('Curr');
+    expect(labelsByKey.get('rateExchange')).toBe('EX.RATE');
+  });
+
+  it('labels freight, duty, and result AY-CP columns for Step 3 Term mapping', () => {
+    const labelsByKey = new Map(BULK_COST_AY_CP_COLUMNS.map((c) => [c.key, c.label]));
+
+    expect(labelsByKey.get('exworkCase')).toBe('Exwork');
+    expect(labelsByKey.get('selectedDuty')).toBe('Final DT');
+    expect(labelsByKey.get('qlc')).toBe('QLC');
+    expect(labelsByKey.get('totalQLC')).toBe('Total QLC');
+  });
+
+  it('labels all diagnostic columns', () => {
+    const labelsByKey = new Map(BULK_COST_DIAGNOSTIC_COLUMNS.map((c) => [c.key, c.label]));
+
+    expect(labelsByKey.get('et')).toBe('ET');
+    expect(labelsByKey.get('mt')).toBe('MT');
+    expect(labelsByKey.get('miscTaxVal')).toBe('Misc Tax');
+    expect(labelsByKey.get('scc')).toBe('SCC');
+    expect(labelsByKey.get('preQLC')).toBe('Pre QLC');
+    expect(labelsByKey.get('stk')).toBe('STK');
+  });
+
+  it('all Review view keys resolve to a label via FINAL_RESULT_COLS_BY_KEY', () => {
+    // These are the keys shown in Step 3 Review (mirrors REVIEW_RESULT_KEYS in BulkCostWorkspace)
+    const reviewKeys: (keyof FinalResultColumns)[] = [
+      'productCost', 'pkh', 'soc', 'docFees', 'currency', 'op1Source',
+      'rateExchange', 'op1', 'op2', 'shipWeightCal', 'ins', 'frQTEC',
+      'selectedDuty', 'wireTT', 'customClear', 'qlc', 'totalQLC', 'markup', 'roundUp',
+    ];
+
+    for (const key of reviewKeys) {
+      const col = FINAL_RESULT_COLS_BY_KEY.get(key);
+      expect(col, `expected column definition for Review key "${key}"`).toBeDefined();
+      expect(col?.label, `"${key}" must have a non-empty label`).toBeTruthy();
+    }
   });
 });
 

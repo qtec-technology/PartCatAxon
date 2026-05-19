@@ -7,9 +7,9 @@
 ## สถานะปัจจุบัน
 
 - Native pages: `/partcatalog`, `/item/[id]`, `/item/new`, `/term/[itemId]`
-- Bulk Cost workspace: `/bulk-cost` (interactive UI, mock data)
+- Bulk Cost workspace: `/bulk-cost` (interactive UI; New Allocation opens a manual PartCatalog workspace from vendor master; AXON `ChainId` handoff is a separate future entry)
 - `/api/*` BFF proxy → Express (port 3001)
-- 33 unit tests ผ่าน (vitest)
+- 70 unit tests ผ่าน (vitest)
 
 ## Development URL
 
@@ -23,7 +23,7 @@ http://localhost:3010
 # จาก root PartCatalogApp/
 npm run dev:next     # รัน next-shell เท่านั้น
 npm run typecheck    # TypeScript check
-npm test             # Unit tests (ต้องผ่าน 33)
+npm test             # Unit tests
 npm run build        # Build check
 
 # หรือจาก next-shell/ โดยตรง
@@ -41,3 +41,4 @@ Turbopack จะสับสนและหา `tailwindcss` ผิดที่ 
 ## Migration Rule
 
 คง Express API ไว้เป็น stable core จนกว่าแต่ละ Next.js page จะผ่าน UI parity + workflow check
+Bulk Cost production entry is either manual PartCatalog entry or future AXON final comparison by `ChainId`; standalone mock supplier data is tests/demo only.

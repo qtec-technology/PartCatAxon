@@ -30,7 +30,6 @@ import type {
   FinalResultColumns,
 } from './bulk-cost.types';
 import { EMPTY_BULK_COST_INPUT, ITEM_GROUP_OPTIONS, SHIP_MODE_LABELS, formatItemGroup, formatShipMode } from './bulk-cost.types';
-import { calculateAllocationPreview } from './bulk-cost.calc';
 import { buildBulkCostFormulaAudit } from './bulk-cost.formula-audit';
 import {
   FINAL_RESULT_COLS,
@@ -38,8 +37,7 @@ import {
   type FinalResultColumnDefinition,
   type FinalResultKey,
 } from './bulk-cost.final-result';
-import { buildBulkCostRunDraftPayload, loadBulkCostRun, saveBulkCostRunDraft, updateBulkCostRunStatus } from './bulk-cost.api';
-import { getDemoCostsForSupplier, getDemoLinesForSupplier } from './bulk-cost.mock';
+import { buildBulkCostRunDraftPayload, calculateBulkCostPreview, loadBulkCostRun, saveBulkCostRunDraft, updateBulkCostRunStatus } from './bulk-cost.api';
 import { useResizableTableColumns, type ResizableTableColumn } from './useResizableTableColumns';
 import {
   mapBulkCostToTermFormData,
@@ -64,7 +62,7 @@ const COST_FIELDS: {
 }[] = [
   { key: 'pkh',     code: 'PKH',     label: 'Packing Handling (PKH)',    rule: 'Weight-based' },
   { key: 'soc',     code: 'SOC',     label: 'Supplier Outb Cost (SOC)', rule: 'Weight-based' },
-  { key: 'freight', code: 'Freight', label: 'Freight (FR)',           rule: 'Weight-based' },
+  { key: 'freight', code: 'FR',      label: 'Freight (FR)',           rule: 'Weight-based' },
   { key: 'customs', code: 'CC',      label: 'Customs Clear (CC)',        rule: 'Weight-based' },
   { key: 'wireTT',  code: 'TT',      label: 'Wire T/T (TT)',           rule: 'Value-based'  },
 ];
@@ -604,22 +602,22 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   const reviewTableSizing = useResizableTableColumns('bulk-cost-result-review', REVIEW_RESULT_TABLE_COLUMNS);
   const formulaTableSizing = useResizableTableColumns('bulk-cost-result-formula', FORMULA_PREVIEW_TABLE_COLUMNS);
   const fullTableSizing = useResizableTableColumns('bulk-cost-result-full', FINAL_PREVIEW_TABLE_COLUMNS);
-  const demoLines = useMemo(() => getDemoLinesForSupplier(supplierCode), [supplierCode]);
-  const demoCosts = useMemo(() => getDemoCostsForSupplier(supplierCode), [supplierCode]);
+  const initialLines = useMemo<AllocationLineSource[]>(() => [], []);
+  const initialCosts = useMemo<BulkCostInput>(() => ({ ...EMPTY_BULK_COST_INPUT }), []);
   const isRestoringMode = initialSavedRunId !== null;
   const [sourceView, setSourceView] = useState<SourceTableView>('latest');
   const [lineColumnPreset, setLineColumnPreset] = useState<LineColumnPreset>('overview');
   const [resultView, setResultView] = useState<ResultView>('review');
   const [originLines, setOriginLines] = useState<AllocationLineSource[]>(() =>
-    isRestoringMode ? [] : demoLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName)),
+    isRestoringMode ? [] : initialLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName)),
   );
   const [allLines, setAllLines] = useState<AllocationLineSource[]>(() =>
-    isRestoringMode ? [] : demoLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName)),
+    isRestoringMode ? [] : initialLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName)),
   );
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(
-    () => isRestoringMode ? new Set() : new Set(demoLines.map((line) => line.lineKey)),
+    () => isRestoringMode ? new Set() : new Set(initialLines.map((line) => line.lineKey)),
   );
-  const [costs, setCosts] = useState<BulkCostInput>(() => isRestoringMode ? { ...EMPTY_BULK_COST_INPUT } : demoCosts);
+  const [costs, setCosts] = useState<BulkCostInput>(() => isRestoringMode ? { ...EMPTY_BULK_COST_INPUT } : initialCosts);
   const [focusedCostInput, setFocusedCostInput] = useState<string | null>(null);
   const [preview, setPreview] = useState<AllocationPreview | null>(null);
   const [previewEdits, setPreviewEdits] = useState<PreviewEdits>({});
@@ -627,6 +625,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   const [isLoadingRun, setIsLoadingRun] = useState(isRestoringMode);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [savedRunId, setSavedRunId] = useState<number | null>(initialSavedRunId);
+  const [revisionSourceRunId, setRevisionSourceRunId] = useState<number | null>(initialSavedRunId);
+  const [revisionGroupId, setRevisionGroupId] = useState<number | null>(initialSavedRunId);
+  const [revisionNo, setRevisionNo] = useState<number | null>(null);
   const [runStatus, setRunStatus] = useState<AllocationRunStatus>('DRAFT');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
@@ -643,10 +644,10 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
         setOriginLines(originLinesData);
         setSelectedKeys(new Set(latestLines.map((l) => l.lineKey)));
       } else {
-        const demo = demoLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName));
-        setAllLines(demo);
-        setOriginLines(demo);
-        setSelectedKeys(new Set(demo.map((l) => l.lineKey)));
+        const lines = initialLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName));
+        setAllLines(lines);
+        setOriginLines(lines);
+        setSelectedKeys(new Set(lines.map((l) => l.lineKey)));
       }
       if (run.inputSnapshot.costs) {
         setCosts(run.inputSnapshot.costs as BulkCostInput);
@@ -657,16 +658,19 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           document.getElementById('preview-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 150);
       }
+      setRevisionSourceRunId(run.runId);
+      setRevisionGroupId(run.revisionGroupId);
+      setRevisionNo(run.revisionNo);
       setRunStatus(run.status);
       setIsLoadingRun(false);
     }).catch(() => {
       if (cancelled) return;
       toast.error('Failed to load saved run data');
-      const demo = demoLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName));
-      setAllLines(demo);
-      setOriginLines(demo);
-      setSelectedKeys(new Set(demo.map((l) => l.lineKey)));
-      setCosts(demoCosts);
+      const lines = initialLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName));
+      setAllLines(lines);
+      setOriginLines(lines);
+      setSelectedKeys(new Set(lines.map((l) => l.lineKey)));
+      setCosts(initialCosts);
       setIsLoadingRun(false);
     });
     return () => { cancelled = true; };
@@ -957,15 +961,20 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
     resetPreview();
   }, [originByKey, resetPreview]);
 
-  const handleCalculate = useCallback(() => {
+  const handleCalculate = useCallback(async () => {
     setIsCalculating(true);
     setPreviewEdits({});
     setSavedRunId(null);
-    window.setTimeout(() => {
-      const result = calculateAllocationPreview(effectiveSelectedLines, costs);
+    setRunStatus('DRAFT');
+    try {
+      const result = await calculateBulkCostPreview({ costs, lines: effectiveSelectedLines });
       setPreview(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to calculate Bulk Cost preview';
+      toast.error(message);
+    } finally {
       setIsCalculating(false);
-    }, 250);
+    }
   }, [effectiveSelectedLines, costs]);
 
   const handleReset = useCallback(() => {
@@ -999,6 +1008,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
     setIsSavingDraft(true);
     try {
       const payload = buildBulkCostRunDraftPayload({
+        sourceRunId: revisionSourceRunId,
         supplierCode,
         supplierName,
         costs,
@@ -1009,14 +1019,18 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       });
       const saved = await saveBulkCostRunDraft(payload);
       setSavedRunId(saved.runId);
-      toast.success(`Bulk Cost draft saved (Run #${saved.runId})`);
+      setRevisionSourceRunId(saved.runId);
+      setRevisionGroupId(saved.revisionGroupId);
+      setRevisionNo(saved.revisionNo);
+      setRunStatus(saved.status);
+      toast.success(`Bulk Cost revision saved (Run #${saved.runId}, Rev ${saved.revisionNo})`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save Bulk Cost draft';
       toast.error(message);
     } finally {
       setIsSavingDraft(false);
     }
-  }, [allLines, costs, getFinalResultForLine, originLines, preview, supplierCode, supplierName]);
+  }, [allLines, costs, getFinalResultForLine, originLines, preview, revisionSourceRunId, supplierCode, supplierName]);
 
   const handleMarkStatus = useCallback(async (status: 'AWARDED' | 'LOST') => {
     if (!savedRunId) return;
@@ -1072,6 +1086,11 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           <div>
             <p className="eyebrow">Bulk Cost Allocation</p>
             <h1>Allocation Workspace</h1>
+            {revisionGroupId !== null && (
+              <span style={{ color: 'var(--pc-muted)', fontSize: 13 }}>
+                Revision chain #{revisionGroupId}{revisionNo ? ` - Rev ${revisionNo}` : ''}
+              </span>
+            )}
           </div>
         </div>
         <div className="workspace-actions" aria-label="Workspace actions">
@@ -1103,7 +1122,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             ) : (
               <Save size={16} aria-hidden="true" />
             )}
-            {isSavingDraft ? 'Saving...' : savedRunId ? `Saved #${savedRunId}` : 'Save Draft'}
+            {isSavingDraft ? 'Saving...' : savedRunId ? `Saved Rev ${revisionNo ?? ''}` : 'Save Revision'}
           </button>
           {savedRunId !== null && runStatus === 'DRAFT' && (
             <>
@@ -1240,64 +1259,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   ))}
                 </select>
               </label>
-            </div>
-          </div>
-
-          {/* PKH SOC */}
-          <div className="cost-bar-cost-section cost-bar-cost-section-first">
-            <div className="cost-bar-fields-row">
-              {COST_FIELDS.filter((f) => ['pkh', 'soc'].includes(f.key)).map(({ key, label }) => {
-                const displayLabel = `${label} (${costs.currency})`;
-                return (
-                  <label className="cost-bar-field cost-bar-cost-field" key={key}>
-                    <span>{displayLabel}</span>
-                    <FormattedNumberInput
-                      id={`bulk-cost-${key}`}
-                      name={`bulkCost.${key}`}
-                      value={costs[key]}
-                      focused={focusedCostInput === key}
-                      onBlur={() => setFocusedCostInput(null)}
-                      onChange={(event) => updateCost(key, event.target.value)}
-                      onFocus={() => setFocusedCostInput(key)}
-                      placeholder="0.00"
-                      aria-label={displayLabel}
-                    />
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* FR CC TT */}
-          <div className="cost-bar-cost-section">
-            <div className="cost-bar-fields-row">
-              {COST_FIELDS.filter((f) => ['freight', 'customs', 'wireTT'].includes(f.key)).map(({ key, label }) => {
-                const displayLabel = `${label} (${costs.currency})`;
-                return (
-                  <label className="cost-bar-field cost-bar-cost-field" key={key}>
-                    <span>{displayLabel}</span>
-                    <FormattedNumberInput
-                      id={`bulk-cost-${key}`}
-                      name={`bulkCost.${key}`}
-                      value={costs[key]}
-                      focused={focusedCostInput === key}
-                      onBlur={() => setFocusedCostInput(null)}
-                      onChange={(event) => updateCost(key, event.target.value)}
-                      onFocus={() => setFocusedCostInput(key)}
-                      placeholder="0.00"
-                      aria-label={displayLabel}
-                    />
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Currency Exchange Rate */}
-          <div className="cost-bar-cost-section">
-            <div className="cost-bar-fields-row">
               <label className="cost-bar-field cost-bar-currency-field">
-                <span>Quote Currency</span>
+                <span>Currency</span>
                 <select
                   id="bulk-cost-currency"
                   name="bulkCost.currency"
@@ -1316,6 +1279,31 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   )}
                 </select>
               </label>
+            </div>
+          </div>
+
+          {/* PKH SOC — source-currency amounts + Exchange Rate */}
+          <div className="cost-bar-cost-section cost-bar-cost-section-first">
+            <div className="cost-bar-fields-row">
+              {COST_FIELDS.filter((f) => ['pkh', 'soc'].includes(f.key)).map(({ key, code, label }) => {
+                const displayLabel = `${code} (${costs.currency})`;
+                return (
+                  <label className="cost-bar-field cost-bar-cost-field" key={key}>
+                    <span>{displayLabel}</span>
+                    <FormattedNumberInput
+                      id={`bulk-cost-${key}`}
+                      name={`bulkCost.${key}`}
+                      value={costs[key]}
+                      focused={focusedCostInput === key}
+                      onBlur={() => setFocusedCostInput(null)}
+                      onChange={(event) => updateCost(key, event.target.value)}
+                      onFocus={() => setFocusedCostInput(key)}
+                      placeholder="0.00"
+                      aria-label={label}
+                    />
+                  </label>
+                );
+              })}
               <label className="cost-bar-field cost-bar-rate-field">
                 <span>Exchange Rate to THB</span>
                 <FormattedNumberInput
@@ -1331,11 +1319,36 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             </div>
           </div>
 
+          {/* FR CC TT — Thai baht direct inputs */}
+          <div className="cost-bar-cost-section">
+            <div className="cost-bar-fields-row">
+              {COST_FIELDS.filter((f) => ['freight', 'customs', 'wireTT'].includes(f.key)).map(({ key, code, label }) => {
+                const displayLabel = `${code} (THB)`;
+                return (
+                  <label className="cost-bar-field cost-bar-cost-field" key={key}>
+                    <span>{displayLabel}</span>
+                    <FormattedNumberInput
+                      id={`bulk-cost-${key}`}
+                      name={`bulkCost.${key}`}
+                      value={costs[key]}
+                      focused={focusedCostInput === key}
+                      onBlur={() => setFocusedCostInput(null)}
+                      onChange={(event) => updateCost(key, event.target.value)}
+                      onFocus={() => setFocusedCostInput(key)}
+                      placeholder="0.00"
+                      aria-label={label}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
         </div>
 
         <div className="cost-bar-note">
           <Info size={16} aria-hidden="true" />
-          <span>Enter Step 2 costs in the selected quote currency. CAL allocates them, then converts final values to THB using the exchange rate.</span>
+          <span>Currency / Exchange Rate / PKH / SOC: กรอกในสกุลเงิน supplier — ระบบแปลงเป็น THB ด้วย Exchange Rate&nbsp;&nbsp;|&nbsp;&nbsp;FR / CC / TT: กรอกเป็นบาท (THB) โดยตรง</span>
         </div>
       </section>
 

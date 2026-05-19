@@ -32,7 +32,7 @@ export const buildCreateItemInsertSql = (writeTableName: string): string => `
         @LongDesc1, @LongDesc2, @LongDesc3, @LongDesc4,
         @U_Punchout, @U_VMI, @U_CustBPA, @U_IsQTECSTock, @U_B1Item, @U_Serialreq,
         @U_MSDS, @U_Certificate, @U_Ecommerce, @U_DG_Required, @U_Permitreq, @U_PermitType,
-        @Active, @MasterFG, @Updatedby, @UpdatedDate
+        @Active, @MasterFG, @Updatedby, GETDATE()
     );
 `;
 
@@ -48,9 +48,11 @@ export const buildUpdateItemSql = (writeTableName: string, columns: string[]): s
         }
     }
 
-    const setClause = columns
-        .map((column) => `${toSqlIdentifier(column)} = @${column}`)
-        .join(',\n        ');
+    const setColumns = columns.filter((column) => column !== 'UpdatedDate');
+    const setClause = [
+        ...setColumns.map((column) => `${toSqlIdentifier(column)} = @${column}`),
+        '[UpdatedDate] = GETDATE()',
+    ].join(',\n        ');
 
     return `
     UPDATE ${writeTableName}

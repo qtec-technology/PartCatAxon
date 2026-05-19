@@ -27,7 +27,7 @@ Latest completed commits:
   - Default is server save date.
   - `U_ValidTo` remains null until business default is confirmed.
 - `e5564ca fix: align bulk cost step 3 term mapping`
-  - Review shows document-fee total, Currency, `OP1 (PSC)`, and `FR QTEC`.
+  - Review shows document-fee total, Currency, `OP1 (PSC)`, and `FR` (Freight FR).
   - Exwork is hidden from Review but kept in Formula/Audit.
   - Step 2 Weight view includes read-only `Chargeable Wt/Ea`.
   - Term preview supplies default `Valid From`.
@@ -85,14 +85,15 @@ Term fields / Bulk Cost Step 3 fields:
 | Item Weight (KG) | Item Wt/Ea |
 | Chargeable W (KG) | Chargeable Wt/Ea |
 | Shipping Weight | Ship Wt/Ea |
-| Freight to QTEC WH | FR Actual (THB) |
+| Freight to QTEC WH | FR Actual (THB) → renamed `FR QTEC` → now `FR` |
 
 Requested notes and status:
 
 - Add `Chargeable Wt/Ea` support for Step 2 automatic weight calculation:
   implemented as read-only derived display from max item/dim weight before
   shipping-weight ceiling.
-- Rename `FR Actual (THB)` to `FR QTEC`: implemented.
+- Rename `FR Actual (THB)` to `FR QTEC`: implemented; then further renamed to
+  `FR` to align with Term's `Freight (FR)` / `U_FR` input field label.
 - Step 3 should show all fields useful for mapping to Term: partially
   implemented; continue carefully if more fields are requested.
 - Draft preview labels should align with Term: partially implemented.

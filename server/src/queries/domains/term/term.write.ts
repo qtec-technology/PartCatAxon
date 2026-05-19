@@ -60,7 +60,7 @@ const TERM_COLUMNS = [
  */
 export function buildCreateTermSql(tableName: string): string {
     const cols = ['ItemID', ...TERM_COLUMNS];
-    const params = cols.map((c) => `@${c}`).join(', ');
+    const params = cols.map((c) => c === 'UpdatedDate' ? 'GETDATE()' : `@${c}`).join(', ');
     return `
     INSERT INTO ${tableName} (${cols.join(', ')})
     OUTPUT INSERTED.TermID
@@ -71,7 +71,9 @@ export function buildCreateTermSql(tableName: string): string {
  * Build UPDATE SQL for an existing Term row.
  */
 export function buildUpdateTermSql(tableName: string): string {
-    const setClause = TERM_COLUMNS.map((c) => `${c} = @${c}`).join(',\n        ');
+    const setClause = TERM_COLUMNS
+        .map((c) => c === 'UpdatedDate' ? `${c} = GETDATE()` : `${c} = @${c}`)
+        .join(',\n        ');
     return `
     UPDATE ${tableName}
     SET ${setClause}

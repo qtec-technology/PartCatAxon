@@ -7,12 +7,14 @@ Updated: 2026-05-15
 These are small, isolated, low-risk tasks. Copilot may do them only after
 reading `.docs/HANDOFF.md` and checking `git status`.
 
-- [ ] Ready for Copilot: Investigate current Bulk Cost Step 3 visible columns.
+- [x] Ready for Copilot: Investigate current Bulk Cost Step 3 visible columns.
   Produce a short note listing existing keys in `REVIEW_RESULT_KEYS`,
   `FORMULA_RESULT_KEYS`, and final-result column definitions. No code changes.
-- [ ] Ready for Copilot: Add or update tests that assert display labels only,
+  (See FEATURE_STATUS.md 2026-05-18 entry.)
+- [x] Ready for Copilot: Add or update tests that assert display labels only,
   without changing formula math. Candidate files:
   `next-shell/tests/unit/bulk-cost-final-result.test.ts`.
+  (Added 4 new label tests; next-shell tests now 70.)
 - [x] Ready for Copilot: Rename display-only header `OP1 Src` to `OP1 (PSC)`
   if it maps only to the existing diagnostic `op1Source` field. Do not change
   formula math. Run focused tests.

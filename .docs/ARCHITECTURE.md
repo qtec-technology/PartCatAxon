@@ -1,7 +1,36 @@
 # ARCHITECTURE.md — PartCatalog Technical Architecture
 
-ปรับปรุงล่าสุด: 8 พฤษภาคม 2026 (Item/Bulk Cost fixes)
+ปรับปรุงล่าสุด: 19 พฤษภาคม 2026 (architecture stabilization reset)
 เจ้าของ: อัปเดตเมื่อมี architecture decision ใหม่
+
+---
+
+## 0. Architecture Reset References
+
+Before adding AXON/Bulk Cost features, read these reset documents:
+
+- `.docs/EXECUTIVE_ALIGNMENT.md` — executive direction from meeting notes
+- `.docs/AXON_HANDOFF_CONTRACT.md` — `ChainId` shared DB/view handoff from
+  AXON final comparison to PartCatalogAxon
+- `.docs/DEPLOYMENT_RUNBOOK.md` — Nginx/NSSM/subdomain/internal CA target
+- `.docs/MODULE_BOUNDARIES.md` — module ownership and automation-ready operation
+  layer target
+
+Current ownership boundary:
+
+```text
+AXON = Pi-Jo side, RFQ chain owner
+PartCatalogAxon = Kim side, costing/calculation/snapshot/Item-Term bridge
+ChainId = shared correlation id
+```
+
+PartCatalogAxon must not rebuild the AXON pipeline. It consumes AXON final
+comparison output through a read-only shared DB/view/module handoff and clones
+that data into PartCatalogAxon snapshots before calculation.
+
+Future automation depends on module boundaries and backend operations, not UI
+click automation. Read `.docs/AUTOMATION_READINESS.md` before designing any AI,
+agent, or scheduled workflow.
 
 ---
 
@@ -287,6 +316,11 @@ File: `next-shell/src/features/bulk-cost/bulk-cost.calc.ts`
 
 > อ่าน `.docs/ROADMAP.md` สำหรับ timeline และ phases
 
+This section is long-term direction, not the current stabilization scope. During
+the 2026-05 architecture reset, do not migrate all Express routes to Server
+Actions, do not replace raw `mssql`/stored procedures with Prisma, and do not
+move AXON's Python orchestrator into PartCatalogAxon.
+
 ### Stack เป้าหมาย
 
 | Layer | Current | Target |
@@ -308,11 +342,12 @@ Browser
     │   └── Better Auth tables (protected)
     └── raw mssql (escape hatch สำหรับ SP + legacy tables)
 
-Python AXON Orchestrator (NSSM daemon)
+Python AXON Orchestrator (NSSM daemon, AXON side / Pi-Jo ownership)
 ├── Stages A-G: Email → Classify → Extract → Rank
 ├── AI: OpenAI GPT-4.1/5.4 + Gemini 2.5 + Claude Sonnet 4
 ├── Vector: Qdrant (192.168.2.54:6333)
-└── POST /api/bulk-cost/extraction → PartCatalog
+└── Publish final comparison by ChainId
+    (legacy alternative: POST extraction payload only if Pi-Jo chooses API push)
 
 Nginx (reverse proxy)
 ├── / → Next.js standalone (3010)

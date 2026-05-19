@@ -2,6 +2,8 @@
 -- Seed Mock Data — PART_CATALOG_AIX
 -- ใช้สำหรับ UAT / Demo เท่านั้น
 -- ต้องรัน 20260512_bulk_cost_full_schema.sql + 20260512_axon_ai_tables.sql ก่อน
+-- ห้ามรันบน production หรือฐานข้อมูลที่มี AXON/PartCatalogAxon handoff จริง
+-- หลัง architecture reset ให้ใช้ AXON final comparison view ผ่าน ChainId แทน seed queue นี้
 -- ─────────────────────────────────────────────────────────────────────────────
 
 

@@ -4,9 +4,58 @@
 > อ้างอิงหลักใน repo: `.docs/BULK_COST.md`, `.docs/BULK_COST_CALCULATION.md`, `.docs/DATA_SCHEMA.md`
 > **อ่านไฟล์นี้ก่อนเริ่ม backend Bulk Cost ทุกครั้ง**
 
+> 2026-05-19 architecture reset note: AXON is owned by Pi-Jo's side.
+> PartCatalogAxon consumes AXON final comparison output by `ChainId`. The
+> immediate integration target is shared DB/view/module handoff, not a public
+> AXON-to-PartCatalog REST API. Read `.docs/AXON_HANDOFF_CONTRACT.md` and
+> `.docs/AUTOMATION_READINESS.md` before implementing new AXON integration code.
+
+> Sections that describe `POST /api/bulk-cost/extraction` are retained as legacy
+> payload reference only. They are not the current integration target until
+> Pi-Jo confirms that AXON should push through an API instead of publishing a
+> final comparison view/shared module.
+
 ---
 
-## 1. แนวคิดหลัก
+## 1. Current Handoff Model
+
+Current ownership:
+
+```text
+AXON (Pi-Jo side)
+  -> owns RFQ chain, supplier communication, quote intake, final comparison
+
+PartCatalogAxon (Kim side)
+  -> reads final comparison by ChainId
+  -> clones selected supplier/lines into Origin/Latest snapshots
+  -> performs Bulk Cost calculation
+  -> saves revisions and later bridges to Item/Term after Awarded rules
+```
+
+Preferred integration shape:
+
+```text
+AXON final comparison tables/views/shared module
+  -> PartCatalogAxon backend read-only query by ChainId
+  -> clone into BulkCostRun + DraftItem + DraftTerm snapshots
+```
+
+The browser must not read SQL Server directly. PartCatalogAxon backend/BFF owns
+the read-only query, clone operation, and audit.
+
+`ChainId` is the shared correlation id. It must be stored with PartCatalogAxon
+run/snapshot data, but it must be combined with comparison revision and source
+line identity because supplier quotes can change after the first comparison.
+
+The current read-model/view contract is documented in
+`.docs/AXON_HANDOFF_CONTRACT.md` and
+`server/sql/20260519_axon_handoff_view_contract.sql`. The verified AXON source
+tables are `CustomerRFQ`, `CustomerRFQBrandGroup`, `CustomerRFQLine`,
+`SupplierRFQ`, `RFQ_SUPPLIER_QUOTE`, `RFQ_SUPPLIER_QUOTE_ITEM`, and
+`RFQ_QUOTE_RANKING`. PartCatalog reads those published views only; it does not
+query or mutate AXON source tables directly from the browser.
+
+## 2. Legacy Payload Reference
 
 AXON ทำหน้าที่ **อ่านเอกสาร supplier แล้วส่งข้อมูลกลับมาให้ PartCatalog** เท่านั้น  
 AXON ไม่ตัดสินใจว่า field ไหนต้องลงฐานข้อมูลอย่างไร เพราะข้อมูลบางตัวต้อง match กับ master data เดิม  

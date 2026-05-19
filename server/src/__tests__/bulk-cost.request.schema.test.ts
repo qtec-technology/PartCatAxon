@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    calculateBulkCostBodySchema,
     bulkCostCWeightPrefillBodySchema,
     saveBulkCostRunBodySchema,
 } from '#src/dtos/bulk-cost/bulk-cost.request.schema.js';
@@ -26,11 +27,12 @@ function makePayload(overrides: Record<string, unknown> = {}) {
 
 describe('saveBulkCostRunBodySchema', () => {
     it('accepts a DRAFT snapshot payload with hidden AXON hints', () => {
-        const result = saveBulkCostRunBodySchema.safeParse(makePayload());
+        const result = saveBulkCostRunBodySchema.safeParse(makePayload({ sourceRunId: 10 }));
 
         expect(result.success).toBe(true);
         if (result.success) {
             expect(result.data.status).toBe('DRAFT');
+            expect(result.data.sourceRunId).toBe(10);
             expect(result.data.lines[0].axon?.uniqueLineId).toBe('AXON-L1');
         }
     });
@@ -46,6 +48,26 @@ describe('saveBulkCostRunBodySchema', () => {
             latestLines: [],
             lines: [],
         }));
+
+        expect(result.success).toBe(false);
+    });
+});
+
+describe('calculateBulkCostBodySchema', () => {
+    it('accepts selected manual lines for backend calculation', () => {
+        const result = calculateBulkCostBodySchema.safeParse({
+            costs: { currency: 'USD', exchangeRate: 35, pkh: 10, soc: 5 },
+            lines: [{ lineKey: 'L1', no: 1, qty: 2, unitPrice: 10, amount: 20 }],
+        });
+
+        expect(result.success).toBe(true);
+    });
+
+    it('rejects empty calculation line sets', () => {
+        const result = calculateBulkCostBodySchema.safeParse({
+            costs: { currency: 'USD', exchangeRate: 35 },
+            lines: [],
+        });
 
         expect(result.success).toBe(false);
     });
