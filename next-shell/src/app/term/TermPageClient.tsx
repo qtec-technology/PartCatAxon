@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/auth/AuthContext';
 import { termApi } from '@/services/term.api';
@@ -261,9 +260,6 @@ export function TermPageClient({
         }
     }, [isDeleting, navigate, readOnlyMode, termId]);
 
-    const handlePrint = () => {
-        window.print();
-    };
 
     const canDeleteTermRecord = canDeleteOwnedRecord(formData.updatedBy, user);
 
@@ -284,21 +280,19 @@ export function TermPageClient({
     if (isInitialLoading) {
         return (
             <div
-                className="h-full bg-[#F0F2F5] flex items-center justify-center"
+                className="page-loader-overlay"
                 role="status"
                 aria-live="polite"
                 aria-busy="true"
             >
-                <div className="flex items-center gap-2 text-term-blue font-semibold">
-                    <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
-                    <span>Loading term data...</span>
-                </div>
+                <span className="page-loader-icon hourglass-spin" aria-hidden="true">⏳</span>
+                <span className="page-loader-text">Loading Term…</span>
             </div>
         );
     }
 
     return (
-        <div className="h-full overflow-y-auto bg-[#F0F2F5] font-sans text-gray-900">
+        <div className="bg-[#F0F2F5] font-sans text-gray-900">
             <TermHeader
                 mode={effectiveMode}
                 itemCode={itemCode}
@@ -308,7 +302,6 @@ export function TermPageClient({
                 onEdit={handleEdit}
                 onCancel={handleCancel}
                 onDelete={handleDelete}
-                onPrint={handlePrint}
                 onSendRfq={handleSendRfq}
                 isSendingRfq={isSendingRfq}
                 disableMutations={readOnlyMode}
@@ -322,6 +315,7 @@ export function TermPageClient({
                 formData={formData}
                 updateFormData={updateFormData}
                 isReadOnly={effectiveMode === 'view'}
+                isNew={effectiveMode === 'new'}
                 suppliers={suppliers}
                 contacts={contacts}
                 orderTerms={orderTerms}

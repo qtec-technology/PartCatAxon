@@ -1,4 +1,4 @@
-import { ArrowLeft, Edit, LogOut, Plus, Printer, Save, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Edit, LogOut, Plus, Save, Trash2, X } from 'lucide-react';
 import type { ButtonHTMLAttributes } from 'react';
 import { Badge, Button } from '../../common/atoms';
 
@@ -73,17 +73,7 @@ export function ItemFormHeader({
         <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end print:hidden">
           {isView && (
             <>
-              <Button
-                type="button"
-                variant="primary"
-                className="whitespace-nowrap"
-                onClick={onPrint}
-                title="Print Item (Ctrl/Cmd + P)"
-                aria-label="Print Item"
-                disabled={isPrinting}
-              >
-                <Printer className="w-4 h-4" /> {isPrinting ? 'PRINTING...' : 'PRINT ITEM'}
-              </Button>
+
               <Button
                 variant="danger"
                 className="whitespace-nowrap"

@@ -15,12 +15,13 @@ Browser
 
 `next-shell/` is the active frontend. `server/` remains the backend API. `client/` was retired on 2026-05-07 and must not be reintroduced into normal dev or deploy.
 
-Architecture reset references:
+Current agent/dev references:
 
-- [.docs/EXECUTIVE_ALIGNMENT.md](.docs/EXECUTIVE_ALIGNMENT.md)
+- [.docs/AGENT_START_HERE.md](.docs/AGENT_START_HERE.md)
+- [.docs/SYSTEM_OVERVIEW.md](.docs/SYSTEM_OVERVIEW.md)
+- [.docs/DOCS_INDEX.md](.docs/DOCS_INDEX.md)
+- [.docs/ROADMAP.md](.docs/ROADMAP.md)
 - [.docs/AXON_HANDOFF_CONTRACT.md](.docs/AXON_HANDOFF_CONTRACT.md)
-- [.docs/DEPLOYMENT_RUNBOOK.md](.docs/DEPLOYMENT_RUNBOOK.md)
-- [.docs/MODULE_BOUNDARIES.md](.docs/MODULE_BOUNDARIES.md)
 
 ## Project Structure
 
@@ -150,5 +151,5 @@ CORS_ALLOWED_ORIGINS=https://partcatalog.example.local
 - Do not move `server/` into `next-shell/` during this cutover.
 - Do not reintroduce, deploy, or run `client/` as the active frontend.
 - Term calculation remains backend source of truth.
-- Bulk Cost Phase 3A persistence is limited to `BulkCostRun` / `DraftItem` / `DraftTerm` snapshots until Awarded reverse mapping is designed.
+- Cost Workspace Phase 3A persistence is limited to `BulkCostRun` / `DraftItem` / `DraftTerm` snapshots until Review/Finalize rules, reverse mapping rules, and the business/order gate are approved.
 - Keep docs updated when architecture or workflow changes.

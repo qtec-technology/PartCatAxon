@@ -1,6 +1,10 @@
 # Bulk Cost Test Data Audit
 
-Last updated: 2026-05-08
+Last updated: 2026-05-25
+
+This is a supporting coverage note, not the calculation source of truth. Use
+`.docs/BULK_COST_CALCULATION.md` for formulas and `.docs/FEATURE_STATUS.md` for
+latest verification counts.
 
 Current `.datatest` exports are CSV files plus one Excel workbook. Earlier audit
 sections 2-4 were produced from the previous TOP 200 markdown/TSV export and are
@@ -253,8 +257,8 @@ Need additional exports or curated cases for:
 
 ## 7. Next Steps
 
-1. Review this audit with business/owner before running
-   `server/sql/20260508_bulk_cost_draft_snapshot.sql`.
+1. Review this audit with business/owner before running any Cost Workspace
+   replacement schema or production data migration.
 2. Re-run the Term coverage/comparison against current `.datatest/vw@PITM1.csv`
    TOP 500.
 3. Build a focused Term golden test set from the candidate `TermID` list and the

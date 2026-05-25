@@ -5,6 +5,7 @@ import {
     buildCreateBulkCostRunSql,
     buildCreateDraftItemSql,
     buildCreateDraftTermSql,
+    buildSetBulkCostRunRevisionGroupSql,
 } from '#src/queries/domains/bulk-cost/bulk-cost.write.js';
 import type {
     BulkCostRunStatus,
@@ -114,6 +115,13 @@ function nullableText(value: unknown): string | null {
 function numberValue(value: unknown, fallback = 0): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function divideValue(value: unknown, divisor: unknown): number {
+    const numerator = numberValue(value, 0);
+    const denominator = numberValue(divisor, 0);
+    if (denominator === 0) return 0;
+    return Math.round((numerator / denominator) * 1000000) / 1000000;
 }
 
 function nullableNumber(value: unknown): number | null {
@@ -325,6 +333,13 @@ export async function createBulkCostRun(
         const runRow = runResult.recordset[0];
         if (!runRow?.RunID) throw new Error('Failed to create BulkCostRun');
 
+        if (runRow.RevisionGroupID === null) {
+            const revisionGroupRequest = new sql.Request(transaction);
+            revisionGroupRequest.input('RunID', sql.BigInt, runRow.RunID);
+            await revisionGroupRequest.query(buildSetBulkCostRunRevisionGroupSql(runTable));
+            runRow.RevisionGroupID = runRow.RunID;
+        }
+
         for (let index = 0; index < data.lines.length; index += 1) {
             const line = data.lines[index];
             const latest = asRecord(line.latest);
@@ -373,6 +388,7 @@ export async function createBulkCostRun(
             termRequest.input('VendorStockItemNo', sql.NVarChar(100), nullableText(latest.supplierOrderCode));
             termRequest.input('U_OrderTerm', sql.NVarChar(30), nullableText(latest.orderTerm));
             termRequest.input('U_TermLocation', sql.NVarChar(10), nullableText(latest.location));
+            termRequest.input('SubLocation', sql.NVarChar(50), nullableText(latest.subLocation || data.costs.subLocation));
             termRequest.input('U_ProdCost', sql.Decimal(19, 6), numberValue(latest.unitPrice, 0));
             termRequest.input('U_PurCurr', sql.NVarChar(10), text(latest.currency));
             termRequest.input('U_PurRate', sql.Decimal(19, 6), numberValue(data.costs.exchangeRate, 1));
@@ -405,20 +421,30 @@ export async function createBulkCostRun(
             termRequest.input('NumInSale', sql.Decimal(19, 6), numberValue(latest.saleConversion, 1));
             termRequest.input('U_MOQ', sql.NVarChar(50), nullableText(latest.moq));
             termRequest.input('LeadTime', sql.NVarChar(5), nullableText(latest.deliveryLeadTime));
+            termRequest.input('U_SalesTerm', sql.NVarChar(20), nullableText(latest.salesTerm));
+            termRequest.input('SaleSubLocation', sql.NVarChar(50), nullableText(latest.salesSubLocation));
             termRequest.input('U_ValidFrom', sql.Date, todayDateOnly());
             termRequest.input('Updatedby', sql.NVarChar(50), actorName);
             termRequest.input('U_OP', sql.Decimal(19, 6), numberValue(finalResult.op1Source, 0));
+            termRequest.input('U_OP_SUM', sql.Decimal(19, 6), numberValue(finalResult.op1, 0));
             termRequest.input('U_OP_THB', sql.Decimal(19, 6), numberValue(finalResult.op2, 0));
             termRequest.input('U_INS', sql.Decimal(19, 6), numberValue(finalResult.ins, 0));
+            termRequest.input('U_FRZONE', sql.Decimal(19, 6), numberValue(finalResult.frZoneCost, 0));
             termRequest.input('U_CIF', sql.Decimal(19, 6), numberValue(finalResult.cifQTEC, 0));
+            termRequest.input('U_CIFZONE', sql.Decimal(19, 6), numberValue(finalResult.cifZone, 0));
             termRequest.input('U_DT', sql.Decimal(19, 6), numberValue(finalResult.selectedDuty, 0));
+            termRequest.input('U_DT_FR', sql.Decimal(19, 6), numberValue(finalResult.dtQTEC, 0));
+            termRequest.input('U_DT_FRZONE', sql.Decimal(19, 6), numberValue(finalResult.dtZone, 0));
             termRequest.input('U_ET', sql.Decimal(19, 6), numberValue(finalResult.et, 0));
             termRequest.input('U_MT', sql.Decimal(19, 6), numberValue(finalResult.mt, 0));
+            termRequest.input('U_DimWeight', sql.Decimal(19, 6), numberValue(finalResult.dimWeight, numberValue(latest.dimensionWeightPerEach, 0)));
             termRequest.input('U_ShipWeightCal', sql.Decimal(19, 6), numberValue(finalResult.shipWeightCal, 0));
             termRequest.input('U_FreightQTEC', sql.Decimal(19, 6), freightFields.uFreightQtec);
             termRequest.input('U_preQLC', sql.Decimal(19, 6), numberValue(finalResult.preQLC, 0));
             termRequest.input('U_STK', sql.Decimal(19, 6), numberValue(finalResult.stk, 0));
             termRequest.input('U_QLC', sql.Decimal(19, 6), numberValue(finalResult.qlc, 0));
+            termRequest.input('U_QLC2', sql.Decimal(19, 6), numberValue(finalResult.qlc2, divideValue(finalResult.qlc, latest.stockConversion)));
+            termRequest.input('U_QLC3', sql.Decimal(19, 6), numberValue(finalResult.totalQLC, 0));
             termRequest.input('U_MK_THB', sql.Decimal(19, 6), numberValue(finalResult.markup, 0));
             termRequest.input('U_SalesPrice', sql.Decimal(19, 6), numberValue(finalResult.roundUp, 0));
 
@@ -527,13 +553,13 @@ export async function loadBulkCostRun(runId: number): Promise<LoadedBulkCostRun 
         freight: numberValue(runRow.U_Freight, 0),
         customs: numberValue(runRow.U_Customs, 0),
         wireTT: numberValue(runRow.U_WireTT, 0),
-        currency: text(runRow.Currency) || 'THB',
+        currency: text(runRow.Currency),
         exchangeRate: numberValue(runRow.ExchangeRate, 1),
         referenceNo: text(runRow.ReferenceNo),
         remark: text(runRow.Remark),
         orderTerm: text(runRow.OrderTerm),
         location: text(runRow.Location),
-        shipModeNo: runRow.ShipModeNo ?? 5,
+        shipModeNo: runRow.ShipModeNo ?? -1,
         contactPerson: text(runRow.ContactPerson),
         saleIncharge: text(runRow.SaleIncharge),
     };

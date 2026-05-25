@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, FolderOpen, List, Tags } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import * as TabsPrimitive from '@radix-ui/react-tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { SearchCriteriaPanel } from '@/components/features/search/SearchCriteriaPanel';
 import { PartItemsGrid } from '@/components/features/search/PartItemsGrid';
 import { BrandVendorView } from '@/components/features/search/views/BrandVendorView';
@@ -272,24 +273,28 @@ export default function PartCatalogPage() {
         onValueChange={handleTabChange}
         className="partcatalog-native-tabs"
       >
-        <TabsList className="partcatalog-native-tabs-list w-full justify-start bg-white border-b border-[#DDDDDD] rounded-none h-auto flex-wrap flex-shrink-0 p-0">
-          <TabsTrigger value="itemList" className="data-[state=active]:bg-[#2264A0] data-[state=active]:text-white px-4 py-3 h-auto rounded-none">
+        <TabsPrimitive.List className="partcatalog-native-tabs-list">
+          {/* Use Radix primitives directly — shadcn TabsList/Trigger both inject conflicting Tailwind classes */}
+          <TabsPrimitive.Trigger value="itemList" className="partcatalog-tab-trigger partcatalog-tab--blue">
             <List size={15} aria-hidden="true" />
             <span>Item List</span>
-          </TabsTrigger>
-          <TabsTrigger value="brandVendor" className="data-[state=active]:bg-[#2264A0] data-[state=active]:text-white px-4 py-3 h-auto rounded-none">
+          </TabsPrimitive.Trigger>
+
+          <TabsPrimitive.Trigger value="brandVendor" className="partcatalog-tab-trigger partcatalog-tab--amber">
             <Tags size={15} aria-hidden="true" />
-            <span>Brand - Vendor</span>
-          </TabsTrigger>
-          <TabsTrigger value="categoryBrand" className="data-[state=active]:bg-[#2264A0] data-[state=active]:text-white px-4 py-3 h-auto rounded-none">
+            <span>Brand · Vendor</span>
+          </TabsPrimitive.Trigger>
+
+          <TabsPrimitive.Trigger value="categoryBrand" className="partcatalog-tab-trigger partcatalog-tab--green">
             <FolderOpen size={15} aria-hidden="true" />
-            <span>Category - Brand</span>
-          </TabsTrigger>
-          <TabsTrigger value="vendorBrand" className="data-[state=active]:bg-[#2264A0] data-[state=active]:text-white px-4 py-3 h-auto rounded-none">
+            <span>Category · Brand</span>
+          </TabsPrimitive.Trigger>
+
+          <TabsPrimitive.Trigger value="vendorBrand" className="partcatalog-tab-trigger partcatalog-tab--purple">
             <Building2 size={15} aria-hidden="true" />
-            <span>Vendor - Brand</span>
-          </TabsTrigger>
-        </TabsList>
+            <span>Vendor · Brand</span>
+          </TabsPrimitive.Trigger>
+        </TabsPrimitive.List>
 
         <TabsContent value="itemList" className="partcatalog-native-tab-content">
           <SearchCriteriaPanel

@@ -3,13 +3,17 @@
 > **ไฟล์นี้โหลดอัตโนมัติทุกครั้งที่เปิด session ใหม่ใน VS Code Copilot**
 > **อ่านก่อนทำงานทุกครั้ง — และอัปเดตเอกสารที่เกี่ยวข้องหลังทำงานเสร็จเสมอ**
 
+> **Current first read:** `.docs/AGENT_START_HERE.md` + `.docs/SYSTEM_OVERVIEW.md`
+> This file contains the current Cost Workspace mission, safe work order, and
+> hard rules for Codex/Claude/Copilot handoff.
+
 ---
 
 ## 1. ภาพรวมโปรเจค
 
 **QTEC Part Catalog** คือระบบ Web Application ภายในองค์กรที่แทนระบบ Microsoft Access เดิม
 ใช้จัดการข้อมูลสินค้า (Item), เงื่อนไขราคา/ต้นทุน (Term), ไฟล์แนบ (Attachment),
-การคำนวณ (Calculation) และ Bulk Cost Allocation
+การคำนวณ (Calculation) และ Cost Workspace / Bulk Cost Allocation
 
 **Active frontend:** `next-shell/` (Next.js 16 + React 19 + TypeScript, port 3010)
 **Backend API:** `server/` (Express + TypeScript, port 3001)
@@ -80,10 +84,11 @@ Browser
 | Web baseline (Search/Item/Term) | ✅ Active — ใช้งานได้จริง |
 | Next.js Phase 1 (BFF proxy) | ✅ Done — `/api/*` route handler พร้อม |
 | Next.js Phase 2 (native pages) | ✅ Done — Item/Term/PartCatalog native แล้ว |
-| Bulk Cost UI (interactive prototype) | ✅ Done — UI พร้อม, 33 unit tests ผ่าน |
-| Bulk Cost backend API + DB | 🚧 Phase 3A — API + SQL script ready; real DB smoke test pending |
-| Architecture Stabilization | 🔄 Active — อ่าน `.docs/EXECUTIVE_ALIGNMENT.md`, `.docs/AXON_HANDOFF_CONTRACT.md`, `.docs/DEPLOYMENT_RUNBOOK.md`, `.docs/MODULE_BOUNDARIES.md` ก่อน feature ถัดไป |
-| AXON → Bulk Cost integration | ❌ Not Started — handoff contract หลักอยู่ใน `.docs/AXON_HANDOFF_CONTRACT.md`; `.docs/AXON_INTEGRATION.md` เป็นรายละเอียดเดิมที่ต้อง align |
+| Cost Workspace direction | 🔄 Active — Cost Workspace คือขอบเขตหลัก; Bulk Cost เป็นหนึ่ง mode |
+| Manual Cost Workspace | 🔄 Active — ทำ Manual ก่อน AXON เพื่อ verify สูตร/field/snapshot |
+| Bulk Cost backend API + DB | ✅ Phase 3A Live — save/load ผ่าน `BulkCostRun` / `DraftItem` / `DraftTerm`; ยังไม่เขียน master `@POITM` / `@PITM1` |
+| Architecture Stabilization | 🔄 Active — อ่าน `.docs/AGENT_START_HERE.md`, `.docs/SYSTEM_OVERVIEW.md`, `.docs/AXON_HANDOFF_CONTRACT.md`, `.docs/DEPLOYMENT_RUNBOOK.md` ก่อน feature ถัดไป |
+| AXON → Cost Workspace integration | ❌ Not Started — handoff contract หลักอยู่ใน `.docs/AXON_HANDOFF_CONTRACT.md`; PartCatalog consumes only AXON awarded rows |
 | Auth migration → Better Auth | ❌ Not Started — Phase 4 |
 | Full AI automation | ❌ Not Started — Phase 5 |
 
@@ -173,10 +178,11 @@ npm run build             # Build check — ต้องไม่มี error
 
 1. อ่านไฟล์นี้ทั้งหมด
 2. อ่าน `.docs/FEATURE_STATUS.md` เพื่อรู้สถานะล่าสุดและ decision log
-3. อ่าน reset docs ก่อนงาน feature ถัดไป: `.docs/EXECUTIVE_ALIGNMENT.md` + `.docs/AXON_HANDOFF_CONTRACT.md` + `.docs/DEPLOYMENT_RUNBOOK.md` + `.docs/MODULE_BOUNDARIES.md`
-4. ถ้างานเกี่ยวกับ Bulk Cost → อ่าน `.docs/BULK_COST.md` + `.docs/BULK_COST_CALCULATION.md` + `.docs/AXON_INTEGRATION.md`
-5. ถ้างานเกี่ยวกับ Phase ถัดไป → อ่าน `.docs/ROADMAP.md`
-6. ถ้างานเกี่ยวกับ target architecture → อ่าน `.docs/ARCHITECTURE.md`
+3. อ่าน `.docs/AGENT_START_HERE.md` + `.docs/SYSTEM_OVERVIEW.md`
+4. อ่าน reset docs ก่อนงาน feature ถัดไป: `.docs/AGENT_START_HERE.md` + `.docs/SYSTEM_OVERVIEW.md` + `.docs/AXON_HANDOFF_CONTRACT.md` + `.docs/DEPLOYMENT_RUNBOOK.md`
+5. ถ้างานเกี่ยวกับ Cost Workspace / Bulk Cost → อ่าน `.docs/COST_WORKSPACE_ARCHITECTURE.md` + `.docs/COST_WORKSPACE_FIELD_COVERAGE.md` + `.docs/BULK_COST.md` + `.docs/BULK_COST_CALCULATION.md`
+6. ถ้างานเกี่ยวกับ Phase ถัดไป → อ่าน `.docs/ROADMAP.md`
+7. ถ้างานเกี่ยวกับ target architecture → อ่าน `.docs/ARCHITECTURE.md`
 
 ### หลังทำงานเสร็จ — ต้องอัปเดตเอกสารเสมอ
 
@@ -185,8 +191,8 @@ npm run build             # Build check — ต้องไม่มี error
 | แก้ bug / เพิ่ม feature | `.docs/FEATURE_STATUS.md` (Implementation Log + status) |
 | ตัดสินใจ architecture | `.docs/ARCHITECTURE.md` + `.docs/FEATURE_STATUS.md` (Decision Log) |
 | Architecture stabilization / cleanup | `.docs/CLEANUP_INVENTORY.md` + `.docs/ROADMAP.md` + `.docs/FEATURE_STATUS.md` |
-| AXON handoff | `.docs/AXON_HANDOFF_CONTRACT.md` + `.docs/AXON_INTEGRATION.md` + `.docs/FEATURE_STATUS.md` |
-| งาน Bulk Cost | `.docs/BULK_COST.md` + `.docs/BULK_COST_CALCULATION.md` + `.docs/AXON_INTEGRATION.md` + `.docs/FEATURE_STATUS.md` |
+| AXON handoff | `.docs/AXON_HANDOFF_CONTRACT.md` + `.docs/FEATURE_STATUS.md` |
+| งาน Cost Workspace / Bulk Cost | `.docs/COST_WORKSPACE_ARCHITECTURE.md` + `.docs/COST_WORKSPACE_FIELD_COVERAGE.md` + `.docs/BULK_COST.md` + `.docs/BULK_COST_CALCULATION.md` + `.docs/FEATURE_STATUS.md` |
 | Phase เสร็จ / scope เปลี่ยน | `.docs/ROADMAP.md` + ไฟล์นี้ section 6 |
 | เปลี่ยน business rule | `.github/copilot-instructions.md` section 8 + `CLAUDE.md` |
 
@@ -211,7 +217,6 @@ npm run build             # Build check — ต้องไม่มี error
 | `.github/copilot-instructions.md` | ไฟล์นี้ | ทุก session (VS Code Copilot auto-load) |
 | `.docs/ARCHITECTURE.md` | Stack, DB, API, current vs target architecture | งาน infrastructure / architecture decision |
 | `.docs/FEATURE_STATUS.md` | Workstream status + decision log + implementation log | รู้สถานะปัจจุบัน / handoff |
-| `.docs/EXECUTIVE_ALIGNMENT.md` | Executive direction from meeting notes | ก่อน architecture/feature reset |
 | `.docs/AXON_HANDOFF_CONTRACT.md` | ChainId/shared-view handoff between AXON and PartCatalogAxon | งานเชื่อม AXON |
 | `.docs/DEPLOYMENT_RUNBOOK.md` | Nginx/NSSM/subdomain/internal CA deploy target | งาน deploy/runtime |
 | `.docs/MODULE_BOUNDARIES.md` | Server/Next module ownership and automation-ready operation layer | งาน cleanup/refactor |
@@ -220,5 +225,4 @@ npm run build             # Build check — ต้องไม่มี error
 | `.docs/CLEANUP_INVENTORY.md` | Dead-code/stale-doc/risk cleanup list | งาน stabilization |
 | `.docs/BULK_COST.md` | Bulk Cost UI guide (flow, components, calc engine) | งาน Bulk Cost UI ทุกชนิด |
 | `.docs/BULK_COST_CALCULATION.md` | Bulk Cost formula review from Excel sample + Term engine reconciliation | งานสูตร Bulk Cost / CAL |
-| `.docs/AXON_INTEGRATION.md` | AXON → PartCatalog data contract | เริ่ม backend Bulk Cost / AXON integration |
 | `.docs/ROADMAP.md` | Phase 1-5 + blocking questions + QTEC Floor checklist | วางแผน / รู้ว่าทำอะไรได้บ้างตอนนี้ |

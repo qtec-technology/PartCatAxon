@@ -149,6 +149,12 @@ export const env = {
     AUTH_MANAGER_GROUPS: parseListEnv('AUTH_MANAGER_GROUPS', ['PCAT-Manager']),
     AUTH_SUPERVISOR_GROUPS: parseListEnv('AUTH_SUPERVISOR_GROUPS', ['PCAT-SuperVisor']),
     AUTH_USER_GROUPS: parseListEnv('AUTH_USER_GROUPS', ['Part Catalog User', 'Domain Users']),
+    AUTH_TRUST_PROXY_HEADERS: parseBooleanEnv('AUTH_TRUST_PROXY_HEADERS', true),
+    AUTH_PROXY_USER_HEADER: String(process.env.AUTH_PROXY_USER_HEADER || 'x-forwarded-user').trim().toLowerCase(),
+    AUTH_PROXY_EMAIL_HEADER: String(process.env.AUTH_PROXY_EMAIL_HEADER || 'x-forwarded-email').trim().toLowerCase(),
+    AUTH_PROXY_NAME_HEADER: String(process.env.AUTH_PROXY_NAME_HEADER || 'x-forwarded-name').trim().toLowerCase(),
+    AUTH_PROXY_GROUPS_HEADER: String(process.env.AUTH_PROXY_GROUPS_HEADER || 'x-forwarded-groups').trim().toLowerCase(),
+    AUTH_PROXY_ROLES_HEADER: String(process.env.AUTH_PROXY_ROLES_HEADER || 'x-forwarded-roles').trim().toLowerCase(),
     SERVER_READ_ONLY: parseBooleanEnv('SERVER_READ_ONLY', false),
 
     get isDev() {

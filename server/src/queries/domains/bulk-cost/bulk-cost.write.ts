@@ -83,6 +83,15 @@ VALUES (
 `;
 }
 
+export function buildSetBulkCostRunRevisionGroupSql(tableName: string): string {
+    return `
+UPDATE ${tableName}
+SET [RevisionGroupID] = @RunID
+WHERE [RunID] = @RunID
+  AND [RevisionGroupID] IS NULL;
+`;
+}
+
 export function buildCreateDraftItemSql(tableName: string): string {
     return `
 INSERT INTO ${tableName} (
@@ -151,6 +160,7 @@ INSERT INTO ${tableName} (
     [VendorStockItemNo],
     [U_OrderTerm],
     [U_TermLocation],
+    [SubLocation],
     [U_ProdCost],
     [U_PurCurr],
     [U_PurRate],
@@ -183,20 +193,30 @@ INSERT INTO ${tableName} (
     [NumInSale],
     [U_MOQ],
     [LeadTime],
+    [U_SalesTerm],
+    [SaleSubLocation],
     [U_ValidFrom],
     [Updatedby],
     [U_OP],
+    [U_OP_SUM],
     [U_OP_THB],
     [U_INS],
+    [U_FRZONE],
     [U_CIF],
+    [U_CIFZONE],
     [U_DT],
+    [U_DT_FR],
+    [U_DT_FRZONE],
     [U_ET],
     [U_MT],
+    [U_DimWeight],
     [U_ShipWeightCal],
     [U_FreightQTEC],
     [U_preQLC],
     [U_STK],
     [U_QLC],
+    [U_QLC2],
+    [U_QLC3],
     [U_MK_THB],
     [U_SalesPrice]
 )
@@ -210,6 +230,7 @@ VALUES (
     @VendorStockItemNo,
     @U_OrderTerm,
     @U_TermLocation,
+    @SubLocation,
     @U_ProdCost,
     @U_PurCurr,
     @U_PurRate,
@@ -242,20 +263,30 @@ VALUES (
     @NumInSale,
     @U_MOQ,
     @LeadTime,
+    @U_SalesTerm,
+    @SaleSubLocation,
     @U_ValidFrom,
     @Updatedby,
     @U_OP,
+    @U_OP_SUM,
     @U_OP_THB,
     @U_INS,
+    @U_FRZONE,
     @U_CIF,
+    @U_CIFZONE,
     @U_DT,
+    @U_DT_FR,
+    @U_DT_FRZONE,
     @U_ET,
     @U_MT,
+    @U_DimWeight,
     @U_ShipWeightCal,
     @U_FreightQTEC,
     @U_preQLC,
     @U_STK,
     @U_QLC,
+    @U_QLC2,
+    @U_QLC3,
     @U_MK_THB,
     @U_SalesPrice
 );

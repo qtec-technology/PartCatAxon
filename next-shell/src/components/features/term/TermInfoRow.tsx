@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { addMonths, format, parseISO, isValid } from 'date-fns';
 import { ExternalLink } from 'lucide-react';
 import { DatePicker } from '../../ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
@@ -18,6 +19,7 @@ interface TermInfoRowProps {
   formData: TermFormData;
   updateFormData: UpdateTermFormData;
   isReadOnly?: boolean;
+  isNew?: boolean;
   suppliers: TermSupplierOption[];
   contacts: TermContactOption[];
   orderTerms: string[];
@@ -48,6 +50,7 @@ export function TermInfoRow({
   formData,
   updateFormData,
   isReadOnly,
+  isNew = false,
   suppliers,
   contacts,
   orderTerms,
@@ -197,14 +200,14 @@ export function TermInfoRow({
   const labelCls = 'text-xs text-gray-600 whitespace-nowrap text-right';
 
   return (
-    <section className="bg-white px-6 py-4 border-b border-gray-200 shadow-sm mb-4" aria-labelledby={`${idBase}-term-info-heading`}>
+    <section className="bg-white px-6 py-4 border-b border-gray-200 shadow-sm mb-4 overflow-x-auto" aria-labelledby={`${idBase}-term-info-heading`}>
       <h2 id={`${idBase}-term-info-heading`} className="sr-only">Term information</h2>
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        <div className="lg:col-span-3 space-y-3">
+      <div className="grid gap-8" style={{ minWidth: '860px', gridTemplateColumns: '3fr 2fr' }}>
+        <div className="space-y-3">
           <div className="grid items-center gap-3" style={{ gridTemplateColumns: '100px 120px 1fr' }}>
             <label htmlFor={ids.itemCode} className={labelCls}>Item Code</label>
             <input id={ids.itemCode} type="text" value={itemCode} readOnly className={`${readOnlyCls} font-mono font-bold text-gray-800`} />
-            <input id={ids.itemDesc} type="text" value={itemDesc} readOnly className={readOnlyCls} aria-label="Item description" />
+            <input id={ids.itemDesc} type="text" value={itemDesc} readOnly className={`${readOnlyCls} md:col-span-1`} aria-label="Item description" />
           </div>
 
           <div className="grid items-center gap-3" style={{ gridTemplateColumns: '100px 120px 1fr' }}>
@@ -313,7 +316,7 @@ export function TermInfoRow({
             </div>
           </div>
 
-          <div className="grid items-center gap-3" style={{ gridTemplateColumns: '100px 1fr' }}>
+          <div className="grid items-center gap-x-3 gap-y-1.5" style={{ gridTemplateColumns: '100px 1fr' }}>
             <div />
             <span id={ids.supplierName} className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-200 text-gray-900 inline-block">
               {selectedSupplier?.name || '\u00A0'}
@@ -365,38 +368,55 @@ export function TermInfoRow({
           </div>
         </div>
 
-        <div className="lg:col-span-2 border-t lg:border-t-0 pt-4 lg:pt-0 lg:border-l border-gray-100 lg:pl-8 space-y-4">
-          <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-100 flex-wrap gap-2">
-            <label htmlFor={ids.active} className={`flex items-center gap-2 text-xs font-bold text-gray-700 whitespace-nowrap select-none ${!isReadOnly ? 'cursor-pointer' : ''}`}>
-              <div className="relative">
-                <input
-                  id={ids.active}
-                  type="checkbox"
-                  checked={formData.active ?? true}
-                  onChange={(event) => updateFormData('active', event.target.checked)}
-                  disabled={isReadOnly}
-                  className="peer sr-only"
-                />
-                <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-term-green" />
-              </div>
-              ACTIVE
-            </label>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Valid From</span>
-              <div className="w-40">
+        <div className="border-l border-gray-100 pl-8 space-y-4">
+          {/* ACTIVE toggle + Valid dates — single row */}
+          <div className="bg-gray-50 px-3 py-2.5 rounded-lg border border-gray-100">
+            <div className="flex items-center gap-3">
+              {/* ACTIVE toggle */}
+              <label htmlFor={ids.active} className={`flex items-center gap-2 text-xs font-bold text-gray-700 select-none shrink-0 ${!isReadOnly ? 'cursor-pointer' : ''}`}>
+                <div className="relative">
+                  <input
+                    id={ids.active}
+                    type="checkbox"
+                    checked={formData.active ?? true}
+                    onChange={(event) => updateFormData('active', event.target.checked)}
+                    disabled={isReadOnly}
+                    className="peer sr-only"
+                  />
+                  <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-term-green" />
+                </div>
+                ACTIVE
+              </label>
+
+              {/* Divider */}
+              <div className="w-px h-5 bg-gray-300 shrink-0" />
+
+              {/* Valid From */}
+              <span className="text-xs font-medium text-gray-600 whitespace-nowrap shrink-0">From</span>
+              <div className="flex-1 min-w-0">
                 <DatePicker
                   id={ids.validFrom}
                   value={formData.validFrom}
-                  onChange={(date: string) => updateFormData('validFrom', date)}
+                  onChange={(date: string) => {
+                    updateFormData('validFrom', date);
+                    if (isNew && !formData.validTo && date) {
+                      const from = parseISO(date);
+                      if (isValid(from)) {
+                        updateFormData('validTo', format(addMonths(from, 1), 'yyyy-MM-dd'));
+                      }
+                    }
+                  }}
                   placeholder="Valid From"
                   disabled={isReadOnly}
                   className={isReadOnly ? 'disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900' : ''}
                 />
               </div>
-              <div className="w-8 shrink-0 text-center">
-                <span className="text-xs text-gray-500">To</span>
-              </div>
-              <div className="w-40">
+
+              {/* Separator */}
+              <span className="text-xs text-gray-400 shrink-0">—</span>
+
+              {/* Valid To */}
+              <div className="flex-1 min-w-0">
                 <DatePicker
                   id={ids.validTo}
                   value={formData.validTo}
@@ -410,11 +430,11 @@ export function TermInfoRow({
           </div>
 
           <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100/50 space-y-3">
-            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
+            <div className="grid grid-cols-2 gap-x-4">
               <div className="min-w-0 space-y-1.5">
                 <span className="text-[12px] uppercase font-bold text-gray-500 tracking-wider">Purchase Term</span>
-                <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: '80px minmax(0, 1fr)' }}>
-                  <label htmlFor={ids.purchaseTerm} className="text-[11px] text-gray-600 text-right">Purchase Term</label>
+                <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: 'max-content minmax(0, 1fr)' }}>
+                  <label htmlFor={ids.purchaseTerm} className="text-[11px] text-gray-600 text-right whitespace-nowrap">Purchase Term</label>
                   <InlineSelect
                     id={ids.purchaseTerm}
                     value={formData.purchaseTerm || ''}
@@ -427,7 +447,7 @@ export function TermInfoRow({
                     options={purchaseTermOptions.map((term) => ({ value: term, label: term }))}
                   />
 
-                  <span className="text-[11px] text-gray-600 text-right">Term Location</span>
+                  <span className="text-[11px] text-gray-600 text-right whitespace-nowrap">Term Location</span>
                   <Select
                     value={formData.purchaseTermLocation || ''}
                     onValueChange={(locationCode) => {
@@ -458,7 +478,7 @@ export function TermInfoRow({
                     </SelectContent>
                   </Select>
 
-                  <label htmlFor={ids.purchaseSubLocation} className="text-[11px] text-gray-600 text-right">Sub Location</label>
+                  <label htmlFor={ids.purchaseSubLocation} className="text-[11px] text-gray-600 text-right whitespace-nowrap">Sub Location</label>
                   <InlineSelect
                     id={ids.purchaseSubLocation}
                     value={formData.purchaseSubLocation || ''}
@@ -475,8 +495,8 @@ export function TermInfoRow({
 
               <div className="min-w-0 space-y-1.5">
                 <span className="text-[12px] uppercase font-bold text-gray-500 tracking-wider">Sales Term</span>
-                <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: '80px minmax(0, 1fr)' }}>
-                  <label htmlFor={ids.salesTerm} className="text-[11px] text-gray-600 text-right">Sales Term</label>
+                <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: 'max-content minmax(0, 1fr)' }}>
+                  <label htmlFor={ids.salesTerm} className="text-[11px] text-gray-600 text-right whitespace-nowrap">Sales Term</label>
                   <InlineSelect
                     id={ids.salesTerm}
                     value={formData.salesTerm || ''}
@@ -489,7 +509,7 @@ export function TermInfoRow({
                     options={salesTermOptions.map((term) => ({ value: term, label: term }))}
                   />
 
-                  <label htmlFor={ids.salesSubLocation} className="text-[11px] text-gray-600 text-right">Sub Location</label>
+                  <label htmlFor={ids.salesSubLocation} className="text-[11px] text-gray-600 text-right whitespace-nowrap">Sub Location</label>
                   <InlineSelect
                     id={ids.salesSubLocation}
                     value={formData.salesSubLocation || ''}

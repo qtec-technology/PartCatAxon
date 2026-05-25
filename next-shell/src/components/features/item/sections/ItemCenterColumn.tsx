@@ -96,7 +96,7 @@ export function ItemCenterColumn({
   };
 
   return (
-    <div className="col-span-12 lg:col-span-6 flex flex-col gap-4">
+    <div className="flex flex-col gap-4 min-w-0">
 
       <div className="bg-gray-50 p-4 border border-gray-200 rounded">
         <div className="bg-white border border-gray-300 w-64 aspect-square mx-auto flex items-center justify-center mb-2 overflow-hidden relative">

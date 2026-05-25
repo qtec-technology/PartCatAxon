@@ -87,7 +87,7 @@ export default function ItemNewPage() {
     };
 
     return (
-        <div className="h-full overflow-y-auto">
+        <div>
             <ItemForm
                 mode={mode}
                 onSave={handleSave}

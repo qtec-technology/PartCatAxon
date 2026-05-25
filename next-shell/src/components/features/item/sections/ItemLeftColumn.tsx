@@ -44,7 +44,7 @@ export function ItemLeftColumn({
   setShowBrandDropdown,
 }: ItemLeftColumnProps) {
   return (
-    <div className="col-span-12 lg:col-span-3 flex flex-col">
+    <div className="flex flex-col min-w-0">
       <SectionHeader title="Item Information" />
       <div className="flex-1 p-4 border border-gray-200 border-t-0 rounded-b-md bg-white">
 

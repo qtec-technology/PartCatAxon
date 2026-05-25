@@ -61,6 +61,9 @@ function makeLine(overrides: Partial<AllocationLineSource> = {}): AllocationLine
     sspk: 0,
     qoc: 0,
     ...overrides,
+    customerStockCode: overrides.customerStockCode ?? '',
+    permitType: overrides.permitType ?? '',
+    subLocation: overrides.subLocation ?? '',
   };
 }
 
@@ -81,6 +84,7 @@ function makeCosts(overrides: Partial<BulkCostInput> = {}): BulkCostInput {
     contactPerson: '',
     saleIncharge: '',
     ...overrides,
+    subLocation: overrides.subLocation ?? '',
   };
 }
 

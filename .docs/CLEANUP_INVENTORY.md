@@ -1,6 +1,6 @@
 # Cleanup Inventory
 
-Last updated: 2026-05-19
+Last updated: 2026-05-25
 
 This inventory tracks dead-code, stale-doc, and architecture cleanup work for
 the stabilization phase. It separates safe cleanup from changes that need design
@@ -10,6 +10,8 @@ approval or runtime coordination.
 
 | Item | Finding | Action | Status |
 |---|---|---|---|
+| Agent handoff docs | Agents were reading scattered/stale docs first and could miss the Cost Workspace decision | Add `.docs/AGENT_START_HERE.md`, `.docs/DOCS_INDEX.md`, and `.docs/COST_WORKSPACE_FIELD_COVERAGE.md` | Done 2026-05-25 |
+| Stale docs | Older AXON API/push, Codex AI briefing, test-data handoff, and standalone validation notes could be read as current truth | Move useful validation guidance into `AGENT_START_HERE.md`, keep AXON truth in `AXON_HANDOFF_CONTRACT.md`, and delete stale docs | Done 2026-05-25 |
 | `client/` docs | `client/` no longer exists, but `AGENTS.md`, `CLAUDE.md`, and `README.md` still referenced a missing `CLIENT_RETIREMENT_PLAN.md` | Replace with "client retired; do not reintroduce" guidance | Done 2026-05-19 |
 | Bulk Cost draft schema wording | Agent quick refs still mentioned `BulkCostLine`; live schema uses `BulkCostRun` + `DraftItem` + `DraftTerm` | Update quick refs | Done 2026-05-19 |
 | Date/time write path | Main repo still passed Node `new Date()` for Item/Term `UpdatedDate`; deploy-proven `repos2` uses SQL `GETDATE()` | Port fix and add regression test | Done 2026-05-19 |
@@ -19,31 +21,59 @@ approval or runtime coordination.
 
 | Area | Finding | Next Action |
 |---|---|---|
-| AXON integration docs | `.docs/AXON_INTEGRATION.md` still contains older API/push wording and AXON pipeline details that read like PartCatalogAxon owns AXON | Rework around `.docs/AXON_HANDOFF_CONTRACT.md` after confirming view names with Pi-Jo |
 | Target architecture docs | `.docs/ARCHITECTURE.md` still has long-term Better Auth/Prisma/Server Actions target sections | Keep as long-term only, but add explicit "not in reset scope" labels |
 | Bulk Cost frontend mocks | `BulkCostWorkspace.tsx` can still load demo lines for known demo supplier codes; `SupplierSelection.tsx` no longer feeds mock/AXON queue rows into active New Allocation | Keep mock imports test/demo-only; remove from workspace once manual blank flow has complete coverage |
 | AXON seed scripts | `server/sql/20260512_seed_mock_data.sql` still seeds legacy `AxonExtractionQueue` demo rows, but `/api/bulk-cost/queue` has been removed from the active route surface | Audit existing DB rows before dropping legacy tables |
 | AI services scope | `ai-services/` was a local CWeight/AI research package, but PartCatalogAxon must not become the AXON orchestrator | Removed from active repo/runtime on 2026-05-19; keep only historical docs unless explicitly re-scoped |
+| Cost Workspace naming | Runtime still uses `BulkCostRun` / `DraftItem` / `DraftTerm`, but the rebuild target is broader Cost Workspace naming | Design replacement schema first: `CostWorkspaceRun`, `CostWorkspaceLine`, `CostWorkspaceSnapshot`; do not rename live tables in place |
+| Manual vs AXON source | Manual Bulk Cost is an add-on path, while AXON_AWARDED is the future primary source | Finish Manual formula/field validation first, then import awarded AXON rows into the same workspace engine |
+| Stale handoff docs | Historical handoff and validation files have been removed from the working tree | Keep removed names out of startup prompts |
 
 ## P2 — Requires Design Before Code
 
 | Area | Risk | Required Decision |
 |---|---|---|
 | ChainId schema | Current Bulk Cost tables need explicit `ChainId`, source revision, supplier quote, and AXON line ids for real handoff | Confirm AXON final comparison view keys |
-| Backend/shared Bulk Cost calculation | Bulk Cost calculation still has frontend-only ownership risk | Define shared calculation API/service before Award/SAP automation |
+| Backend/shared Bulk Cost calculation | Active Manual CAL calls backend `POST /api/bulk-cost/calculate`, but stale frontend/test calculation fixtures may still confuse agents | Keep backend calculate API as source of truth and remove or relabel any remaining frontend-only calculation fixtures after coverage review |
 | Operation layer | Automation is hard if core actions are only UI flows | Initial plan documented in `AUTOMATION_READINESS.md`; first Bulk Cost operation wrapper added; continue with AXON handoff read model |
-| Auth model | Windows/IIS-style auth is not automation/service-account ready | Decide transitional domain header vs future Better Auth migration path |
+| Auth model | Legacy Windows-bound auth is not automation/service-account ready | Continue proxy/header-based transitional auth and decide future Better Auth or service-account model separately |
 | Deploy scripts | `repos2/deploy` has proven scripts but belongs to old temporary deployment shape | Port only useful Nginx/NSSM/smoke pieces after review |
+| Legacy AIX tables | `AxonExtractionQueue`, `GraingerWeightData`, and `GraingerWeightImportLog` appear obsolete for the target architecture | Backup and run row-count, FK, object-dependency, and code-reference checks before dropping |
+
+## Drop Candidate Checklist
+
+Do not drop database objects directly from screenshots. Before deleting any
+table or script, record:
+
+- row count
+- latest updated/created timestamp
+- foreign keys referencing or referenced by the object
+- stored procedures/views/functions/triggers that reference the object
+- app code references from `rg`
+- backup/export path
+- replacement source of truth
+
+Current candidate direction:
+
+| Object | Direction | Reason |
+|---|---|---|
+| `AxonExtractionQueue` | Drop candidate after checks | Legacy queue/mock path; target AXON source is awarded SQL/shared view |
+| `GraingerWeightData` | Drop candidate after checks | Active CWeight source is `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` |
+| `GraingerWeightImportLog` | Drop candidate after checks | Paired with obsolete AIX staging table |
+| `BulkCostRun` | Keep until replacement | Current live save/load depends on it |
+| `DraftItem` | Keep until replacement | Current snapshot line data depends on it |
+| `DraftTerm` | Keep until replacement | Current snapshot term data depends on it |
 
 ## Verification Baseline
 
-Latest reset verification:
+Run before handoff after code changes:
 
 ```text
 npm run typecheck
-npm test        # server 110 + next-shell 70
+npm test
 npm run build
 ```
 
-All passed on 2026-05-19 after the Bulk Cost entry cleanup and `ai-services/`
-retirement.
+For exact latest pass counts and historical verification, read
+`.docs/FEATURE_STATUS.md`. Do not treat this cleanup inventory as a current test
+result.

@@ -1,4 +1,4 @@
-import { ArrowLeft, Save, X, Edit, LogOut, Mail, Printer, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, X, Edit, LogOut, Mail, Trash2 } from 'lucide-react';
 import { Button, Badge } from '../common/atoms';
 
 interface TermHeaderProps {
@@ -10,7 +10,6 @@ interface TermHeaderProps {
   onEdit?: () => void;
   onCancel?: () => void;
   onDelete?: () => void;
-  onPrint?: () => void;
   onSendRfq?: () => void;
   isSendingRfq?: boolean;
   disableMutations?: boolean;
@@ -28,7 +27,6 @@ export function TermHeader({
   onEdit,
   onCancel,
   onDelete,
-  onPrint,
   onSendRfq,
   isSendingRfq = false,
   disableMutations = false,
@@ -79,9 +77,6 @@ export function TermHeader({
           {/* VIEW mode: Print, Send RFQ, Delete, Exit, Edit */}
           {mode === 'view' && (
             <>
-              <Button variant="primary" onClick={onPrint} className={wideActionBtnCls}>
-                <Printer className="w-4 h-4" /> PRINT TERM
-              </Button>
               <Button variant="primary" onClick={onSendRfq} disabled={isSendingRfq} className={wideActionBtnCls}>
                 <Mail className="w-4 h-4" /> {isSendingRfq ? 'LOADING...' : 'SEND RFQ'}
               </Button>

@@ -1,6 +1,6 @@
 # PartCatalog — Roadmap
 
-> อัปเดตล่าสุด: 2026-05-19
+> อัปเดตล่าสุด: 2026-05-25
 > อ่านร่วมกับ `.docs/FEATURE_STATUS.md` (สถานะปัจจุบัน) และ `.docs/ARCHITECTURE.md`
 
 ---
@@ -11,7 +11,7 @@
 Phase 0 🔄  Architecture Stabilization (AXON handoff + deploy reset)
 Phase 1 ✅  Web Baseline (ใช้งานได้จริง)
 Phase 2 🔄  Next.js Native Migration (กำลังทำ)
-Phase 3 ⏳  Bulk Cost Backend + AXON Integration
+Phase 3 ⏳  Cost Workspace Backend + AXON Integration
 Phase 4 ⏳  Auth Migration → Better Auth
 Phase 5 ⏳  Full AI Automation
 ```
@@ -36,9 +36,20 @@ Bulk Cost production flow.
 
 - [x] Port Item/Term `UpdatedDate` fix จาก deploy-proven `repos2`: SQL Server
       local `GETDATE()` แทน Node `new Date()` SQL parameter
+- [x] Create agent-ready handoff pack:
+      `.docs/AGENT_START_HERE.md`, `.docs/DOCS_INDEX.md`, and
+      `.docs/COST_WORKSPACE_FIELD_COVERAGE.md`
 - [ ] Align deploy topology with AXON: Nginx, subdomain, internal CA, NSSM
-- [ ] Lock AXON handoff contract around `ChainId`, comparison revision,
-      supplier quote, and AXON line identity
+- [ ] Harden current Trusted Reverse Proxy Header Auth before production:
+      bind Express to `127.0.0.1` only, add `TRUSTED_PROXY_IPS` validation
+      before reading `x-forwarded-*` headers, ensure Nginx strips/overwrites
+      client-supplied identity headers, and evaluate optional proxy header HMAC
+      signing if the deployed proxy/SSO layer supports it
+- [x] Lock Cost Workspace direction: one workspace supports `SINGLE` + `BULK`
+      and `MANUAL` + `AXON_AWARDED`; Manual is completed first to verify
+      formulas/columns/snapshots before real AXON view integration
+- [ ] Lock AXON handoff contract around `ChainId` / AIX ID, comparison revision,
+      awarded supplier quote, AXON line identity, and header-vs-line cost markers
 - [x] Draft AXON final comparison header/line SQL view contract from the
       read-only AXON copy (`server/sql/20260519_axon_handoff_view_contract.sql`)
 - [x] Scaffold read-only AXON final comparison endpoint by `ChainId`
@@ -79,13 +90,23 @@ Bulk Cost production flow.
 - [x] Native ItemPage (`/item/[id]`, `/item/new`)
 - [x] Native TermPage (`/term/[itemId]`)
 - [x] Native Search/PartCatalog (`/partcatalog`)
-- [x] Bulk Cost UI prototype (mock data, 42 next-shell unit tests)
+- [x] Bulk Cost / Cost Workspace UI connected to backend calculate and live DB
+      save/load paths
 - [x] Client retirement complete (client/ deleted 2026-05-07)
 - [x] Root dev/build/test scripts use `server + next-shell` only
 - [x] `/` redirects to `/partcatalog`
 - [ ] UI parity checklist: next-shell vs legacy SPA (Item + Term)
 - [ ] Production entry point: user เข้า next-shell แทน SPA
-- [ ] Deprecate legacy `client/` SPA
+- [x] Legacy `client/` SPA retired; do not reintroduce into normal workflows
+- [ ] Evaluate Next.js Cache Components / `use cache` for stable read-only
+      data and route shells only (lookups, vendor lists, item groups, static
+      reference data). Do not cache auth-sensitive pages, draft workspace
+      state, CAL results, save/revision flows, or data that must be fresh per
+      request.
+- [ ] Create minimal UI template registry / internal `/menu` or `/templates`
+      route for QTEC page shells, search panels, dense grids, form sections,
+      workspace steps, and review tables. Keep it internal and use it as an AI
+      reference, not a business workflow.
 
 **Prerequisites ก่อน go-live:**
 - Next.js UI ต้องผ่าน UAT รอบแรก
@@ -93,11 +114,24 @@ Bulk Cost production flow.
 
 ---
 
-## Phase 3 — Bulk Cost Backend + AXON Integration ⏳
+## Phase 3 — Cost Workspace Backend + AXON Integration ⏳
 
-เชื่อม Bulk Cost UI กับ backend และ AXON:
+เชื่อม Cost Workspace UI กับ backend และ AXON. Bulk Cost is now one mode inside
+Cost Workspace, alongside Single Cost.
 
 ### 3A — DB Schema + Backend API
+
+Rebuild target naming:
+
+```text
+CostWorkspaceRun
+CostWorkspaceLine
+CostWorkspaceSnapshot
+```
+
+Current live implementation still uses `BulkCostRun` / `DraftItem` /
+`DraftTerm`. Keep it until replacement schema and migration/retirement scripts
+are ready.
 
 **Blocking questions (ตอบแล้วสำหรับ Phase 3A):**
 - [x] Q7: Allocation result เก็บใน BulkCostRun table แยก (ไม่ overwrite @PITM1)
@@ -110,7 +144,18 @@ Bulk Cost production flow.
 
 **งานที่ต้องทำ:**
 - [x] ออกแบบ DB schema: `BulkCostRun`, `DraftItem`, `DraftTerm`
-- [x] สร้าง SQL script: `server/sql/20260508_bulk_cost_draft_snapshot.sql`
+- [ ] Redesign schema as Cost Workspace: `CostWorkspaceRun`,
+      `CostWorkspaceLine`, `CostWorkspaceSnapshot`
+- [ ] Review `.docs/COST_WORKSPACE_FIELD_COVERAGE.md` with owner and mark each
+      field as main grid, review/finalize, system, deferred, or not needed
+- [ ] Lock Calculation Template for Cost Workspace: inputs, allocation basis,
+      backend calculation source, output columns, golden tests, and snapshot
+      traceability
+- [ ] Add source/mode dimensions: `MANUAL | AXON_AWARDED` and `SINGLE | BULK`
+- [ ] Add PartCatalog Review / Finalize step before writing real Item/Term
+      master data
+- [x] สร้าง SQL scripts: `server/sql/20260512_bulk_cost_full_schema.sql` and
+      `server/sql/20260519_bulk_cost_manual_revision.sql`
 - [x] สร้าง Express API route: `POST /api/bulk-cost/runs`
 - [x] เชื่อม BulkCostWorkspace save draft เข้า API
 - [ ] Formula audit before DB execution: Term-engine parity fields
@@ -125,22 +170,30 @@ Bulk Cost production flow.
       TOP 500 exports — 12 golden-case tests in `golden-cases.test.ts`
 - [ ] Collect missing golden-case exports for ET/MT/MiscTax/SCC/STK, CWeight,
       and additional order-term variants
-- [ ] Run SQL script on `PART_CATALOG_AIX` and smoke test real save
+- [ ] Audit live `PART_CATALOG_AIX` schema before any replacement:
+      `BulkCostRun`, `DraftItem`, and `DraftTerm` are current live tables and
+      must be kept until Cost Workspace replacement schema is approved
 - [ ] ออกแบบ Awarded reverse mapping flow แยก Phase ถัดไป (ยังไม่สร้าง endpoint)
-- [ ] SupplierSelection โหลดจาก real DB (`@OCRD`)
+- [x] Manual New Allocation supplier selection loads vendor master data from
+      `@OCRD` through the existing lookup API
 
 ### 3B — AXON Integration
 
-อ่าน `.docs/AXON_INTEGRATION.md` และ `.docs/CODEX_BRIEFING.md` ก่อน
+อ่าน `.docs/AXON_HANDOFF_CONTRACT.md` ก่อนเสมอ. ไฟล์ handoff contract นี้เป็น
+source ล่าสุดสำหรับการเชื่อม AXON; เอกสาร API/push รุ่นเก่าถูกลบออกเพื่อไม่ให้
+agent สับสนกับทิศทาง SQL/shared-view handoff ปัจจุบัน.
 
-**Business Decisions ยืนยันแล้ว (2026-05-12):**
+**Business Decisions ยืนยันแล้ว (2026-05-12; wording refreshed 2026-05-25):**
 - [x] AXON Model = **Hybrid Push+Pull**: AXON push เข้า DB อัตโนมัติ, เซลล์ Pull ผ่าน Dashboard
-- [x] Item Group = AI Suggest (🪄) → Sales Edit → Manager Approve ตอน AWARDED
+- [x] Item Group = AI Suggest (🪄) → Sales Edit → Manager Approve in the
+      AXON/awarded flow; PartCatalog consumes awarded rows and does not own
+      Award selection
 - [x] Three-tier fallback สำหรับ CWeight: existing/export data → AI suggestion (ภายหลัง) → User manual (เสมอแก้ได้)
 - [x] Scope ล่าสุด: Kim/Codex ทำเฉพาะ CWeight / Weight & Dimension; HS Code, Duty, Permit, Shelf Life เป็น AXON/ทีมอื่น
 
 **งาน codebase owner หลัง architecture reset:**
-- [ ] A2: SupplierSelection / AXON Chain inbox โหลดจาก real source
+- [ ] A2: AXON Chain inbox/import loads awarded rows from real SQL view by
+      `ChainId` / AIX ID
 - [ ] A3: Read-only AXON final comparison handoff by `ChainId`
       (shared DB/view/module; do not start with public REST API)
 - [ ] B1: SQL read model / snapshot repository for AXON comparison clone
@@ -151,8 +204,10 @@ Bulk Cost production flow.
 - [ ] B6: Workspace columns ตาม legacy Term form (UOM dropdown, Ship Mode ฯลฯ)
 - [ ] C5: Wire CWeight service route ภายหลังเมื่อ local pattern ผ่าน test แล้ว
 - [ ] C6: Verify Codex CWeight response ตรง Bulk Cost weight fields
-- [ ] D1: Manager Approve dialog + PATCH status AWARDED
-- [ ] D2: Reverse Mapping summary (read-only preview หลัง AWARDED)
+- [ ] D1: PartCatalog Review / Finalize validation for a saved revision
+      (no Award ownership; AXON owns Award)
+- [ ] D2: Reverse Mapping summary / read-only preview after Review/Finalize
+      and business/order gate approval
 
 **งาน Codex / GPT 5.5 (CWeight layer — isolated):**
 - [ ] C1: CWeight / Weight & Dimension local research module
@@ -161,7 +216,8 @@ Bulk Cost production flow.
 - [ ] C4: CWeight prompt/research notes เฉพาะกรณีที่ต้องใช้ AI ภายหลัง
 
 **ทำพร้อมกันได้ (parallel):** A2/A3/B1-B6 (Claude/AXON) + C1-C4 (Codex CWeight)
-**ต้องรอลำดับ:** C5 รอ CWeight local pattern/test ผ่านก่อน | D1 รอ B2-B3 เสร็จก่อน
+**ต้องรอลำดับ:** C5 รอ CWeight local pattern/test ผ่านก่อน | D1 รอ
+Manual Workspace field/formula coverage ก่อน
 
 ### 3C — Prisma ORM (ขึ้นอยู่กับ 3A)
 
@@ -173,13 +229,41 @@ Bulk Cost production flow.
 
 ## Phase 4 — Auth Migration → Better Auth ⏳
 
-**สาเหตุ:** Windows/IIS auth ยึดติด IIS มากเกินไปสำหรับ AI/agent identity
+**Current auth status:** production uses Trusted Reverse Proxy Header Auth.
+Nginx/SSO authenticates the internal AD/domain user, strips and overwrites
+identity headers, then Express reads only trusted `x-forwarded-*` headers.
+IIS/iisnode is not part of the auth flow.
+
+**Phase 0 hardening first:** keep the current auth method and secure the
+transport path before changing auth architecture.
+
+- [ ] Express API binds to loopback only (`127.0.0.1`), never public
+      `0.0.0.0`
+- [ ] `auth.middleware.ts` validates `TRUSTED_PROXY_IPS` using
+      `req.socket.remoteAddress` before trusting identity headers
+- [ ] Requests carrying proxy identity headers from untrusted IPs return `401`
+- [ ] Nginx/SSO config strips incoming client `x-forwarded-*` identity headers
+      and writes the trusted values itself
+- [ ] Add tests for trusted proxy, untrusted proxy, missing identity, group
+      mapping, and elevated role mapping
+- [ ] Optional: add HMAC signature verification for identity headers if the
+      proxy/SSO layer can sign headers with a shared secret
+- [ ] AD server cutover runbook: Express app is unchanged; update only
+      Nginx/SSO AD target, then smoke test login and role mapping
+
+**Better Auth trigger:** do this later only when role changes must be DB-backed
+without redeploy, external users must be supported, or AI/service-account
+identity requires first-class auth.
+
+**สาเหตุ:** legacy Windows-bound auth ไม่เหมาะกับ AI/agent identity และ service account
 
 - [ ] ติดตั้ง Better Auth
 - [ ] JWT + Org plugin (RBAC)
 - [ ] User roles: Manager, Supervisor, Staff
 - [ ] Multi-tenant prep (ถ้าจำเป็น)
 - [ ] Migrate session model ใน next-shell
+- [x] Legacy host-bound auth removal from active runtime: production auth reads
+  only trusted Nginx/proxy identity headers
 - [x] Bulk Cost access control: authenticated domain/catalog users can access and save normal work; manager/supervisor reserved for elevated actions
 
 **Prerequisites:** Phase 3A เสร็จก่อน (เพราะ auth กระทบ Bulk Cost save permissions)
@@ -194,12 +278,13 @@ business logic.
 
 ระบบอัตโนมัติเต็มรูปแบบ:
 
-- [ ] AXON Email → SupplierReply → Quote Extraction pipeline ต่อตรงกับ Bulk Cost
+- [ ] AXON Email → SupplierReply → Quote Extraction pipeline publishes awarded
+      rows into Cost Workspace handoff
 - [ ] AI-assisted field suggestion (Warning + Suggestion mode)
 - [ ] AI Quote Ranker (Stage G3) ส่งผลไปยัง SupplierSelection sorting
 - [ ] Auto-prefill Item/Term fields จาก AI extraction
 - [ ] Qdrant vector search สำหรับ duplicate item detection
-- [ ] Approval matrix / governance flow สำหรับ Bulk Cost runs
+- [ ] Approval matrix / governance flow สำหรับ Cost Workspace revisions
 - [ ] Python orchestrator deploy เป็น NSSM daemon service
 
 ---
@@ -216,7 +301,7 @@ Browser
 Python AXON Orchestrator (NSSM daemon, AXON side)
 ├── OpenAI / Gemini Vision / Claude CLI
 ├── Qdrant vector DB (192.168.2.54)
-└── POST → PartCatalog /api/bulk-cost/extraction
+└── Publish final comparison by ChainId through shared DB/view/module handoff
 
 Deploy: NSSM + Nginx reverse proxy + standalone Next.js
 ```
@@ -231,7 +316,7 @@ Deploy: NSSM + Nginx reverse proxy + standalone Next.js
 | `CLAUDE.md` (~70 lines) | ✅ สร้างแล้ว |
 | `.github/workflows/lint.yml` | ❌ ยังไม่มี |
 | `lefthook.yml` (pre-commit) | ❌ ยังไม่มี |
-| Unit tests pass | ✅ next-shell 44 tests + server 73 tests |
+| Unit tests pass | ดู count ล่าสุดใน `.docs/FEATURE_STATUS.md` |
 | TypeScript strict | ✅ |
 
 ---

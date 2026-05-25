@@ -7,7 +7,7 @@ import { AuthProvider } from '@/auth/AuthContext';
 import { getStaticAuthContext } from '@/features/auth/static-auth';
 
 export const metadata: Metadata = {
-  title: 'QTEC AXON SYSTEM',
+  title: 'QTEC PartCatalog',
   description: 'QTEC Part Catalog and cost intelligence workspace',
   icons: {
     icon: '/favicon.ico',

@@ -248,6 +248,9 @@ function computeFinalResult(
 ): FinalResultColumns {
   const productCost = line.unitPrice;
   const exRate = costs.exchangeRate;
+  const orderTerm = line.orderTerm || costs.orderTerm;
+  const location = line.location || costs.location;
+  const shipModeNo = line.shipModeNo || costs.shipModeNo;
 
   // OP1 (THB) = (PCS + PKH + SOC + COC + Mill + Test Cert + COO + Any Other) * exchange rate.
   const docCOO = round6(line.docFee.coo + line.docFee.coa);
@@ -262,9 +265,9 @@ function computeFinalResult(
   const op1 = round6(op1Source * exRate);
 
   // ── Exwork Case ───────────────────────────────────────────────────────────
-  const isExworkTerm = costs.orderTerm === 'Exwork' || costs.orderTerm === 'Ex-work';
-  const isFOBType = isExworkTerm || ['FCA', 'FAS', 'FOB'].includes(costs.orderTerm);
-  const exworkCase = (isFOBType && (costs.shipModeNo === 3 || costs.shipModeNo === 6)) ? 1.03 : 1;
+  const isExworkTerm = orderTerm === 'Exwork' || orderTerm === 'Ex-work';
+  const isFOBType = isExworkTerm || ['FCA', 'FAS', 'FOB'].includes(orderTerm);
+  const exworkCase = (isFOBType && (shipModeNo === 3 || shipModeNo === 6)) ? 1.03 : 1;
 
   // ── OP2 = OP1 * ExworkCase ────────────────────────────────────────────────
   const op2 = round6(op1 * exworkCase);
@@ -273,7 +276,7 @@ function computeFinalResult(
   const ins = round6(op2 * (line.insPercent / 100));
 
   // ── Shipping Weight ───────────────────────────────────────────────────────
-  const dw = calcDW(line.length, line.width, line.height, costs.shipModeNo, line.dimUnit);
+  const dw = calcDW(line.length, line.width, line.height, shipModeNo, line.dimUnit);
   const iw = line.itemWeightPerEach ?? 0;
   const swCal = line.shippingWeightPerEach !== null && line.shippingWeightPerEach > 0
     ? line.shippingWeightPerEach
@@ -282,11 +285,11 @@ function computeFinalResult(
   // FR Zone
   let frZoneRate = 0;
   let frZoneCost = 0;
-  if (isExworkTerm || costs.orderTerm === 'FCA') {
-    if (costs.shipModeNo === 3) {
+  if (isExworkTerm || orderTerm === 'FCA') {
+    if (shipModeNo === 3) {
       frZoneRate = 0;
       frZoneCost = round6(0.1 * op2);
-    } else if (costs.shipModeNo === 6) {
+    } else if (shipModeNo === 6) {
       frZoneRate = line.zoneRate;
       frZoneCost = round6(Math.max(dw, iw) * line.zoneRate);
     }
@@ -298,13 +301,13 @@ function computeFinalResult(
 
   // ── CIF ───────────────────────────────────────────────────────────────────
   let cifQTEC = 0;
-  if (!(isExworkTerm || costs.orderTerm === 'FCA') || costs.shipModeNo !== 3) {
+  if (!(isExworkTerm || orderTerm === 'FCA') || shipModeNo !== 3) {
     cifQTEC = round6(op2 + ins + frEachTHB);
   }
 
   let cifZone = 0;
-  if ((isExworkTerm || costs.orderTerm === 'FCA') &&
-      (costs.shipModeNo === 3 || costs.shipModeNo === 6)) {
+  if ((isExworkTerm || orderTerm === 'FCA') &&
+      (shipModeNo === 3 || shipModeNo === 6)) {
     cifZone = round6(op2 + ins + frZoneCost);
   }
 
@@ -354,8 +357,8 @@ function computeFinalResult(
 
   return {
     supplierName: line.vendorName,
-    purchaseOrderTerm: costs.orderTerm,
-    termLocation: costs.location,
+    purchaseOrderTerm: orderTerm,
+    termLocation: location,
     productCost,
     pkh: pkhEach,
     soc: socEach,

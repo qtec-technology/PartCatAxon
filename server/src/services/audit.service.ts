@@ -28,7 +28,7 @@ export interface AuditLogEntry {
  * Application-level audit event only.
  *
  * This project does not use a database audit table.
- * Actor identity is derived from Windows Authentication and
+ * Actor identity is derived from trusted proxy/auth middleware context and
  * persisted in business records through Updatedby/UpdatedDate.
  */
 export function writeAuditLog(entry: AuditLogEntry): void {

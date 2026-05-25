@@ -98,7 +98,7 @@ export function mapBulkCostToTermFormData(
     validFrom: todayIsoDate(),
     // Pricing
     prodCost: finalResult.productCost,
-    currency: costs.currency,
+    currency: source.currency || costs.currency,
     exRate: costs.exchangeRate,
     // Allocated per-each costs
     pkh: finalResult.pkh,
@@ -106,9 +106,10 @@ export function mapBulkCostToTermFormData(
     wireTT: finalResult.wireTT,
     customClear: finalResult.customClear,
     // Shipment context
-    purchaseTerm: costs.orderTerm,
-    purchaseTermLocation: costs.location,
-    shipMode: String(costs.shipModeNo ?? -1),
+    purchaseTerm: source.orderTerm || costs.orderTerm,
+    purchaseTermLocation: source.location || costs.location,
+    purchaseSubLocation: source.subLocation || costs.subLocation,
+    shipMode: String(source.shipModeNo > 0 ? source.shipModeNo : (costs.shipModeNo ?? -1)),
     // Dimensions / weight
     dimUnit: String(source.dimUnit || 1),
     length: source.length,
@@ -209,7 +210,7 @@ export function mapBulkCostToItemData(source: AllocationLineSource): ItemData {
     mfrCatalogNo: source.mfgPartNumber,
     itemDescription: source.sapDescription,
     specialRequirement: '',
-    customerStockCode: '',
+    customerStockCode: source.customerStockCode || '',
     stockUOM: source.uom || 'EA',
     countryOfOrigin: source.countryOfOrigin,
     eccn: '',
@@ -230,7 +231,7 @@ export function mapBulkCostToItemData(source: AllocationLineSource): ItemData {
     b1Item: false,
     dgRequired: false,
     permitRequired,
-    permitType: '',
+    permitType: source.permitType || '',
     hsCode: source.hsCode,
     longDesc1: '',
     longDesc2: '',

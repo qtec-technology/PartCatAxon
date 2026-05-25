@@ -1,10 +1,11 @@
 # AXON Handoff Contract
 
-Last updated: 2026-05-19
+Last updated: 2026-05-22
 
 This contract defines how PartCatalogAxon consumes AXON output. AXON is owned by
-Pi-Jo's side. PartCatalogAxon reads the final comparison result, clones the
-selected data into its own snapshots, and then performs costing.
+Pi-Jo's side. PartCatalogAxon reads only the awarded final comparison result,
+clones the selected data into Cost Workspace snapshots, and then performs
+Single/Bulk costing.
 
 ## Ownership
 
@@ -13,9 +14,9 @@ selected data into its own snapshots, and then performs costing.
 | RFQ chain lifecycle | AXON | Customer request, supplier discovery, supplier RFQ, quote intake |
 | Email/document extraction | AXON | AI pipeline and source document handling |
 | Final comparison | AXON | Published for PartCatalogAxon consumption |
-| Costing workspace | PartCatalogAxon | Sales review, Latest edits, Bulk Cost calculation |
+| Cost Workspace | PartCatalogAxon | Sales review, Latest edits, Single/Bulk calculation |
 | Snapshot/revision | PartCatalogAxon | Origin, Latest, Result snapshots tied to `ChainId` |
-| Item/Term bridge | PartCatalogAxon | Deferred until Awarded reverse mapping rules are approved |
+| Item/Term bridge | PartCatalogAxon | Deferred until Review/Finalize, reverse mapping, and business/order gate rules are approved |
 
 ## Integration Shape
 
@@ -24,10 +25,10 @@ environment, not a public AXON-to-PartCatalog REST API.
 
 ```text
 AXON tables
-  -> AXON final comparison SQL view or shared module
-  -> PartCatalogAxon backend read-only query by ChainId
-  -> clone selected comparison into PartCatalogAxon snapshots
-  -> Bulk Cost calculation and save
+  -> AXON awarded final comparison SQL view or shared module
+  -> PartCatalogAxon backend read-only query by ChainId / AIX ID
+  -> clone awarded supplier/lines into Cost Workspace draft
+  -> Single/Bulk calculation and save revision
 ```
 
 The browser must not connect directly to SQL Server. The PartCatalogAxon
@@ -35,8 +36,10 @@ backend/BFF owns the read-only query and clone operation.
 
 ## Identity Model
 
-`ChainId` is the main correlation id across systems. It connects the customer
-request, supplier RFQ, quote comparison, costing run, snapshots, and audit trail.
+`ChainId` is the main correlation id across systems and is expected to be the
+business AIX ID, pending final confirmation from Pi-Jo's view. It connects the
+customer request, supplier RFQ, quote comparison, costing run, snapshots, and
+audit trail.
 
 `ChainId` must not be the only key for PartCatalogAxon snapshots. The minimum
 line identity needs revision and supplier/line dimensions because quotes can be
@@ -66,7 +69,7 @@ Draft line RunId + ChainId + AxonLineId
 ## Handoff Views
 
 Final names must be confirmed with Pi-Jo, but PartCatalogAxon should expect a
-header/line split.
+header/line split filtered to awarded supplier/line rows only.
 
 Current server scaffold:
 
@@ -84,6 +87,20 @@ DB_VIEW_AXON_FINAL_COMPARISON_LINES=<qualified-or-unqualified-view-name>
 
 Until those env vars are set, the endpoint returns `501` rather than guessing a
 view name.
+
+AXON AI may mark supplier costs as header-level or line-level because suppliers
+can quote costs in either shape. PartCatalog must not assume one fixed basis
+until the final AXON columns are confirmed. Expected marker values are:
+
+```text
+HEADER_TOTAL
+LINE_TOTAL
+PER_UNIT
+UNKNOWN
+```
+
+PartCatalog treats these as calculation inputs/suggestions. Sales can still
+edit before CAL.
 
 Proposed AXON-side view contract is captured in
 `server/sql/20260519_axon_handoff_view_contract.sql`. It is a handoff script for
@@ -251,8 +268,8 @@ filtered by `ChainId`, not a standalone supplier picker that loses RFQ context.
 ## Safety Rules
 
 - Do not write to AXON source tables from PartCatalogAxon.
-- Do not write to SAP Item/Term master tables before Awarded reverse mapping is
-  designed and approved.
+- Do not write to SAP Item/Term master tables before Review/Finalize, reverse
+  mapping, and business/order gate rules are designed and approved.
 - Preserve `ChainId`, source revision, and source line ids on every snapshot and
   audit record.
 - Treat AXON and AI values as suggestions until sales verifies them.

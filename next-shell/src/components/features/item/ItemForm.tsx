@@ -580,7 +580,10 @@ export function ItemForm({
           />
         )}
 
-        <div className="grid grid-cols-12 gap-6 items-stretch">
+        <div
+          className="grid gap-4 items-stretch"
+          style={{ gridTemplateColumns: '1fr 2fr max-content' }}
+        >
           <ItemLeftColumn
             control={control}
             register={register}

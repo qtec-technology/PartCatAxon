@@ -244,19 +244,15 @@ export default function ItemPage() {
 
     if (loading) {
         return (
-            <div className="page-stack" style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--muted-fg)' }}>
-                        Loading Item…
-                    </div>
-                </div>
+            <div className="page-loader-overlay">
+                <span className="page-loader-icon hourglass-spin" aria-hidden="true">⏳</span>
+                <span className="page-loader-text">Loading Item…</span>
             </div>
         );
     }
 
     return (
-        <div className="h-full overflow-y-auto">
+        <div className="min-h-full">
             <ItemForm
                 mode={mode}
                 initialData={data}

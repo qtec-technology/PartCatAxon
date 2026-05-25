@@ -1,10 +1,11 @@
 # Bulk Cost Calculation Formula Reference
 
-Last updated: 2026-05-08
+Last updated: 2026-05-20
 
-This document is the authoritative formula reference for Bulk Cost Allocation.
-It is derived from the Excel golden sample and reconciled against the current
-implementation in `next-shell/src/features/bulk-cost/bulk-cost.calc.ts`.
+This document is the formula reference for Bulk Cost Allocation. It is derived
+from the Excel golden sample and reconciled against the current backend
+implementation in `server/src/services/bulk-cost-calculation.service.ts`, which
+delegates line-level Term math to `server/src/services/calculation.service.ts`.
 
 ---
 
@@ -321,17 +322,17 @@ Implementation ownership as of 2026-05-19:
   enforces one supplier/currency per run as calculation errors, supports
   included/excluded lines, last-line residual rounding, and VAT as a diagnostic
   post-sale-price amount.
-- The Next.js frontend pure function `next-shell/src/features/bulk-cost/bulk-cost.calc.ts`
-  remains the interactive preview path until UI CAL is wired to a backend
-  calculate endpoint.
+- The Next.js frontend calls `POST /api/bulk-cost/calculate` for interactive
+  CAL preview. `next-shell/src/features/bulk-cost/bulk-cost.calc.ts` remains a
+  legacy/test fixture and formula-audit comparison helper, not the source of
+  truth.
 - Term calculation remains backend source of truth in
   `server/src/services/calculation.service.ts`.
 - `next-shell/src/features/bulk-cost/bulk-cost.formula-audit.ts` is a
   temporary guard that compares frontend Bulk Cost output against Term/Excel
   formula steps for each line. It does not replace the source of truth.
-- Before Awarded automation or SAP writes, UI preview should be switched to call
-  the backend Bulk Cost calculation path so preview, save, automation, and
-  reverse mapping cannot drift.
+- Before Awarded automation or SAP writes, keep preview, save, automation, and
+  reverse mapping on the same backend calculation path so they cannot drift.
 
 ### 5.1 Temporary Formula Audit
 
@@ -444,15 +445,22 @@ and By Lot / Batch fees that generate PartCatalog add-item candidates.
 Confirmed 2026-05-08 for Phase 3A:
 
 1. Bulk Cost persistence lives in `PART_CATALOG_AIX`.
-2. Manual save revision creates a new `BulkCostRun` revision plus
-   `BulkCostLine` line snapshots. It does not create `DraftItem` / `DraftTerm`,
-   and it still does not write to `@POITM` / `@PITM1`.
+2. Manual save revision creates a new `BulkCostRun` revision plus one
+   `DraftItem` and one `DraftTerm` snapshot per saved/selected line. `BulkCostLine`
+   is not part of the live Phase 3A schema, and the save still does not write to
+   `@POITM` / `@PITM1`. DraftTerm snapshots persist the backend-calculated OP,
+   freight/zone, CIF, duty, weight, QLC, markup, and sales-price fields needed
+   for revision review.
 3. Normal authenticated domain/catalog users can save `DRAFT` runs. No manager
    approval gate is required before draft snapshot save.
 4. AXON matching hints such as `UniqueLineID`, `MatchMethod`, and
    `MatchConfidence` are persisted as hidden technical fields. Sales users do
    not need to confirm these hints in the UI.
-5. Lifecycle statuses are `DRAFT -> QUOTED -> AWARDED -> REVERSE_MAPPED -> LOST -> ARCHIVED`.
+5. Manual UI must expose line-level calculation inputs that can change the
+   Term result: Lead Time, MOQ, Zone Rate, ET %, ETC/Misc Tax, and SCC. These
+   are not AXON-only hidden fields in manual mode; sales can edit them before
+   CAL/Save Revision.
+6. Lifecycle statuses are `DRAFT -> QUOTED -> AWARDED -> REVERSE_MAPPED -> LOST -> ARCHIVED`.
    Phase 3A starts with `DRAFT`; Award/Reverse-map endpoints are deferred.
 
 Open after Phase 3A:

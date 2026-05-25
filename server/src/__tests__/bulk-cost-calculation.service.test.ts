@@ -138,4 +138,28 @@ describe('calculateBulkCostPreview', () => {
         expect(finalResult.op1Source).toBe(17.5);
         expect(finalResult.roundUp).not.toBe(1);
     });
+
+    it('recalculates only the lines in the save payload so unselected UI lines are not persisted', () => {
+        const selected = makeLine({ lineKey: 'SELECTED', vendorCode: 'V-001', currency: 'USD' });
+        const unselected = makeLine({ lineKey: 'UNSELECTED', vendorCode: 'V-002', currency: 'EUR' });
+        const draft = buildAuthoritativeBulkCostDraft({
+            supplierCode: 'V-001',
+            supplierName: 'Vendor',
+            status: 'DRAFT',
+            costs: { freight: 100, customs: 20, wireTT: 3, currency: 'USD', exchangeRate: 35, orderTerm: 'FCA', shipModeNo: 1 },
+            originLines: [selected, unselected],
+            latestLines: [selected, unselected],
+            preview: { totalLines: 1, lines: [] },
+            lines: [{
+                lineKey: 'SELECTED',
+                origin: selected,
+                latest: selected,
+                result: { finalResult: {} },
+            }],
+        } satisfies SaveBulkCostRunInput);
+
+        expect(draft.preview.totalLines).toBe(1);
+        expect(draft.preview.runWarnings).toHaveLength(0);
+        expect(draft.lines.map((line) => line.lineKey)).toEqual(['SELECTED']);
+    });
 });

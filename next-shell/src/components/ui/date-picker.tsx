@@ -25,6 +25,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
     const generatedId = React.useId();
     const buttonId = String(id || generatedId);
     const buttonName = buttonId;
+
     // Parse initial date safely
     const dateValue = React.useMemo(() => {
         if (!value) return undefined;
@@ -42,7 +43,6 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
     const handleSelect = (d: Date | undefined) => {
         setSelectedDate(d);
         if (d) {
-            // Format as YYYY-MM-DD for consistency with input type="date"
             onChange(format(d, 'yyyy-MM-dd'));
         } else {
             onChange('');
@@ -59,13 +59,13 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
                     variant={"outline"}
                     disabled={disabled}
                     className={cn(
-                        "justify-start text-left font-normal bg-white border-gray-300 text-xs px-2 py-1 h-auto",
+                        "justify-start text-left font-normal bg-white border-gray-400 text-xs px-2 py-1 h-auto w-full",
                         !value && "text-muted-foreground",
                         "focus:border-[#2264A0] focus:ring-1 focus:ring-[#2264A0]",
                         className
                     )}
                 >
-                    <CalendarIcon className="mr-2 h-3 w-3 opacity-50" />
+                    <CalendarIcon className="mr-1.5 h-3 w-3 shrink-0 opacity-70 text-gray-600" />
                     {dateValue ? format(dateValue, "dd-MMM-yyyy") : <span>{placeholder}</span>}
                 </Button>
             </PopoverTrigger>

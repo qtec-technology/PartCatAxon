@@ -90,6 +90,114 @@ function booleanPermission(permissions: Record<string, unknown> | undefined, key
     return keys.some((key) => permissions[key] === true || String(permissions[key]).toLowerCase() === 'true');
 }
 
+function headerValue(req: Request, headerName: string): string {
+    const normalizedName = String(headerName || '').trim().toLowerCase();
+    if (!normalizedName) return '';
+    const value = req.headers[normalizedName];
+    if (Array.isArray(value)) return String(value[0] || '').trim();
+    return String(value || '').trim();
+}
+
+function splitDomainUser(rawUser: string): { domain: string; username: string } {
+    const raw = String(rawUser || '').trim();
+    if (!raw) return { domain: '', username: '' };
+    if (raw.includes('\\')) {
+        const [domain, username] = raw.split('\\');
+        return { domain: domain || '', username: username || '' };
+    }
+    if (raw.includes('@')) {
+        const [username, domain] = raw.split('@');
+        return { domain: domain || '', username: username || '' };
+    }
+    return { domain: '', username: raw };
+}
+
+function splitDisplayName(displayName: string, username: string): { firstname: string; lastname: string } {
+    const parts = String(displayName || username || '').trim().split(/\s+/).filter(Boolean);
+    return {
+        firstname: parts[0] || username || '',
+        lastname: parts.slice(1).join(' '),
+    };
+}
+
+interface ParsedHeaderIdentity {
+    username: string;
+    firstname: string;
+    lastname: string;
+    displayName: string;
+    email: string;
+    domain: string;
+    groups: string[];
+    permissions?: Record<string, unknown>;
+}
+
+function identityFromProxyHeaders(req: Request): ParsedHeaderIdentity | null {
+    if (!env.AUTH_TRUST_PROXY_HEADERS) return null;
+    const rawUser = headerValue(req, env.AUTH_PROXY_USER_HEADER);
+    if (!rawUser) return null;
+
+    const split = splitDomainUser(rawUser);
+    const username = split.username;
+    if (!username) return null;
+
+    const displayName = headerValue(req, env.AUTH_PROXY_NAME_HEADER) || username;
+    const nameParts = splitDisplayName(displayName, username);
+    const groups = [
+        ...collectAuthGroups({
+            groups: headerValue(req, env.AUTH_PROXY_GROUPS_HEADER),
+            roles: headerValue(req, env.AUTH_PROXY_ROLES_HEADER),
+        }),
+    ];
+
+    return {
+        username,
+        firstname: nameParts.firstname,
+        lastname: nameParts.lastname,
+        displayName,
+        email: headerValue(req, env.AUTH_PROXY_EMAIL_HEADER),
+        domain: split.domain,
+        groups,
+    };
+}
+
+function applyParsedIdentity(identity: ParsedHeaderIdentity): {
+    username: string;
+    firstname: string;
+    lastname: string;
+    displayName: string;
+    email: string;
+    domain: string;
+    isUser: boolean;
+    isManager: boolean;
+    isSupervisor: boolean;
+} {
+    const isManager =
+        booleanPermission(identity.permissions, ['is_manager', 'manager', 'pcat_manager']) ||
+        groupMatches(identity.groups, env.AUTH_MANAGER_GROUPS);
+    const isSupervisor =
+        booleanPermission(identity.permissions, ['is_supervisor', 'supervisor', 'pcat_supervisor']) ||
+        groupMatches(identity.groups, env.AUTH_SUPERVISOR_GROUPS);
+    let isUser =
+        booleanPermission(identity.permissions, ['is_user', 'part_catalog_user', 'pcat_user']) ||
+        groupMatches(identity.groups, env.AUTH_USER_GROUPS);
+
+    if (identity.username !== 'Guest' && env.AUTH_ALLOW_DOMAIN_USERS) {
+        isUser = true;
+    }
+
+    return {
+        username: identity.username,
+        firstname: identity.firstname,
+        lastname: identity.lastname,
+        displayName: identity.displayName,
+        email: identity.email,
+        domain: identity.domain,
+        isUser,
+        isManager,
+        isSupervisor,
+    };
+}
+
 // Dev-mode: cache local user info (no need to look up every request)
 let _cachedDevUser: { username: string; domain: string } | null = null;
 
@@ -108,17 +216,15 @@ function getDevUser(): { username: string; domain: string } {
 /**
  * Authentication Middleware
  *
- * Production (IIS + Windows Authentication):
- *   - IIS handles Windows Authentication via Negotiate/NTLM
- *   - Win Auth data comes as JSON in x-iisnode-auth-user header
- *     Format: { username, firstname, lastname, displayName, email, full_user, permissions, database_name }
- *   - Fallback: x-remote-user header (DOMAIN\username format)
+ * Production:
+ *   - Preferred: trusted reverse proxy headers from Nginx/SSO layer:
+ *     x-forwarded-user, x-forwarded-email, x-forwarded-name, x-forwarded-groups.
  *
  * Development:
  *   - Uses Node.js os.userInfo() (cached; no child process spawning)
  *
  * Role check:
- *   - Production: uses Windows Auth permissions only
+ *   - Production: uses proxy headers and configured group headers
  *   - Non-production: uses ROLE_MANAGERS / ROLE_SUPERVISORS env vars
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -134,49 +240,18 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
         let isSupervisor = false;
 
         if (env.isProd) {
-            // ── Production: Read from Windows Authentication headers ──
-            const authHeaderJson = req.headers['x-iisnode-auth-user'] as string || '';
-
-            if (authHeaderJson) {
-                try {
-                    const parsed = JSON.parse(authHeaderJson) as Record<string, unknown>;
-                    username = String(parsed.username || '').trim() || 'Guest';
-                    firstname = String(parsed.firstname || '').trim();
-                    lastname = String(parsed.lastname || '').trim();
-                    displayName = String(parsed.displayName || '').trim() || username;
-                    email = String(parsed.email || '').trim();
-                    const fullUser = String(parsed.full_user || '').trim();
-                    domain = fullUser.includes('\\') ? fullUser.split('\\')[0] : '';
-
-                    const permissions = parsed.permissions && typeof parsed.permissions === 'object'
-                        ? parsed.permissions as Record<string, unknown>
-                        : undefined;
-                    const groups = collectAuthGroups(parsed);
-
-                    isManager =
-                        booleanPermission(permissions, ['is_manager', 'manager', 'pcat_manager']) ||
-                        groupMatches(groups, env.AUTH_MANAGER_GROUPS);
-                    isSupervisor =
-                        booleanPermission(permissions, ['is_supervisor', 'supervisor', 'pcat_supervisor']) ||
-                        groupMatches(groups, env.AUTH_SUPERVISOR_GROUPS);
-                    isUser =
-                        booleanPermission(permissions, ['is_user', 'part_catalog_user', 'pcat_user']) ||
-                        groupMatches(groups, env.AUTH_USER_GROUPS);
-                } catch {
-                    // JSON parse failed; fall through to x-remote-user.
-                }
-            }
-
-            // Fallback: x-remote-user header (DOMAIN\username)
-            if (username === 'Guest') {
-                const remoteUser = req.headers['x-remote-user'] as string || '';
-                if (remoteUser) {
-                    const parts = remoteUser.split('\\');
-                    domain = parts.length > 1 ? parts[0] : '';
-                    username = parts.length > 1 ? parts[1] : parts[0];
-                    displayName = username;
-                    firstname = username;
-                }
+            const proxyIdentity = identityFromProxyHeaders(req);
+            if (proxyIdentity) {
+                const applied = applyParsedIdentity(proxyIdentity);
+                username = applied.username;
+                firstname = applied.firstname;
+                lastname = applied.lastname;
+                displayName = applied.displayName;
+                email = applied.email;
+                domain = applied.domain;
+                isUser = applied.isUser;
+                isManager = applied.isManager;
+                isSupervisor = applied.isSupervisor;
             }
 
             if (username !== 'Guest' && env.AUTH_ALLOW_DOMAIN_USERS) {
@@ -307,4 +382,3 @@ export function requireManager(req: Request, res: Response, next: NextFunction):
     }
     next();
 }
-

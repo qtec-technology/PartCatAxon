@@ -75,6 +75,7 @@ type MockQuoteSeed = {
   currency: string;
   orderTerm: string;
   location: string;
+  subLocation?: string;
   shipModeNo: number;
   deliveryLeadTime: string;
   itemGroup?: string;
@@ -83,6 +84,8 @@ type MockQuoteSeed = {
   countryOfOrigin?: string;
   importDutyPercent?: number;
   importPermit?: string;
+  permitType?: string;
+  customerStockCode?: string;
   shelfLifeRequire?: string;
   paymentTerms?: string;
   validityDays?: string;
@@ -107,6 +110,7 @@ type MockLineSeed = {
   itemGroup?: string;
   itemCategory?: string;
   itemCode?: string;
+  customerStockCode?: string;
   supplierOrderCode?: string;
   uom?: string;
   currency?: string;
@@ -116,8 +120,10 @@ type MockLineSeed = {
   deliveryLeadTime?: string;
   orderTerm?: string;
   location?: string;
+  subLocation?: string;
   shipModeNo?: number;
   importPermit?: string;
+  permitType?: string;
   shelfLifeRequire?: string;
   importDutyPercent?: number;
   termId?: number | null;
@@ -157,6 +163,7 @@ function buildQuote(seed: MockQuoteSeed, quoteIndex: number): BulkCostMockQuote 
     remark: seed.costs.remark,
     orderTerm: seed.orderTerm,
     location: seed.location,
+    subLocation: seed.subLocation ?? '',
     shipModeNo: seed.shipModeNo,
     contactPerson: seed.contactPerson,
     saleIncharge: seed.saleIncharge,
@@ -167,6 +174,7 @@ function buildQuote(seed: MockQuoteSeed, quoteIndex: number): BulkCostMockQuote 
     const currency = line.currency ?? seed.currency;
     const orderTerm = line.orderTerm ?? seed.orderTerm;
     const location = line.location ?? seed.location;
+    const subLocation = line.subLocation ?? seed.subLocation ?? '';
     const shipModeNo = line.shipModeNo ?? seed.shipModeNo;
     const qty = line.qty;
     const amount = Number((qty * line.unitPrice).toFixed(6));
@@ -188,6 +196,7 @@ function buildQuote(seed: MockQuoteSeed, quoteIndex: number): BulkCostMockQuote 
       no,
       itemGroup: line.itemGroup ?? seed.itemGroup ?? '104',
       itemCategory: line.itemCategory ?? seed.itemCategory ?? 'Industrial',
+      customerStockCode: line.customerStockCode ?? seed.customerStockCode ?? '',
       itemCode: line.itemCode ?? '',
       sapDescription: line.sapDescription,
       manufacturer: line.manufacturer,
@@ -207,7 +216,9 @@ function buildQuote(seed: MockQuoteSeed, quoteIndex: number): BulkCostMockQuote 
       deliveryLeadTime: line.deliveryLeadTime ?? seed.deliveryLeadTime,
       orderTerm,
       location,
+      subLocation,
       importPermit: line.importPermit ?? seed.importPermit ?? 'No',
+      permitType: line.permitType ?? seed.permitType ?? '',
       shelfLifeRequire: line.shelfLifeRequire ?? seed.shelfLifeRequire ?? 'No',
       itemWeightPerEach: itemWeight,
       dimensionWeightPerEach: dimWeight,

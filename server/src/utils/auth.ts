@@ -4,7 +4,7 @@ import type { Request } from 'express';
  * Get the firstname to save as "Updatedby" in the database.
  *
  * Priority:
- *   1. authUser.firstname (from Windows Authentication — preferred)
+ *   1. authUser.firstname (from trusted proxy auth headers — preferred)
  *   2. First word of authUser.displayName (fallback)
  *   3. authUser.username (last resort)
  *   4. 'System'

@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — PartCatalog Technical Architecture
 
-ปรับปรุงล่าสุด: 19 พฤษภาคม 2026 (architecture stabilization reset)
+ปรับปรุงล่าสุด: 22 พฤษภาคม 2026 (Cost Workspace decision)
 เจ้าของ: อัปเดตเมื่อมี architecture decision ใหม่
 
 ---
@@ -12,6 +12,8 @@ Before adding AXON/Bulk Cost features, read these reset documents:
 - `.docs/EXECUTIVE_ALIGNMENT.md` — executive direction from meeting notes
 - `.docs/AXON_HANDOFF_CONTRACT.md` — `ChainId` shared DB/view handoff from
   AXON final comparison to PartCatalogAxon
+- `.docs/COST_WORKSPACE_ARCHITECTURE.md` — Cost Workspace decision: Single +
+  Bulk, Manual + AXON_AWARDED, draft/RAM vs immutable snapshot revisions
 - `.docs/DEPLOYMENT_RUNBOOK.md` — Nginx/NSSM/subdomain/internal CA target
 - `.docs/MODULE_BOUNDARIES.md` — module ownership and automation-ready operation
   layer target
@@ -24,9 +26,14 @@ PartCatalogAxon = Kim side, costing/calculation/snapshot/Item-Term bridge
 ChainId = shared correlation id
 ```
 
-PartCatalogAxon must not rebuild the AXON pipeline. It consumes AXON final
-comparison output through a read-only shared DB/view/module handoff and clones
-that data into PartCatalogAxon snapshots before calculation.
+PartCatalogAxon must not rebuild the AXON pipeline. It consumes only AXON
+awarded supplier/line output through a read-only shared DB/view/module handoff
+and clones that data into Cost Workspace snapshots before calculation.
+
+Cost Workspace is the broader target feature. It supports both `SINGLE` and
+`BULK` calculation modes, and both `MANUAL` and `AXON_AWARDED` sources. Manual
+is implemented first to verify formulas, required Item/Term columns, and
+snapshot behavior before the real AXON view is available.
 
 Future automation depends on module boundaries and backend operations, not UI
 click automation. Read `.docs/AUTOMATION_READINESS.md` before designing any AI,
@@ -63,7 +70,7 @@ Browser
     │   ├── /term/[itemId]/edit   Edit term
     │   ├── /term/new             New Term page
     │   ├── /term/preview         Bulk Cost term preview (localStorage)
-    │   ├── /bulk-cost            Bulk Cost (SupplierSelection → BulkCostWorkspace)
+    │   ├── /bulk-cost            Current Cost Workspace surface (legacy route name)
     │   └── /api-health           Proxy health check page
     │
     └── /api/* (BFF route handler)
@@ -152,15 +159,21 @@ relative paths that can break under Webpack/Turbopack resolution.
 
 ### Production
 
-- Windows Authentication via IIS headers
-- `X-Forwarded-User` / `X-Forwarded-Email` headers จาก IIS
-- ไม่ fallback ไป env vars ใน production
+- Runtime is behind Nginx / a trusted reverse proxy.
+- The proxy/SSO layer must authenticate the domain user before forwarding to
+  Express and may set:
+  - `x-forwarded-user` (`DOMAIN\username` or `username@domain`)
+  - `x-forwarded-email`
+  - `x-forwarded-name`
+  - `x-forwarded-groups` / `x-forwarded-roles`
+- Express reads only trusted proxy identity headers in production.
+- ไม่ fallback ไป dev env vars ใน production
 
 ### Permission Model
 
 ```typescript
 // Any authenticated domain user (or catalog user) can access normal work
-isUser = true  // domain user on Windows Auth, or catalog user in dev
+isUser = true  // authenticated proxy user, configured catalog group, or catalog user in dev
 
 // Elevated actions (create/edit/delete item, delete term, admin):
 hasElevatedAccess = isManager || isSupervisor
@@ -232,13 +245,16 @@ hasElevatedAccess = isManager || isSupervisor
 - **Important:** default param `attachments: initialAttachments = EMPTY_ATTACHMENTS`
   (ต้องใช้ module-level constant ไม่ใช่ `[]` literal เพราะทำให้ infinite loop)
 
-### BulkCostWorkspace (`next-shell/src/features/bulk-cost/BulkCostWorkspace.tsx`)
+### Cost Workspace / BulkCostWorkspace (`next-shell/src/features/bulk-cost/BulkCostWorkspace.tsx`)
 
 - ~2000 lines; รับ `supplierCode`, `supplierName`, `onBack` props
 - State: `allLines`, `costs`, `preview`, `previewEdits`, `sourceView`
 - Views: Origin (read-only) / Latest (editable) / Changes (diff)
 - Steps: Step 1 (cost bar) → Step 2 (source lines) → Step 3 (result review)
 - ใช้ `bulk-cost.preview.ts` เพื่อส่งข้อมูลไป `/item/preview` และ `/term/preview` tabs
+- Architecture target is Cost Workspace, not Bulk-only. The current route/code
+  names may stay temporarily while the data model moves toward
+  `CostWorkspaceRun`, `CostWorkspaceLine`, and `CostWorkspaceSnapshot`.
 
 ### bulk-cost page (`next-shell/src/app/bulk-cost/page.tsx`)
 
@@ -326,10 +342,10 @@ move AXON's Python orchestrator into PartCatalogAxon.
 | Layer | Current | Target |
 |---|---|---|
 | Frontend | Next.js + Express BFF | Next.js **Server Actions** + RSC (ตัด Express ออก) |
-| Auth | Mock session / Windows IIS | **Better Auth** (JWT + Org plugin + RBAC) |
+| Auth | Mock session / legacy Windows-bound auth | **Better Auth** (JWT + Org plugin + RBAC) |
 | Data layer | Raw mssql + Repository pattern | **Prisma ORM** (30+ models) + raw mssql escape hatch สำหรับ SP |
 | AI | ไม่มี | **Python AXON orchestrator** (OpenAI + Gemini Vision + Claude CLI + Qdrant) |
-| Deploy | npm run dev / IIS | **NSSM daemon + Nginx reverse proxy** + standalone Next.js |
+| Deploy | npm run dev / legacy host | **NSSM daemon + Nginx reverse proxy** + standalone Next.js |
 
 ### Target Application Flow
 
@@ -347,7 +363,6 @@ Python AXON Orchestrator (NSSM daemon, AXON side / Pi-Jo ownership)
 ├── AI: OpenAI GPT-4.1/5.4 + Gemini 2.5 + Claude Sonnet 4
 ├── Vector: Qdrant (192.168.2.54:6333)
 └── Publish final comparison by ChainId
-    (legacy alternative: POST extraction payload only if Pi-Jo chooses API push)
 
 Nginx (reverse proxy)
 ├── / → Next.js standalone (3010)
@@ -369,7 +384,12 @@ user → belongs to → organization
 // Multi-tenant prep: organization = business unit
 ```
 
-### Prisma Schema (เป้าหมาย — Bulk Cost tables)
+### Prisma Schema (superseded target — use Cost Workspace naming)
+
+The old Bulk Cost table naming below remains useful as historical context only.
+The current rebuild target is documented in
+`.docs/COST_WORKSPACE_ARCHITECTURE.md` and should prefer
+`CostWorkspaceRun`, `CostWorkspaceLine`, and `CostWorkspaceSnapshot`.
 
 ```prisma
 model BulkCostRun {
@@ -407,8 +427,10 @@ Client → API: POST /api/bulk-cost/runs
 
 **Note:** `bulk-cost.calc.ts` (pure function) ยังคงใช้ได้ใน Server Action โดยตรง ไม่ต้องเขียนใหม่
 
-Awarded reverse mapping is deferred. Phase 3A must not create Draft Item/Term or
-write `@POITM` / `@PITM1`; the existing-term INSERT-vs-UPDATE rule is still open.
+Awarded reverse mapping is deferred. Phase 3A creates only AIX
+`DraftItem` / `DraftTerm` snapshot rows under `BulkCostRun`; it must not create
+real Item/Term master records or write `@POITM` / `@PITM1`. The existing-term
+INSERT-vs-UPDATE rule is still open.
 
 ---
 

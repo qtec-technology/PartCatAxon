@@ -43,7 +43,7 @@ export const SHIP_MODE_LABELS: Record<number, string> = {
 };
 
 export function formatShipMode(shipModeNo: number): string {
-  return SHIP_MODE_LABELS[shipModeNo] ?? (shipModeNo ? String(shipModeNo) : '-');
+  return SHIP_MODE_LABELS[shipModeNo] ?? (shipModeNo > 0 ? String(shipModeNo) : '-');
 }
 
 export interface AllocationLineSource {
@@ -59,6 +59,7 @@ export interface AllocationLineSource {
   no: number;                      // A6: NO.
   itemGroup: string;               // User-confirmed ItemGroupCode for new item code generation
   itemCategory: string;            // Item master category candidate
+  customerStockCode: string;       // Customer stock code candidate
   sapDescription: string;          // B6: SAP PART DESCRIPTION
   manufacturer: string;            // C6: MANUFACTURE
   mfgPartNumber: string;           // D6: MFG P/N
@@ -81,7 +82,11 @@ export interface AllocationLineSource {
   deliveryLeadTime: string;        // W6: Delivery Lead time
   orderTerm: string;               // X6: Purchase Term (Exwork/FCA/FAS/FOB/CIF/CFR/DDP)
   location: string;                // Y6: Term Location
+  subLocation: string;             // Purchase Sub Location
+  salesTerm?: string;              // Sales Term
+  salesSubLocation?: string;       // Sales Sub Location
   importPermit: string;            // Z6: Import Permit
+  permitType: string;              // Permit Type
   shelfLifeRequire: string;        // AA6: Shelf Life Require
 
   // ── PART 2 columns AC–AK: Weight & Ratio ──────────────────────────────────
@@ -181,6 +186,7 @@ export interface BulkCostInput {
   /** Shipping context — same for all lines in one quotation run */
   orderTerm: string;      // e.g. 'Exwork', 'FOB', 'CIF'
   location: string;       // Ship From — e.g. 'US', 'California'
+  subLocation: string;    // Purchase Sub Location filtered by Term Location
   shipModeNo: number;     // 1=Air FWD, 2=Sea, 3=Truck, 4=QTEC-MC, 5=QTEC-Truck, 6=Air COUR
 
   /** Contact info — read-only display in Step 1 header */
@@ -399,13 +405,14 @@ export const EMPTY_BULK_COST_INPUT: BulkCostInput = {
   freight: 0,
   customs: 0,
   wireTT: 0,
-  currency: 'THB',
+  currency: '',
   exchangeRate: 1,
   referenceNo: '',
   remark: '',
-  orderTerm: 'Exwork',
+  orderTerm: '',
   location: '',
-  shipModeNo: 5,
+  subLocation: '',
+  shipModeNo: -1,
   contactPerson: '',
   saleIncharge: '',
 };

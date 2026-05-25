@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
-import { Loader2, Search, X } from 'lucide-react';
+import { Building2, ChevronRight, Loader2, Search, X } from 'lucide-react';
 import { lookupApi, type VendorLookupOption } from '@/services/lookup.api';
 
 interface SupplierSelectionProps {
@@ -46,7 +46,7 @@ export function SupplierSelection({ onSelectSupplier }: SupplierSelectionProps) 
 
   const handleSelect = useCallback((vendor: VendorLookupOption) => {
     setSelected(vendor);
-    setQuery(`${vendor.cardCode} - ${vendor.cardName}`);
+    setQuery(vendor.cardName);   // show name only — user doesn't need to read the code
     setOpen(false);
   }, []);
 
@@ -82,6 +82,14 @@ export function SupplierSelection({ onSelectSupplier }: SupplierSelectionProps) 
   return (
     <div className="page-stack bulk-cost-supplier-page">
       <section className="panel supplier-search-panel">
+        <div className="supplier-selection-copy">
+          <div>
+            <p className="eyebrow">Manual Bulk Cost</p>
+            <h2>Select supplier to start a blank run</h2>
+          </div>
+          <span>Search vendor master, then open an empty workspace for manual line entry.</span>
+        </div>
+
         <div className="supplier-search-bar">
           <Search size={18} aria-hidden="true" />
           <div
@@ -103,7 +111,7 @@ export function SupplierSelection({ onSelectSupplier }: SupplierSelectionProps) 
                 autoComplete="off"
                 className="vendor-combobox-input supplier-search-input"
                 value={query}
-                placeholder={loading ? 'Loading suppliers...' : 'Search supplier code or name'}
+                placeholder={loading ? 'Loading suppliers...' : 'ค้นหาชื่อหรือรหัสซัพพลายเออร์...'}
                 disabled={loading}
                 onChange={handleInputChange}
                 onFocus={handleInputFocus}
@@ -148,8 +156,9 @@ export function SupplierSelection({ onSelectSupplier }: SupplierSelectionProps) 
                       handleSelect(vendor);
                     }}
                   >
-                    <span className="vendor-code">{vendor.cardCode}</span>
+                    <Building2 size={14} className="vendor-option-icon" aria-hidden="true" />
                     <span className="vendor-name">{vendor.cardName}</span>
+                    <span className="vendor-code">{vendor.cardCode}</span>
                   </li>
                 ))}
               </ul>
@@ -160,14 +169,24 @@ export function SupplierSelection({ onSelectSupplier }: SupplierSelectionProps) 
             )}
           </div>
 
+          {/* Selected supplier chip */}
+          {selected && (
+            <div className="bulk-supplier-selected-chip">
+              <Building2 size={13} aria-hidden="true" />
+              <span className="bulk-supplier-chip-name">{selected.cardName}</span>
+              <span className="bulk-supplier-chip-code">{selected.cardCode}</span>
+            </div>
+          )}
+
           <button
             type="button"
-            className="primary-button compact-btn"
+            className="primary-button compact-btn bulk-supplier-open-btn"
             disabled={!selected}
             onClick={handleOpen}
-            title="Open a blank Bulk Cost workspace"
+            title="Open a blank manual Bulk Cost workspace"
           >
             Open Workspace
+            <ChevronRight size={15} aria-hidden="true" />
           </button>
         </div>
 

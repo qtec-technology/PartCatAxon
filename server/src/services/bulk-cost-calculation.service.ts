@@ -19,6 +19,7 @@ interface BulkCostInput {
     remark: string;
     orderTerm: string;
     location: string;
+    subLocation: string;
     shipModeNo: number;
     contactPerson: string;
     saleIncharge: string;
@@ -46,6 +47,7 @@ interface AllocationLineSource {
     deliveryLeadTime: string;
     orderTerm: string;
     location: string;
+    subLocation: string;
     importPermit: string;
     shelfLifeRequire: string;
     itemWeightPerEach: number | null;
@@ -126,6 +128,7 @@ interface FinalResultColumns {
     op1: number;
     exworkCase: number;
     op2: number;
+    dimWeight: number;
     ins: number;
     frQTEC: number;
     frZoneRate: number;
@@ -144,6 +147,7 @@ interface FinalResultColumns {
     preQLC: number;
     stk: number;
     qlc: number;
+    qlc2: number;
     spk: number;
     qocVal: number;
     totalQLC: number;
@@ -406,9 +410,9 @@ export function calculateBulkCostPreview(
 }
 
 export function buildAuthoritativeBulkCostDraft(input: SaveBulkCostRunInput): SaveBulkCostRunInput {
-    const sourceLines = input.latestLines.length > 0
-        ? input.latestLines
-        : input.lines.map((line) => line.latest);
+    const sourceLines = input.lines.length > 0
+        ? input.lines.map((line) => line.latest)
+        : input.latestLines;
     const preview = calculateBulkCostPreview({
         costs: input.costs,
         lines: sourceLines,
@@ -464,14 +468,17 @@ function computeFinalResult(
     const docFeeTotal = round6(
         line.docFee.coc + line.docFee.millCert + line.docFee.testCert + docCOO + line.docFee.anyOther,
     );
+    const orderTerm = line.orderTerm || costs.orderTerm;
+    const location = line.location || costs.location;
+    const shipModeNo = line.shipModeNo || costs.shipModeNo;
     const calculated = calculate({
         productCost: line.unitPrice,
         pkh: pkhEach,
         soc: socEach,
         docFees: docFeeTotal,
         exchangeRate: costs.exchangeRate,
-        orderTerm: costs.orderTerm,
-        shipModeNo: costs.shipModeNo,
+        orderTerm,
+        shipModeNo,
         dimUnit: line.dimUnit,
         length: line.length,
         width: line.width,
@@ -500,8 +507,8 @@ function computeFinalResult(
 
     return {
         supplierName: line.vendorName,
-        purchaseOrderTerm: costs.orderTerm,
-        termLocation: costs.location,
+        purchaseOrderTerm: orderTerm,
+        termLocation: location,
         productCost: line.unitPrice,
         pkh: pkhEach,
         soc: socEach,
@@ -528,6 +535,7 @@ function computeFinalResult(
         op1: calculated.U_OP_SUM,
         exworkCase,
         op2: calculated.U_OP_THB,
+        dimWeight: calculated.U_DimWeight,
         ins: calculated.U_INS,
         frQTEC: freightEach,
         frZoneRate: line.zoneRate,
@@ -546,6 +554,7 @@ function computeFinalResult(
         preQLC: calculated.U_preQLC,
         stk: calculated.U_STK,
         qlc: calculated.U_QLC,
+        qlc2: calculated.U_QLC2,
         spk: line.sspk,
         qocVal: line.qoc,
         totalQLC: calculated.U_TotalPrice,
@@ -568,9 +577,10 @@ function normalizeCosts(raw: Record<string, unknown>): BulkCostInput {
         exchangeRate: numberValue(raw.exchangeRate, 1),
         referenceNo: text(raw.referenceNo),
         remark: text(raw.remark),
-        orderTerm: text(raw.orderTerm) || 'Exwork',
+        orderTerm: text(raw.orderTerm),
         location: text(raw.location),
-        shipModeNo: intValue(raw.shipModeNo, 5),
+        subLocation: text(raw.subLocation),
+        shipModeNo: intValue(raw.shipModeNo, -1),
         contactPerson: text(raw.contactPerson),
         saleIncharge: text(raw.saleIncharge),
     };
@@ -607,6 +617,7 @@ function normalizeLine(raw: Record<string, unknown>): AllocationLineSource {
         deliveryLeadTime: text(raw.deliveryLeadTime),
         orderTerm: text(raw.orderTerm),
         location: text(raw.location),
+        subLocation: text(raw.subLocation),
         importPermit: text(raw.importPermit),
         shelfLifeRequire: text(raw.shelfLifeRequire),
         itemWeightPerEach: nullableNumber(raw.itemWeightPerEach),
@@ -625,7 +636,7 @@ function normalizeLine(raw: Record<string, unknown>): AllocationLineSource {
         saleConversion: numberValue(raw.saleConversion, 1),
         moq: nullableNumber(raw.moq),
         insPercent: numberValue(raw.insPercent),
-        shipModeNo: intValue(raw.shipModeNo, 5),
+        shipModeNo: intValue(raw.shipModeNo, -1),
         freightRate: numberValue(raw.freightRate),
         dimUnit: intValue(raw.dimUnit, 1),
         length: numberValue(raw.length),

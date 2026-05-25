@@ -1,21 +1,42 @@
 # BULK_COST.md — Bulk Cost Allocation Feature Guide
 
-ปรับปรุงล่าสุด: 13 พฤษภาคม 2026 (updated)
+ปรับปรุงล่าสุด: 22 พฤษภาคม 2026 (Cost Workspace decision)
 **Agent: อัปเดตไฟล์นี้เมื่อมีการเปลี่ยนแปลง Bulk Cost ทุกชนิด**
 
 ---
 
 ## 1. สถานะปัจจุบัน
 
-**Phase 3A Live** — UI พร้อม, DB connected, mock fallbacks removed
+**Phase 3A Live / Rebuild Decision Active** — current implementation still uses
+Bulk Cost route/code names, but the target architecture is now **Cost
+Workspace**. Read `.docs/COST_WORKSPACE_ARCHITECTURE.md` before changing schema,
+AXON handoff, or finalization flow.
+
+### 1.1 Cost Workspace Decision
+
+Bulk Cost is no longer the full product boundary. It is one calculation mode
+inside Cost Workspace.
+
+| Decision | Current answer |
+|---|---|
+| Product boundary | `Cost Workspace` |
+| Calculation modes | `SINGLE` + `BULK` in one editor |
+| Data sources | `AXON_AWARDED` primary, `MANUAL` add-on |
+| First implementation focus | Finish Manual first to verify formula, columns, UI, and snapshots |
+| AXON handoff | Shared SQL View / DB view by `ChainId` / AIX ID |
+| AXON filter | Only awarded supplier/line rows |
+| Supplier cost basis | AXON AI marks header vs line; PartCatalog calculates |
+| Save behavior | Draft is editable; every Save/Finalize creates a new immutable revision |
+| Target table names | Prefer `CostWorkspaceRun`, `CostWorkspaceLine`, `CostWorkspaceSnapshot` for rebuild |
+| ChainId | Search/display/correlation field, not primary key |
 
 | ส่วน | สถานะ |
 |---|---|
-| SupplierSelection (Step 1) | ✅ Done — table layout, expandable rows, 400-record pager |
-| BulkCostWorkspace (Step 2-4) | ✅ Done — Source Lines, Cost Bar, Result Review |
+| SupplierSelection (Step 1) | ✅ Done — clear Manual Bulk Cost supplier search that opens a blank run |
+| BulkCostWorkspace (Step 2-4) | ✅ Done — Manual workspace labels aligned with Term where possible, Step 1 starts with Term-style empty selections, DB lookups/global defaults include Purchase Sub Location, Step 2 Line Items Grid uses Item lookup dropdowns for Category/Permit Type, captures Cust Stock Code, exposes purchase/calc inputs in 2.2, keeps order-setting propagation explicit, separates selling-side terms, optional run info, Source Lines, CAL state/error, Save Revision state, Result Review |
 | Allocation Run List | ✅ Done — 2-tab page, search, status/saleIncharge filters, visible horizontal scrollbar + 400-row pager, resizable columns, split Supplier/Code |
 | Restore saved run | ✅ Done — opening run from list pre-loads CAL at Step 3 |
-| Mark Awarded / Lost | ✅ Done — buttons in Workspace toolbar after Save Revision |
+| Mark Awarded / Lost | ✅ Existing run-status buttons only — not AXON supplier Award ownership |
 | Item/Term preview banner | ✅ Done — banner stays in normal flow so it never covers form headers while scrolling |
 | Manual quote numeric input UX | ✅ Done — zero values clear on focus; non-zero values select all for quick overwrite |
 | Calculation engine | ✅ Backend API source of truth — UI `CAL` calls `POST /api/bulk-cost/calculate`; draft save persists the returned snapshot |
@@ -37,16 +58,16 @@
 ├── Tab: Allocations
 │   └── AllocationList — search / status / saleIncharge filter
 │       └── Open run → BulkCostWorkspace (pre-loaded at Step 3)
-│           └── Mark Awarded / Lost → toast + status badge
+│           └── Mark run status Awarded / Lost → toast + status badge
 └── Tab: New Allocation
     └── SupplierSelection
         └── เลือก supplier จาก vendor master → URL params อัปเดต (?supplier=CODE&supplierName=NAME)
             └── BulkCostWorkspace รับ supplierCode + supplierName และเปิด blank workspace
-                ├── Cost Bar (Step 1 ใน workspace): กรอก order term, ship mode, costs
-                ├── Source Lines (Step 2): ดู/แก้ไข origin/latest lines, เลือก lines สำหรับ CAL
+                ├── Cost Bar (Step 1 ใน workspace): Bulk Header & Global Setup — order setup including Purchase Sub Location, bulk costs, global variables; run metadata is optional and not part of calculation inputs
+                ├── Source Lines (Step 2): ดู/แก้ไข origin/latest lines แบบ 2.1 Item data, 2.2 Purchase conditions, 2.3 Shipping cost, 2.4 Document fees, 2.5 Purchase price/insurance, 2.6 Sales conditions; เลือก lines สำหรับ CAL
                 ├── [กด CAL] → POST /api/bulk-cost/calculate → setPreview()
                 ├── Result Review (Step 3): ดู/แก้ไข final results, preview item/term draft
-                └── Save Revision → Awarded / Lost buttons ปรากฏ
+                └── Save Revision → run-status Awarded / Lost buttons ปรากฏ
 ```
 
 ### Page Refresh Behavior
@@ -129,6 +150,12 @@ AllocationRun           // Context ของการ CAL 1 ครั้ง (cos
 FinalResultColumns      // คอลัมน์ผลลัพธ์สุดท้าย (AY-CP + diagnostic fields)
 ```
 
+Manual line identity now includes `customerStockCode`; Item preview maps it to
+the Item form candidate. `itemCategory` and `permitType` must be selected from
+the same Item lookup API used by the Item page where possible. Step 2.2 exposes
+line-level calculation inputs (`leadTime`, `moq`, `zoneRate`, `etPercent`,
+`miscTax`, `scc`) because they affect DraftTerm snapshots and/or Term CAL.
+
 `bulk-cost.final-result.ts` is the display/export contract for the CAL final
 table. `BULK_COST_AY_CP_COLUMNS` is exactly Excel AY-CP (44 columns).
 Diagnostic fields such as `op1Source`, `et`, `mt`, `miscTaxVal`, `scc`,
@@ -146,7 +173,7 @@ of the AY-CP table.
 - **Per-each direct:** document fees (COC, Mill, Test Cert, COA, COO, Any Other)
 - **Quote-level context:** Currency, Order Term, Location, Exchange Rate, Ship Mode
 - Last-line residual correction — แก้ rounding ให้ sum ตรง
-- Warning: missing weight → แสดง warning; weight-based costs may fall into residual behavior if every line is missing weight
+- Weight Validation: Block CAL immediately if weight-based costs (PKH, SOC, Freight, CC) are > 0 and any selected line is missing weight/dimensions.
 
 ### OP1 Formula (confirmed by manager)
 
@@ -227,12 +254,13 @@ The Step 3 Review table is mapped toward the Term calculation layout:
 | Shipping Weight | `Ship Wt/Ea`, the rounded weight used by CAL |
 | Freight to QTEC WH | `FR` (maps to `U_FR` = Freight (FR) in Term) |
 
-Backend draft save now calls `buildAuthoritativeBulkCostDraft()` from
+Frontend CAL preview calls backend `POST /api/bulk-cost/calculate`, and backend
+draft save calls `buildAuthoritativeBulkCostDraft()` from
 `server/src/services/bulk-cost-calculation.service.ts` before repository writes.
 The saved `PreviewSnapshotJson` and per-line DraftTerm calculated fields are
 derived from the backend Term calculation sequence, not trusted from the client
-payload. Frontend `bulk-cost.calc.ts` remains a preview/formula-audit guard until
-the UI is wired to call a backend calculate endpoint.
+payload. Frontend `bulk-cost.calc.ts` remains a legacy/test fixture and
+formula-audit comparison helper, not the authoritative calculation path.
 
 `Exwork` remains available in Formula/Audit diagnostics but is not shown in the
 Step 3 Review table.
@@ -294,12 +322,12 @@ Flow:
 
 | Preset | Fields ที่เห็น |
 |---|---|
-| **Basic** | Identity: item code, brand, mfr no, description, HS Code, permit, shelf life, Supp Order Code |
-| **Price** | Qty, UOM, unit price, currency |
-| **Document Fees** | COC, Mill, Test Cert, COA, COO, Any Other |
-| **Weight** | Ship weight per each, CWeight, dimensions |
-| **Duty** | Duty % |
-| **Term** | Delivery lead time, Supp Order Code |
+| **2.1 Item data** | Item Group, Mfr Brand, Mfr Catalog No, Item Description, Category dropdown, Cust Stock Code, Stock UOM, Country of Origin, Shelf Life, Permit, Permit Type dropdown, HS Code. |
+| **2.2 Purchase conditions** | Purchase Term, Term Location, Sub Location, Supp Order Code, Lead Time, MOQ, Duty %, STK %, Zone Rate, ET %, ETC, SCC. Defaults can be pushed from Step 1 with `Apply Order Settings to All`, but line values drive CAL. |
+| **2.3 Shipping cost** | Ship Mode, dimensions, item/shipping/chargeable weight, freight/courier rate. |
+| **2.4 Document fees** | COC, Mill, Test Cert, COA, COO, Any Other, and document fee total/basis. |
+| **2.5 Purchase price/insurance** | Qty, Product Cost (PCS), Currency, allocated PKH/SOC/DOC, OP1/OP1 THB, INS %. |
+| **2.6 Sales conditions** | Sales Term, Sales Sub Location, Purchase/Stock/Sales UOM conversion, SPK, QOC, Markup. These are selling-side fields and are intentionally separate from purchase/import cost fields. |
 | **All** | ทุก field — read-only audit view |
 
 ---
@@ -326,7 +354,7 @@ Flow:
 - **ไม่มี** approval gate ใน prototype flow ปัจจุบัน (save ตรง)
 - **ItemCode** ไม่ใช่ user-entered field — ระบบ generate จาก ItemGroup prefix + SP
 - **Manual Save Revision** บันทึก `BulkCostRun` พร้อม `DraftItem` / `DraftTerm` line
-  snapshots ใน `PART_CATALOG_AIX` เท่านั้น; ไม่สร้าง `DraftItem` / `DraftTerm`
+  snapshots ใน `PART_CATALOG_AIX` เท่านั้น; ไม่สร้าง Item/Term master จริง
   และยังไม่เขียน `@POITM` / `@PITM1`
 - **Document fee basis is mandatory**: Per Each / UOM By Each fees enter OP1;
   item-line totals must be normalized to per-each first; By Lot / Batch fees
@@ -340,7 +368,10 @@ Flow:
   expected pricing/margin cases before the SQL script is run in production.
 - **AXON hints** เช่น `UniqueLineID`, `MatchMethod`, `MatchConfidence` เป็น hidden technical fields
   สำหรับ persistence/reverse mapping เท่านั้น ไม่ต้องแสดงให้ sales confirm ใน UI
-- **Status lifecycle**: `DRAFT -> QUOTED -> AWARDED -> REVERSE_MAPPED -> LOST -> ARCHIVED`
+- **Status lifecycle**: `DRAFT -> QUOTED -> AWARDED -> REVERSE_MAPPED -> LOST -> ARCHIVED`.
+  In Manual Workspace this is a PartCatalog run status. It is not the AXON
+  supplier Award decision; AXON owns supplier Award and PartCatalog consumes
+  only `Award = Y` rows.
 - **Existing sync jobs**: `Sync POITM PARTCATALOG_SQL SBOQTEC` and
   `PartCat_Collect_Brand_Vendor` already sync to `PART_CATALOGSQL`; this is not
   a blocker because `PART_CATALOG_AIX` exposes the required data through synonyms.
@@ -355,7 +386,7 @@ Flow:
 4. Keep CWeight local research reports current: formula, divisor, rounding, ship mode, dim unit, matching fields, and `.docs/CWEIGHT_EVALUATION.md`
 5. Keep Grainger CWeight lookup source as `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; do not deploy the obsolete AIX `GraingerWeightData` staging script for the active path
 6. Use backend-only `POST /api/bulk-cost/cweight-prefill` for draft-line CWeight suggestions first; wire to Bulk Cost UI later only after separate UI approval
-7. Wire UI CAL preview to the backend calculation service/API so preview and save use the same server result immediately
+7. Keep UI CAL preview and save aligned on the backend calculation service/API; add regression coverage when fields change
 8. Connect real AXON data source แทน seed data
 9. ออกแบบ Awarded reverse mapping flow ก่อนสร้าง endpoint จริง
 10. ทำ E2E test สำหรับ full allocation → save snapshot flow
@@ -365,7 +396,7 @@ Flow:
 ## 13. ข้อห้ามสำหรับ Bulk Cost
 
 - ❌ อย่าเขียน Bulk Cost save เข้า `@POITM` / `@PITM1` ใน Phase 3A
-- ❌ อย่าสร้าง Draft Item/Term หรือ Award/Reverse-map endpoint จนกว่า INSERT-vs-UPDATE term rule จะได้รับการออกแบบ
+- ❌ อย่าสร้าง Item/Term master จริง หรือ Award/Reverse-map endpoint จนกว่า INSERT-vs-UPDATE term rule จะได้รับการออกแบบ; Phase 3A สร้างได้เฉพาะ `DraftItem` / `DraftTerm` snapshot
 - ❌ อย่าแก้ Grainger mock data (เป็น golden regression baseline จากผู้บริหาร)
 - ❌ อย่าเปลี่ยนสูตร OP1 โดยไม่มีการยืนยันจาก business owner
 
@@ -379,6 +410,6 @@ Flow:
 |---|---|
 | `.docs/BULK_COST_CALCULATION.md` | สูตรคำนวณ Bulk Cost จาก Excel sample + reconciliation กับ Term engine |
 | `.docs/BULK_COST.md` | Feature guide และ decision log สรุปของ Bulk Cost |
-| `.docs/AXON_INTEGRATION.md` | AXON extraction contract และ BulkCostRun revision handoff flow |
+| `.docs/AXON_HANDOFF_CONTRACT.md` | AXON awarded shared-view handoff by ChainId / AIX ID |
 | `.docs/DATA_SCHEMA.md` | Item/Term schema และ calculation field mapping |
 | `.docs/FEATURE_STATUS.md` | สถานะล่าสุดและ decision log |

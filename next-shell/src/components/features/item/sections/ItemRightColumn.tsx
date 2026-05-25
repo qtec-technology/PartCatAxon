@@ -39,7 +39,7 @@ function CheckboxRow({
   return (
     <div className="flex justify-end items-center gap-2 h-7">
       <span className={cn(
-        "text-xs text-right",
+        "text-xs text-right whitespace-nowrap",
         isRed ? "text-[#C12B2B] font-bold uppercase" : "",
         isGray ? "text-gray-400 uppercase" : "text-gray-700"
       )}>{label}</span>
@@ -79,10 +79,10 @@ export function ItemRightColumn({
   updatedDateValue,
 }: ItemRightColumnProps) {
   return (
-    <div className="col-span-12 lg:col-span-3 space-y-4">
+    <div className="shrink-0 flex flex-col">
       <SectionHeader title="Status & Flags" />
-      <div className="p-4 border border-gray-200 border-t-0 rounded-b-md bg-[#F5F5F5]">
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-2 gap-y-1">
+      <div className="px-2 pt-1 pb-2 border border-gray-200 border-t-0 rounded-b-md bg-[#F5F5F5]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-1">
           <CheckboxRow label="ACTIVE" name="active" control={control} isReadOnly={isReadOnly} isRed />
           <CheckboxRow label="MASTER FG" name="masterFG" control={control} isReadOnly={isReadOnly} isGray />
 

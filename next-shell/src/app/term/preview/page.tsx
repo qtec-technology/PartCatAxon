@@ -98,7 +98,7 @@ function TermPreviewContent() {
     const noop = () => { /* preview: no-op */ };
 
     return (
-        <div className="h-full overflow-y-auto bg-[#F0F2F5] font-sans text-gray-900">
+        <div className="bg-[#F0F2F5] font-sans text-gray-900">
             <div className="bulk-cost-preview-banner">
                 <div className="bulk-cost-preview-banner-content">
                     <span className="bulk-cost-preview-banner-title">Bulk Cost Preview — Term</span>
@@ -123,7 +123,6 @@ function TermPreviewContent() {
                 onEdit={noop}
                 onCancel={noop}
                 onDelete={noop}
-                onPrint={noop}
                 onSendRfq={noop}
                 isSendingRfq={false}
                 disableMutations={true}

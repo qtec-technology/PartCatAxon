@@ -68,3 +68,46 @@ describe('requireCatalogAccess', () => {
         });
     });
 });
+
+describe('authMiddleware production proxy headers', () => {
+    it('uses trusted proxy identity headers in production', async () => {
+        vi.resetModules();
+        vi.stubEnv('NODE_ENV', 'production');
+        vi.stubEnv('AUTH_ALLOW_DOMAIN_USERS', 'false');
+        vi.stubEnv('AUTH_TRUST_PROXY_HEADERS', 'true');
+        vi.stubEnv('AUTH_USER_GROUPS', 'Part Catalog User');
+        vi.stubEnv('AUTH_MANAGER_GROUPS', 'PCAT-Manager');
+        vi.stubEnv('AUTH_SUPERVISOR_GROUPS', 'PCAT-SuperVisor');
+
+        const { authMiddleware } = await import('#src/middleware/auth.middleware.js');
+        const req = {
+            headers: {
+                'x-forwarded-user': 'QTEC\\kim',
+                'x-forwarded-name': 'Kim QTEC',
+                'x-forwarded-email': 'kim@qtec.local',
+                'x-forwarded-groups': 'Part Catalog User;PCAT-Manager',
+            },
+        } as unknown as Request;
+        const res = {
+            setHeader: vi.fn(),
+        } as unknown as Response;
+        const next = vi.fn() as NextFunction;
+
+        authMiddleware(req, res, next);
+
+        expect(next).toHaveBeenCalledOnce();
+        expect(req.authUser).toMatchObject({
+            username: 'kim',
+            firstname: 'Kim',
+            lastname: 'QTEC',
+            displayName: 'Kim QTEC',
+            email: 'kim@qtec.local',
+            domain: 'QTEC',
+            isUser: true,
+            isManager: true,
+            isSupervisor: false,
+        });
+
+        vi.unstubAllEnvs();
+    });
+});

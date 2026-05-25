@@ -71,6 +71,9 @@ function makeLine(overrides: Partial<AllocationLineSource> = {}): AllocationLine
     sspk: 0,
     qoc: 0,
     ...overrides,
+    customerStockCode: overrides.customerStockCode ?? '',
+    permitType: overrides.permitType ?? '',
+    subLocation: overrides.subLocation ?? '',
   };
 }
 
@@ -91,6 +94,7 @@ function makeCosts(overrides: Partial<BulkCostInput> = {}): BulkCostInput {
     referenceNo: '',
     remark: '',
     ...overrides,
+    subLocation: overrides.subLocation ?? '',
   };
 }
 
@@ -245,7 +249,7 @@ describe('Final Result (OP1 → Round Up)', () => {
   });
 
   it('should apply exwork case 1.03 for FCA + Truck (mode 3)', () => {
-    const lines = [makeLine({ unitPrice: 10 })];
+    const lines = [makeLine({ unitPrice: 10, orderTerm: 'FCA', shipModeNo: 3 })];
     const costs = makeCosts({ pkh: 0, soc: 0, exchangeRate: 10, orderTerm: 'FCA', shipModeNo: 3 });
     const result = calculateAllocationPreview(lines, costs);
     const fr = result.lines[0].finalResult;
@@ -257,11 +261,22 @@ describe('Final Result (OP1 → Round Up)', () => {
   });
 
   it('should apply exwork case 1.03 for hyphenated Ex-work + Truck (mode 3)', () => {
-    const lines = [makeLine({ unitPrice: 10 })];
+    const lines = [makeLine({ unitPrice: 10, orderTerm: 'Ex-work', shipModeNo: 3 })];
     const costs = makeCosts({ pkh: 0, soc: 0, exchangeRate: 10, orderTerm: 'Ex-work', shipModeNo: 3 });
     const result = calculateAllocationPreview(lines, costs);
     const fr = result.lines[0].finalResult;
 
+    expect(fr.exworkCase).toBe(1.03);
+    expect(fr.op2).toBeCloseTo(103, 2);
+  });
+
+  it('should let line-level purchase term and ship mode override Step 1 defaults', () => {
+    const lines = [makeLine({ unitPrice: 10, orderTerm: 'FCA', shipModeNo: 3 })];
+    const costs = makeCosts({ pkh: 0, soc: 0, exchangeRate: 10, orderTerm: 'CIF', shipModeNo: 1 });
+    const result = calculateAllocationPreview(lines, costs);
+    const fr = result.lines[0].finalResult;
+
+    expect(fr.purchaseOrderTerm).toBe('FCA');
     expect(fr.exworkCase).toBe(1.03);
     expect(fr.op2).toBeCloseTo(103, 2);
   });

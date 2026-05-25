@@ -176,6 +176,13 @@ export function AllocationList({ onOpen }: AllocationListProps) {
           <select
             className="supplier-filter-select"
             value={saleInchargeFilter}
+            onMouseDownCapture={(e) => {
+              const el = e.currentTarget;
+              if (typeof window === 'undefined') return;
+              const rect = el.getBoundingClientRect();
+              const vSpace = window.innerHeight - rect.bottom;
+              if (vSpace < 260) window.scrollBy({ top: 260 - vSpace + 8, behavior: 'auto' });
+            }}
             onChange={(e) => { setSaleInchargeFilter(e.target.value); setCurrentPage(1); }}
           >
             <option value="">ทั้งหมด</option>

@@ -62,6 +62,30 @@ Each service must document:
 - restart policy
 - stop command
 
+## Auth Headers
+
+PartCatalogAxon uses trusted proxy headers as the production auth transport.
+The target path is:
+
+```text
+Domain auth / SSO / reverse proxy auth
+  -> Nginx trusted headers
+  -> PartCatalogAxon Express auth middleware
+```
+
+The trusted proxy layer must set identity headers only after authentication:
+
+| Header | Meaning |
+|---|---|
+| `x-forwarded-user` | `DOMAIN\username` or `username@domain` |
+| `x-forwarded-email` | user email |
+| `x-forwarded-name` | display name |
+| `x-forwarded-groups` | semicolon/comma-separated catalog AD groups |
+| `x-forwarded-roles` | optional role aliases |
+
+Keep `AUTH_TRUST_PROXY_HEADERS=true`. Do not expose the Express API port
+directly to browsers; only the trusted proxy/Next BFF should reach it.
+
 ## Deploy Protocol
 
 1. Create or review PR. Do not patch production code directly.
