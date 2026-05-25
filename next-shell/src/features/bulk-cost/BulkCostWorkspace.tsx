@@ -7,7 +7,12 @@ import {
   BadgeDollarSign,
   Boxes,
   Calculator,
+  Check,
   CheckCircle2,
+  Edit3,
+  Eye,
+  FileText,
+  History,
   Info,
   Loader2,
   RotateCcw,
@@ -104,7 +109,7 @@ const SHIP_MODE_OPTIONS = [
  *     insufficient.
  *  3. MIN is set to 420 px — enough for a 10-item option list on most screens.
  */
-const ensureSelectSpaceBelow = (el: HTMLSelectElement): void => {
+const ensureSelectSpaceBelow = (el: HTMLElement): void => {
   if (typeof window === 'undefined') return;
   const MIN = 420;
 
@@ -976,7 +981,252 @@ function formatYesNo(value: string): string {
     : 'No';
 }
 
-export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: initialSavedRunId = null, backLabel = 'Back to Allocations', onBack }: BulkCostWorkspaceProps) {
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+interface ValidationIssue {
+  field: string;
+  label: string;
+  type: 'error' | 'warning';
+  message: string;
+  value?: any;
+}
+
+interface ValidationResult {
+  status: 'ready' | 'missing' | 'warning';
+  itemIssues: ValidationIssue[];
+  termIssues: ValidationIssue[];
+  calcIssues: ValidationIssue[];
+  traceIssues: ValidationIssue[];
+}
+
+function validateLineCandidate(
+  line: AllocationLineSource,
+  costs: BulkCostInput,
+  runInfo: {
+    runId: number | null;
+    revisionGroupId: number | null;
+    revisionNo: number | null;
+    status: string;
+    supplierCode: string;
+    cntctCode?: string | null;
+  },
+  finalResult?: FinalResultColumns,
+): ValidationResult {
+  const itemIssues: ValidationIssue[] = [];
+  const termIssues: ValidationIssue[] = [];
+  const calcIssues: ValidationIssue[] = [];
+  const traceIssues: ValidationIssue[] = [];
+
+  // 1. Item Candidate Validation
+  if (!line.itemGroup || line.itemGroup.trim() === '') {
+    itemIssues.push({ field: 'itemGroup', label: 'Item Group', type: 'error', message: 'Item Group is required for code generation.', value: line.itemGroup });
+  }
+  if (!line.manufacturer || line.manufacturer.trim() === '') {
+    itemIssues.push({ field: 'manufacturer', label: 'Mfr Brand', type: 'error', message: 'Manufacturer Brand is required.', value: line.manufacturer });
+  }
+  if (!line.mfgPartNumber || line.mfgPartNumber.trim() === '') {
+    itemIssues.push({ field: 'mfgPartNumber', label: 'Mfr Catalog No', type: 'error', message: 'Manufacturer Catalog Number is required.', value: line.mfgPartNumber });
+  }
+  if (!line.sapDescription || line.sapDescription.trim() === '') {
+    itemIssues.push({ field: 'sapDescription', label: 'Item Description', type: 'error', message: 'Item Description is required.', value: line.sapDescription });
+  }
+  if (!line.uom || line.uom.trim() === '') {
+    itemIssues.push({ field: 'uom', label: 'Stock UOM', type: 'error', message: 'Stock UOM is required.', value: line.uom });
+  }
+  if (!line.countryOfOrigin || line.countryOfOrigin.trim() === '') {
+    itemIssues.push({ field: 'countryOfOrigin', label: 'Country of Origin', type: 'error', message: 'Country of Origin is required for imports.', value: line.countryOfOrigin });
+  }
+
+  const permitReq = line.importPermit === 'Yes' || line.importPermit === '1' || line.importPermit === 'true' || line.importPermit === 'Y';
+  if (permitReq && (!line.permitType || line.permitType.trim() === '')) {
+    itemIssues.push({ field: 'permitType', label: 'Permit Type', type: 'error', message: 'Permit Type is required when Import Permit is enabled.', value: line.permitType });
+  }
+  if (!line.hsCode || line.hsCode.trim() === '') {
+    itemIssues.push({ field: 'hsCode', label: 'HS Code', type: 'warning', message: 'HS Code is missing (recommended).', value: line.hsCode });
+  }
+
+  // 2. Term Candidate Validation
+  const supplierCodeVal = line.vendorCode || runInfo.supplierCode;
+  if (!supplierCodeVal || supplierCodeVal.trim() === '') {
+    termIssues.push({ field: 'vendorCode', label: 'Supplier Code', type: 'error', message: 'Supplier Code is required.', value: supplierCodeVal });
+  }
+  if (!line.supplierOrderCode || line.supplierOrderCode.trim() === '') {
+    termIssues.push({ field: 'supplierOrderCode', label: 'Supp Order Code', type: 'warning', message: 'Supplier Order Code/GG Code is blank.', value: line.supplierOrderCode });
+  }
+
+  const contactPersonVal = costs.contactPerson;
+  if (!contactPersonVal || contactPersonVal.trim() === '') {
+    termIssues.push({ field: 'contactPerson', label: 'Contact Person', type: 'warning', message: 'Contact Person is missing.', value: contactPersonVal });
+  } else if (!runInfo.cntctCode) {
+    termIssues.push({ field: 'contactPerson', label: 'Contact Person', type: 'warning', message: 'Contact Person Code resolution required before Term master write (เก็บเป็นชื่อใน revision เท่านั้น ยังไม่ได้แปลงเป็น code).', value: contactPersonVal });
+  }
+
+  const orderTerm = line.orderTerm || costs.orderTerm;
+  if (!orderTerm || orderTerm.trim() === '') {
+    termIssues.push({ field: 'orderTerm', label: 'Purchase Term', type: 'error', message: 'Purchase Term is required.', value: orderTerm });
+  }
+
+  const location = line.location || costs.location;
+  if (!location || location.trim() === '') {
+    termIssues.push({ field: 'location', label: 'Term Location', type: 'error', message: 'Term Location is required.', value: location });
+  }
+
+  const subLocation = line.subLocation || costs.subLocation;
+  if (!subLocation || subLocation.trim() === '') {
+    termIssues.push({ field: 'subLocation', label: 'Purchase Sub Location', type: 'error', message: 'Purchase Sub Location is required.', value: subLocation });
+  }
+
+  if (line.salesTerm) {
+    if (!line.salesSubLocation || line.salesSubLocation.trim() === '') {
+      termIssues.push({ field: 'salesSubLocation', label: 'Sales Sub Location', type: 'error', message: 'Sales Sub Location is required when Sales Term is set.', value: line.salesSubLocation });
+    }
+  }
+
+  const currency = line.currency || costs.currency;
+  if (!currency || currency.trim() === '') {
+    termIssues.push({ field: 'currency', label: 'Currency', type: 'error', message: 'Currency is required.', value: currency });
+  }
+
+  const exchangeRate = costs.exchangeRate;
+  if (!exchangeRate || exchangeRate <= 0) {
+    termIssues.push({ field: 'exchangeRate', label: 'Exchange Rate', type: 'error', message: 'Exchange Rate must be greater than 0.', value: exchangeRate });
+  }
+
+  if (line.unitPrice <= 0) {
+    termIssues.push({ field: 'unitPrice', label: 'Product Cost (PCS)', type: 'error', message: 'Product Cost must be greater than 0.', value: line.unitPrice });
+  }
+
+  if (line.qty <= 0) {
+    termIssues.push({ field: 'qty', label: 'Quantity', type: 'error', message: 'Quantity must be greater than 0.', value: line.qty });
+  }
+
+  if (!line.purchaseUOM || line.purchaseUOM.trim() === '') {
+    termIssues.push({ field: 'purchaseUOM', label: 'Purchase UOM', type: 'error', message: 'Purchase UOM is required.', value: line.purchaseUOM });
+  }
+  if (!line.saleUOM || line.saleUOM.trim() === '') {
+    termIssues.push({ field: 'saleUOM', label: 'Sales UOM', type: 'error', message: 'Sales UOM is required.', value: line.saleUOM });
+  }
+  if (!line.stockConversion || line.stockConversion <= 0) {
+    termIssues.push({ field: 'stockConversion', label: 'Stock Conv (NumInBuy)', type: 'error', message: 'Stock UOM Conversion factor must be greater than 0.', value: line.stockConversion });
+  }
+  if (!line.saleConversion || line.saleConversion <= 0) {
+    termIssues.push({ field: 'saleConversion', label: 'Sale Conv (NumInSale)', type: 'error', message: 'Sales UOM Conversion factor must be greater than 0.', value: line.saleConversion });
+  }
+
+  const shipModeNo = line.shipModeNo !== undefined && line.shipModeNo >= 0 ? line.shipModeNo : costs.shipModeNo;
+  if (shipModeNo === undefined || shipModeNo < 0) {
+    termIssues.push({ field: 'shipModeNo', label: 'Ship Mode', type: 'error', message: 'Ship Mode is required.', value: shipModeNo });
+  }
+
+  // 3. Calculation/Result Validation
+  if (!finalResult) {
+    calcIssues.push({ field: 'calculation', label: 'Calculation Output', type: 'error', message: 'Calculation result is not available. Please run CAL first.' });
+  } else {
+    const checkCalc = (val: any, fieldName: string, label: string) => {
+      if (val === undefined || val === null || Number.isNaN(Number(val))) {
+        calcIssues.push({ field: fieldName, label, type: 'error', message: `${label} calculation output is missing or invalid.`, value: val });
+      }
+    };
+    checkCalc(finalResult.op1Source, 'op1Source', 'OP1 (Source)');
+    checkCalc(finalResult.op1, 'op1', 'OP1 (THB)');
+    checkCalc(finalResult.op2, 'op2', 'OP2 (THB)');
+    checkCalc(finalResult.shipWeightCal, 'shipWeightCal', 'Ship Weight Cal (kg)');
+    checkCalc(finalResult.frQTEC, 'frQTEC', 'Allocated Freight (FR)');
+    checkCalc(finalResult.ins, 'ins', 'Insurance (INS)');
+    checkCalc(finalResult.cifQTEC, 'cifQTEC', 'CIF Price');
+    checkCalc(finalResult.selectedDuty, 'selectedDuty', 'Import Duty Tax');
+    checkCalc(finalResult.qlc, 'qlc', 'Landed Cost (QLC)');
+    checkCalc(finalResult.totalQLC, 'totalQLC', 'Total QLC');
+    checkCalc(finalResult.roundUp, 'roundUp', 'Sales Price');
+  }
+
+  // 4. Traceability/Source Validation
+  if (!runInfo.runId) {
+    traceIssues.push({ field: 'runId', label: 'Run ID', type: 'error', message: 'Run ID is missing (Run must be saved).' });
+  }
+  if (!runInfo.revisionGroupId) {
+    traceIssues.push({ field: 'revisionGroupId', label: 'Revision Group ID', type: 'error', message: 'Revision Group ID is missing.' });
+  }
+  if (!runInfo.revisionNo) {
+    traceIssues.push({ field: 'revisionNo', label: 'Revision No', type: 'error', message: 'Revision Number is missing.' });
+  }
+
+  const createdBy = costs.saleIncharge;
+  if (!createdBy || createdBy.trim() === '') {
+    traceIssues.push({ field: 'saleIncharge', label: 'Saved By', type: 'warning', message: 'Saved By user metadata is blank.' });
+  }
+
+  // Aggregate Status
+  let status: 'ready' | 'missing' | 'warning' = 'ready';
+  const hasErrors =
+    itemIssues.some(i => i.type === 'error') ||
+    termIssues.some(i => i.type === 'error') ||
+    calcIssues.some(i => i.type === 'error') ||
+    traceIssues.some(i => i.type === 'error');
+  const hasWarnings =
+    itemIssues.some(i => i.type === 'warning') ||
+    termIssues.some(i => i.type === 'warning') ||
+    calcIssues.some(i => i.type === 'warning') ||
+    traceIssues.some(i => i.type === 'warning');
+
+  if (hasErrors) {
+    status = 'missing';
+  } else if (hasWarnings) {
+    status = 'warning';
+  }
+
+  return {
+    status,
+    itemIssues,
+    termIssues,
+    calcIssues,
+    traceIssues
+  };
+}
+
+function ValidationFieldRow({
+  label,
+  value,
+  issue,
+}: {
+  label: string;
+  value?: string | number;
+  issue?: ValidationIssue;
+}) {
+  const isError = issue?.type === 'error';
+  const isWarning = issue?.type === 'warning';
+  const displayValue = value !== undefined ? String(value) : '';
+
+  let rowClass = 'review-validation-row--ok';
+  let icon = <CheckCircle2 size={14} style={{ color: '#10b981' }} />;
+  if (isError) {
+    rowClass = 'review-validation-row--error';
+    icon = <XCircle size={14} style={{ color: '#ef4444' }} />;
+  } else if (isWarning) {
+    rowClass = 'review-validation-row--warning';
+    icon = <AlertTriangle size={14} style={{ color: '#f59e0b' }} />;
+  }
+
+  return (
+    <div className={`review-validation-row ${rowClass}`}>
+      <div className="review-validation-row-icon">{icon}</div>
+      <div className="review-validation-row-content">
+        <div className="review-validation-row-label">{label}</div>
+        {issue ? (
+          <div className="review-validation-row-message" style={{ color: isError ? '#dc2626' : '#d97706', fontWeight: 600 }}>
+            {issue.message}
+          </div>
+        ) : (
+          <div className="review-validation-row-value">{displayValue || '-'}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: initialSavedRunId = null, backLabel = 'Back to Workspace Runs', onBack }: BulkCostWorkspaceProps) {
   const lineTableSizing = useResizableTableColumns('bulk-cost-source-lines', LINE_TABLE_COLUMNS);
   const reviewTableSizing = useResizableTableColumns('bulk-cost-result-review', REVIEW_RESULT_TABLE_COLUMNS);
   const formulaTableSizing = useResizableTableColumns('bulk-cost-result-formula', FORMULA_PREVIEW_TABLE_COLUMNS);
@@ -1010,6 +1260,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   const [itemCategoryLookups, setItemCategoryLookups] = useState<LookupOption[]>([]);
   const [permitTypeLookups, setPermitTypeLookups] = useState<LookupOption[]>([]);
   const [countryLookups, setCountryLookups] = useState<LookupOption[]>([]);
+  const [brandLookups, setBrandLookups] = useState<LookupOption[]>([]);
   const [focusedCostInput, setFocusedCostInput] = useState<string | null>(null);
   const [preview, setPreview] = useState<AllocationPreview | null>(null);
   const [previewEdits, setPreviewEdits] = useState<PreviewEdits>({});
@@ -1018,6 +1269,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   const [isLoadingRun, setIsLoadingRun] = useState(isRestoringMode);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [savedRunId, setSavedRunId] = useState<number | null>(initialSavedRunId);
+  const [isReviewFinalizeActive, setIsReviewFinalizeActive] = useState(false);
+  const [activeReviewLineKey, setActiveReviewLineKey] = useState<string | null>(null);
   const [revisionSourceRunId, setRevisionSourceRunId] = useState<number | null>(initialSavedRunId);
   const [revisionGroupId, setRevisionGroupId] = useState<number | null>(initialSavedRunId);
   const [revisionNo, setRevisionNo] = useState<number | null>(null);
@@ -1037,6 +1290,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
         setOriginLines(originLinesData);
         setSelectedKeys(new Set(latestLines.map((l) => l.lineKey)));
         setGlobalDefaults(globalDefaultsFromLine(latestLines[0], run.inputSnapshot.costs?.currency || initialCosts.currency));
+        setActiveReviewLineKey(latestLines[0].lineKey);
       } else {
         const lines = initialLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName));
         setAllLines(lines);
@@ -1109,6 +1363,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
         if (lookups.countries.length > 0) setCountryLookups(lookups.countries);
         if (lookups.itemCategories.length > 0) setItemCategoryLookups(lookups.itemCategories);
         if (lookups.permitTypes.length > 0) setPermitTypeLookups(lookups.permitTypes);
+        if (lookups.brands.length > 0) setBrandLookups(lookups.brands);
       })
       .catch((error) => {
         if (cancelled) return;
@@ -1426,6 +1681,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   const itemCategorySelectOptions = useMemo(() => itemCategoryLookups, [itemCategoryLookups]);
   const permitTypeSelectOptions = useMemo(() => permitTypeLookups, [permitTypeLookups]);
   const countrySelectOptions = useMemo(() => countryLookups, [countryLookups]);
+  const brandSelectOptions = useMemo(() => brandLookups, [brandLookups]);
   const foreignCostCurrencyLabel = costs.currency || 'FCY';
 
   const toggleLine = useCallback((key: string) => {
@@ -1675,7 +1931,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       const result = await calculateBulkCostPreview({ costs, lines: effectiveSelectedLines });
       setPreview(result);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to calculate Bulk Cost preview';
+      const message = err instanceof Error ? err.message : 'Failed to calculate Cost Workspace preview';
       setCalcError(message);
       toast.error(message);
     } finally {
@@ -1730,9 +1986,12 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       setRevisionGroupId(saved.revisionGroupId);
       setRevisionNo(saved.revisionNo);
       setRunStatus(saved.status);
-      toast.success(`Bulk Cost revision saved (Run #${saved.runId}, Rev ${saved.revisionNo})`);
+      if (allLines.length > 0 && !activeReviewLineKey) {
+        setActiveReviewLineKey(allLines[0].lineKey);
+      }
+      toast.success(`Cost Workspace revision saved (Run #${saved.runId}, Rev ${saved.revisionNo})`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save Bulk Cost draft';
+      const message = err instanceof Error ? err.message : 'Failed to save Cost Workspace draft';
       toast.error(message);
     } finally {
       setIsSavingDraft(false);
@@ -1745,9 +2004,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
     try {
       await updateBulkCostRunStatus(savedRunId, status);
       setRunStatus(status);
-      toast.success(`Run #${savedRunId} marked as ${status}`);
+      toast.success(`Run #${savedRunId} marked as ${status === 'AWARDED' ? 'Won' : 'Lost'}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : `Failed to mark run as ${status}`;
+      const message = err instanceof Error ? err.message : `Failed to mark run as ${status === 'AWARDED' ? 'Won' : 'Lost'}`;
       toast.error(message);
     } finally {
       setIsUpdatingStatus(false);
@@ -1788,7 +2047,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               {backLabel}
             </button>
             <div>
-              <p className="eyebrow">Bulk Cost Allocation</p>
+              <p className="eyebrow">Cost Workspace</p>
               <h1>Loading Run #{initialSavedRunId}…</h1>
             </div>
           </div>
@@ -1810,8 +2069,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             {backLabel}
           </button>
           <div>
-            <p className="eyebrow">Manual Bulk Cost</p>
-            <h1>Manual Allocation Workspace</h1>
+            <p className="eyebrow">Manual Cost Workspace</p>
+            <h1>Manual Cost Workspace</h1>
             <div className="manual-workspace-meta">
               <span className="manual-state-pill">{revisionStatusLabel}</span>
               <span>{revisionHelpText}</span>
@@ -1851,6 +2110,18 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             )}
             {saveButtonText}
           </button>
+          {savedRunId !== null && (
+            <button
+              className={`secondary-button ${isReviewFinalizeActive ? 'active-tab' : ''}`}
+              style={{ background: isReviewFinalizeActive ? '#ebf3fc' : undefined, borderColor: isReviewFinalizeActive ? 'var(--pc-blue)' : undefined, color: isReviewFinalizeActive ? 'var(--pc-blue)' : undefined }}
+              type="button"
+              onClick={() => setIsReviewFinalizeActive(!isReviewFinalizeActive)}
+              title={isReviewFinalizeActive ? 'Back to Editor' : 'Validate Item/Term candidates'}
+            >
+              {isReviewFinalizeActive ? <Edit3 size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+              {isReviewFinalizeActive ? 'Back to Editor' : 'Review & Finalize'}
+            </button>
+          )}
           {savedRunId !== null && runStatus === 'DRAFT' && (
             <>
               <button
@@ -1858,21 +2129,21 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 type="button"
                 disabled={isUpdatingStatus}
                 onClick={() => { void handleMarkStatus('AWARDED'); }}
-                title="Mark this run as Awarded"
+                title="Mark this run as Won (local workspace status, not AXON Award)"
               >
                 {isUpdatingStatus ? (
                   <Loader2 size={16} className="spin-icon" aria-hidden="true" />
                 ) : (
                   <Trophy size={16} aria-hidden="true" />
                 )}
-                Awarded
+                Mark Won
               </button>
               <button
                 className="danger-button"
                 type="button"
                 disabled={isUpdatingStatus}
                 onClick={() => { void handleMarkStatus('LOST'); }}
-                title="Mark this run as Lost"
+                title="Mark this run as Lost (local workspace status, not AXON Award)"
               >
                 {isUpdatingStatus ? (
                   <Loader2 size={16} className="spin-icon" aria-hidden="true" />
@@ -1886,13 +2157,442 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           {savedRunId !== null && runStatus !== 'DRAFT' && (
             <span className={`workspace-status-badge workspace-status-badge--${runStatus.toLowerCase()}`}>
               {runStatus === 'AWARDED' ? <Trophy size={14} aria-hidden="true" /> : <XCircle size={14} aria-hidden="true" />}
-              {runStatus}
+              {runStatus === 'AWARDED' ? 'WON' : runStatus}
             </span>
           )}
         </div>
       </section>
 
-      <div className="bulk-cost-workspace-body">
+      {isReviewFinalizeActive ? (
+        <div className="review-finalize-container">
+          {/* Left panel: Lines List */}
+          <div className="review-sidebar">
+            <div className="review-sidebar-header">
+              <h3>Line Items Validation</h3>
+              <p style={{ margin: 0, fontSize: 11, color: 'var(--pc-muted)' }}>
+                Select a line to review Item &amp; Term candidate required fields.
+              </p>
+            </div>
+            <div className="review-line-list">
+              {allLines.map((line, idx) => {
+                const lineResult = preview?.lines.find((l) => l.lineKey === line.lineKey);
+                const finalResult = lineResult ? getFinalResultForLine(lineResult) : undefined;
+                const resolvedContact = contactLookups.find(c => c.name === costs.contactPerson);
+                const cntctCode = resolvedContact ? resolvedContact.cntctCode : null;
+                const validation = validateLineCandidate(line, costs, {
+                  runId: savedRunId,
+                  revisionGroupId,
+                  revisionNo,
+                  status: runStatus,
+                  supplierCode,
+                  cntctCode,
+                }, finalResult);
+
+                const isActive = activeReviewLineKey === line.lineKey;
+                const statusText =
+                  validation.status === 'ready' ? 'Ready' :
+                  validation.status === 'warning' ? 'Warning' : 'Missing Fields';
+                const totalIssues =
+                  validation.itemIssues.length +
+                  validation.termIssues.length +
+                  validation.calcIssues.length +
+                  validation.traceIssues.length;
+
+                return (
+                  <button
+                    key={line.lineKey}
+                    className={`review-line-item ${isActive ? 'review-line-item--active' : ''}`}
+                    type="button"
+                    onClick={() => setActiveReviewLineKey(line.lineKey)}
+                  >
+                    <div className="review-line-item-meta">
+                      <div className="review-line-item-title">
+                        #{line.no} - {line.sapDescription || 'No description'}
+                      </div>
+                      <div className="review-line-item-subtitle">
+                        Brand: {line.manufacturer || '-'} | Model: {line.mfgPartNumber || '-'}
+                      </div>
+                      <div className="review-issue-badges">
+                        <span className={`review-issue-badge review-issue-badge--${validation.status}`}>
+                          {validation.status === 'ready' && <Check size={10} />}
+                          {validation.status === 'warning' && <AlertTriangle size={10} />}
+                          {validation.status === 'missing' && <XCircle size={10} />}
+                          {statusText}
+                        </span>
+                        {totalIssues > 0 && (
+                          <span className="review-issue-badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+                            {totalIssues} issue{totalIssues > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right panel: Validation Details */}
+          <div className="review-details-pane">
+            {(() => {
+              const selectedLine = allLines.find((l) => l.lineKey === activeReviewLineKey);
+              if (!selectedLine) {
+                return (
+                  <div className="panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                    <p style={{ color: 'var(--pc-muted)' }}>Select a line item from the sidebar to review validation details.</p>
+                  </div>
+                );
+              }
+
+              const lineResult = preview?.lines.find((l) => l.lineKey === selectedLine.lineKey);
+              const finalResult = lineResult ? getFinalResultForLine(lineResult) : undefined;
+              const resolvedContact = contactLookups.find(c => c.name === costs.contactPerson);
+              const cntctCode = resolvedContact ? resolvedContact.cntctCode : null;
+              const validation = validateLineCandidate(selectedLine, costs, {
+                runId: savedRunId,
+                revisionGroupId,
+                revisionNo,
+                status: runStatus,
+                supplierCode,
+                cntctCode,
+              }, finalResult);
+
+              return (
+                <div className="review-details-scroll">
+                  <div className="review-details-header">
+                    <div>
+                      <h3>Line #{selectedLine.no} Validation Details</h3>
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--pc-muted)' }}>
+                        {selectedLine.sapDescription}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => {
+                          if (lineResult && finalResult) {
+                            const now = Date.now();
+                            const key = storeBulkCostPreview({
+                              type: 'item',
+                              meta: { type: 'item', lineKey: selectedLine.lineKey, description: selectedLine.sapDescription, supplierName: selectedLine.vendorName, createdAt: now },
+                              itemData: mapBulkCostToItemData(selectedLine),
+                            });
+                            window.open(`/item/preview?key=${encodeURIComponent(key)}`, '_blank', 'noopener');
+                          }
+                        }}
+                        disabled={!lineResult}
+                        title="Preview Item Form candidate"
+                      >
+                        <FileText size={14} /> Item Preview
+                      </button>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => {
+                          if (lineResult && finalResult) {
+                            const now = Date.now();
+                            const key = storeBulkCostPreview({
+                              type: 'term',
+                              meta: { type: 'term', lineKey: selectedLine.lineKey, description: selectedLine.sapDescription, supplierName: selectedLine.vendorName, createdAt: now },
+                              formData: mapBulkCostToTermFormData(selectedLine, costs, finalResult),
+                              calcResults: mapBulkCostToTermCalcResults(selectedLine, finalResult),
+                            });
+                            window.open(`/term/preview?key=${encodeURIComponent(key)}`, '_blank', 'noopener');
+                          }
+                        }}
+                        disabled={!lineResult}
+                        title="Preview Term Form candidate"
+                      >
+                        <FileText size={14} /> Term Preview
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1. Item Candidate Group */}
+                  <div className="review-validation-section">
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Boxes size={16} />
+                      Item Registration Candidate
+                    </h4>
+                    <div className="review-validation-grid">
+                      {/* Item Group */}
+                      <ValidationFieldRow
+                        label="Item Group"
+                        value={selectedLine.itemGroup ? `${formatItemGroup(selectedLine.itemGroup)} (${selectedLine.itemGroup})` : undefined}
+                        issue={validation.itemIssues.find(i => i.field === 'itemGroup')}
+                      />
+                      {/* Mfr Brand */}
+                      <ValidationFieldRow
+                        label="Mfr Brand"
+                        value={selectedLine.manufacturer}
+                        issue={validation.itemIssues.find(i => i.field === 'manufacturer')}
+                      />
+                      {/* Mfr Catalog No */}
+                      <ValidationFieldRow
+                        label="Mfr Catalog No"
+                        value={selectedLine.mfgPartNumber}
+                        issue={validation.itemIssues.find(i => i.field === 'mfgPartNumber')}
+                      />
+                      {/* Item Description */}
+                      <ValidationFieldRow
+                        label="Item Description"
+                        value={selectedLine.sapDescription}
+                        issue={validation.itemIssues.find(i => i.field === 'sapDescription')}
+                      />
+                      {/* Stock UOM */}
+                      <ValidationFieldRow
+                        label="Stock UOM"
+                        value={selectedLine.uom}
+                        issue={validation.itemIssues.find(i => i.field === 'uom')}
+                      />
+                      {/* Country of Origin */}
+                      <ValidationFieldRow
+                        label="Country of Origin"
+                        value={selectedLine.countryOfOrigin}
+                        issue={validation.itemIssues.find(i => i.field === 'countryOfOrigin')}
+                      />
+                      {/* Permit Type */}
+                      <ValidationFieldRow
+                        label="Permit Type"
+                        value={selectedLine.permitType || '-'}
+                        issue={validation.itemIssues.find(i => i.field === 'permitType')}
+                      />
+                      {/* HS Code */}
+                      <ValidationFieldRow
+                        label="HS Code"
+                        value={selectedLine.hsCode || '-'}
+                        issue={validation.itemIssues.find(i => i.field === 'hsCode')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. Term Candidate Group */}
+                  <div className="review-validation-section">
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileText size={16} />
+                      Purchase Term Candidate
+                    </h4>
+                    <div className="review-validation-grid">
+                      <ValidationFieldRow
+                        label="Supplier Code"
+                        value={selectedLine.vendorCode || supplierCode}
+                        issue={validation.termIssues.find(i => i.field === 'vendorCode')}
+                      />
+                      <ValidationFieldRow
+                        label="Contact Person"
+                        value={costs.contactPerson || '-'}
+                        issue={validation.termIssues.find(i => i.field === 'contactPerson')}
+                      />
+                      <ValidationFieldRow
+                        label="Supp Order Code"
+                        value={selectedLine.supplierOrderCode || '-'}
+                        issue={validation.termIssues.find(i => i.field === 'supplierOrderCode')}
+                      />
+                      <ValidationFieldRow
+                        label="Purchase Term"
+                        value={selectedLine.orderTerm || costs.orderTerm}
+                        issue={validation.termIssues.find(i => i.field === 'orderTerm')}
+                      />
+                      <ValidationFieldRow
+                        label="Term Location"
+                        value={selectedLine.location || costs.location}
+                        issue={validation.termIssues.find(i => i.field === 'location')}
+                      />
+                      <ValidationFieldRow
+                        label="Purchase Sub Location"
+                        value={selectedLine.subLocation || costs.subLocation}
+                        issue={validation.termIssues.find(i => i.field === 'subLocation')}
+                      />
+                      {selectedLine.salesTerm && (
+                        <>
+                          <ValidationFieldRow
+                            label="Sales Term"
+                            value={selectedLine.salesTerm}
+                          />
+                          <ValidationFieldRow
+                            label="Sales Sub Location"
+                            value={selectedLine.salesSubLocation || '-'}
+                            issue={validation.termIssues.find(i => i.field === 'salesSubLocation')}
+                          />
+                        </>
+                      )}
+                      <ValidationFieldRow
+                        label="Currency"
+                        value={selectedLine.currency || costs.currency}
+                        issue={validation.termIssues.find(i => i.field === 'currency')}
+                      />
+                      <ValidationFieldRow
+                        label="Exchange Rate"
+                        value={costs.exchangeRate}
+                        issue={validation.termIssues.find(i => i.field === 'exchangeRate')}
+                      />
+                      <ValidationFieldRow
+                        label="Product Cost (PCS)"
+                        value={selectedLine.unitPrice}
+                        issue={validation.termIssues.find(i => i.field === 'unitPrice')}
+                      />
+                      <ValidationFieldRow
+                        label="Quantity"
+                        value={selectedLine.qty}
+                        issue={validation.termIssues.find(i => i.field === 'qty')}
+                      />
+                      <ValidationFieldRow
+                        label="Purchase UOM"
+                        value={selectedLine.purchaseUOM}
+                        issue={validation.termIssues.find(i => i.field === 'purchaseUOM')}
+                      />
+                      <ValidationFieldRow
+                        label="Sales UOM"
+                        value={selectedLine.saleUOM}
+                        issue={validation.termIssues.find(i => i.field === 'saleUOM')}
+                      />
+                      <ValidationFieldRow
+                        label="Stock Conv (NumInBuy)"
+                        value={selectedLine.stockConversion}
+                        issue={validation.termIssues.find(i => i.field === 'stockConversion')}
+                      />
+                      <ValidationFieldRow
+                        label="Sale Conv (NumInSale)"
+                        value={selectedLine.saleConversion}
+                        issue={validation.termIssues.find(i => i.field === 'saleConversion')}
+                      />
+                      <ValidationFieldRow
+                        label="Ship Mode"
+                        value={formatShipMode(selectedLine.shipModeNo !== undefined && selectedLine.shipModeNo >= 0 ? selectedLine.shipModeNo : costs.shipModeNo)}
+                        issue={validation.termIssues.find(i => i.field === 'shipModeNo')}
+                      />
+                      <ValidationFieldRow
+                        label="Valid From"
+                        value={todayIsoDate()}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3. Calculation/Result Group */}
+                  <div className="review-validation-section">
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Calculator size={16} />
+                      Calculation &amp; Landed Price Parity
+                    </h4>
+                    <div className="review-validation-grid">
+                      <ValidationFieldRow
+                        label="OP1 (Source)"
+                        value={finalResult?.op1Source}
+                        issue={validation.calcIssues.find(i => i.field === 'op1Source')}
+                      />
+                      <ValidationFieldRow
+                        label="OP1 (THB)"
+                        value={finalResult?.op1}
+                        issue={validation.calcIssues.find(i => i.field === 'op1')}
+                      />
+                      <ValidationFieldRow
+                        label="OP2 (THB)"
+                        value={finalResult?.op2}
+                        issue={validation.calcIssues.find(i => i.field === 'op2')}
+                      />
+                      <ValidationFieldRow
+                        label="Ship Weight Cal"
+                        value={finalResult?.shipWeightCal !== undefined ? `${finalResult.shipWeightCal} kg` : undefined}
+                        issue={validation.calcIssues.find(i => i.field === 'shipWeightCal')}
+                      />
+                      <ValidationFieldRow
+                        label="Allocated Freight (FR)"
+                        value={finalResult?.frQTEC}
+                        issue={validation.calcIssues.find(i => i.field === 'frQTEC')}
+                      />
+                      <ValidationFieldRow
+                        label="Insurance (INS)"
+                        value={finalResult?.ins}
+                        issue={validation.calcIssues.find(i => i.field === 'ins')}
+                      />
+                      <ValidationFieldRow
+                        label="CIF Price"
+                        value={finalResult?.cifQTEC}
+                        issue={validation.calcIssues.find(i => i.field === 'cifQTEC')}
+                      />
+                      <ValidationFieldRow
+                        label="Import Duty Tax"
+                        value={finalResult?.selectedDuty}
+                        issue={validation.calcIssues.find(i => i.field === 'selectedDuty')}
+                      />
+                      <ValidationFieldRow
+                        label="Landed Cost (QLC)"
+                        value={finalResult?.qlc}
+                        issue={validation.calcIssues.find(i => i.field === 'qlc')}
+                      />
+                      <ValidationFieldRow
+                        label="Total QLC"
+                        value={finalResult?.totalQLC}
+                        issue={validation.calcIssues.find(i => i.field === 'totalQLC')}
+                      />
+                      <ValidationFieldRow
+                        label="Sales Price"
+                        value={finalResult?.roundUp}
+                        issue={validation.calcIssues.find(i => i.field === 'roundUp')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4. Traceability Group */}
+                  <div className="review-validation-section">
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <History size={16} />
+                      Revision Traceability Metadata
+                    </h4>
+                    <div className="review-validation-grid">
+                      <ValidationFieldRow
+                        label="Run ID"
+                        value={savedRunId || undefined}
+                        issue={validation.traceIssues.find(i => i.field === 'runId')}
+                      />
+                      <ValidationFieldRow
+                        label="Revision Group ID"
+                        value={revisionGroupId || undefined}
+                        issue={validation.traceIssues.find(i => i.field === 'revisionGroupId')}
+                      />
+                      <ValidationFieldRow
+                        label="Revision No"
+                        value={revisionNo || undefined}
+                        issue={validation.traceIssues.find(i => i.field === 'revisionNo')}
+                      />
+                      <ValidationFieldRow
+                        label="Source Type"
+                        value="MANUAL"
+                      />
+                      <ValidationFieldRow
+                        label="Calculation Mode"
+                        value={allLines.length > 1 ? 'BULK' : 'SINGLE'}
+                      />
+                      <ValidationFieldRow
+                        label="Saved By"
+                        value={costs.saleIncharge || '-'}
+                        issue={validation.traceIssues.find(i => i.field === 'saleIncharge')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Disclaimer & Finalize button */}
+                  <div className="review-disclaimer-panel">
+                    <p>
+                      Master write is blocked until Review/Finalize rules, reverse mapping rules, and business/order gate are approved.
+                    </p>
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled
+                      style={{ opacity: 0.6, cursor: 'not-allowed', width: '220px' }}
+                    >
+                      Finalize to Item/Term
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      ) : (
+        <div className="bulk-cost-workspace-body">
       <section className="panel cost-bar-panel" aria-labelledby="cost-title">
         <div className="cost-bar-step-heading">
           <div className="cost-bar-step-title-row">
@@ -2012,7 +2712,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           </div>
 
           <div className="bulk-setup-card bulk-setup-card--costs">
-            <div className="bulk-setup-card-title">1.2 &amp; 1.3 Bulk Costs</div>
+            <div className="bulk-setup-card-title">1.2 &amp; 1.3 Shared Costs</div>
             <label className="cost-bar-field">
               <span>Total PKH ({foreignCostCurrencyLabel}) <span className="alloc-method-badge">By Wt</span></span>
               <FormattedNumberInput
@@ -2470,6 +3170,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                               currencyOptions={currencySelectOptions}
                               itemCategoryOptions={itemCategorySelectOptions}
                               itemGroupOptions={itemGroupSelectOptions}
+                              brandOptions={brandSelectOptions}
                               line={line}
                               missingWeight={missingWeight}
                               shipModeOptions={shipModeSelectOptions}
@@ -2550,7 +3251,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           <div className="cost-bar-step-title-row">
             <span className="cost-bar-step-badge cost-bar-step-badge--green">3</span>
             <div>
-              <h2 id="preview-title">Output &amp; Allocation Grid <span>(แสดงผลลัพธ์การปันส่วนต่อชิ้น)</span></h2>
+              <h2 id="preview-title">Cost Result Grid <span>(แสดงผลลัพธ์การปันส่วนต่อชิ้น)</span></h2>
               <p>ผลการปันส่วนค่าใช้จ่ายรวมลงแต่ละสินค้า พร้อม preview Item/Term draft</p>
             </div>
           </div>
@@ -2574,7 +3275,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
         {isCalculating ? (
           <div className="preview-loading">
             <Loader2 size={28} className="spin-icon" aria-hidden="true" />
-            <p>Calculating allocation...</p>
+            <p>Calculating cost result...</p>
           </div>
         ) : preview === null ? (
           <div className="preview-empty">
@@ -2702,6 +3403,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
         )}
       </section>
       </div>
+      )}
     </div>
   );
 }
@@ -2744,6 +3446,7 @@ function cellChangedClass(changed: boolean, className = ''): string {
 
 function SourceLineCell({
   allocatedCosts,
+  brandOptions,
   changedCellKeys,
   checked,
   columnKey,
@@ -2773,6 +3476,7 @@ function SourceLineCell({
   onToggleLine,
 }: {
   allocatedCosts: { pkhEa: number; socEa: number; frEa: number; ccEa: number; ttEa: number; op1Fcy: number; exRate: number; op1Thb: number; insAmount: number } | null;
+  brandOptions: LookupOption[];
   changedCellKeys: Set<string>;
   checked: boolean;
   columnKey: string;
@@ -2854,7 +3558,7 @@ function SourceLineCell({
     case 'itemGroup':
       return <LineItemGroupCell changed={hasChanged(changedCellKeys, line.lineKey, 'itemGroup')} editable={editable} itemGroupOptions={itemGroupOptions} line={line} tableSizing={tableSizing} onChange={(value) => onTextChange(line.lineKey, 'itemGroup', value)} />;
     case 'itemCategory':
-      return <LineSelectTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'itemCategory')} columnKey="itemCategory" editable={editable} line={line} options={ensureLookupOption(itemCategoryOptions, line.itemCategory)} tableSizing={tableSizing} value={line.itemCategory} onChange={(value) => onTextChange(line.lineKey, 'itemCategory', value)} />;
+      return <LineLookupTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'itemCategory')} columnKey="itemCategory" editable={editable} line={line} options={ensureLookupOption(itemCategoryOptions, line.itemCategory)} tableSizing={tableSizing} value={line.itemCategory} onChange={(value) => onTextChange(line.lineKey, 'itemCategory', value)} />;
     case 'customerStockCode':
       return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'customerStockCode')} columnKey="customerStockCode" editable={editable} line={line} tableSizing={tableSizing} value={line.customerStockCode} onChange={(value) => onTextChange(line.lineKey, 'customerStockCode', value)} />;
     case 'matchStatus':
@@ -2862,7 +3566,7 @@ function SourceLineCell({
     case 'description':
       return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'sapDescription')} className={`text-left-cell ${stickyClass}`.trim()} columnKey="description" editable={editable} line={line} stickyStyle={stickyStyle} tableSizing={tableSizing} value={line.sapDescription} onChange={(value) => onTextChange(line.lineKey, 'sapDescription', value)} />;
     case 'manufacturer':
-      return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'manufacturer')} columnKey="manufacturer" editable={editable} line={line} tableSizing={tableSizing} value={line.manufacturer} onChange={(value) => onTextChange(line.lineKey, 'manufacturer', value)} />;
+      return <LineLookupTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'manufacturer')} columnKey="manufacturer" editable={editable} line={line} options={brandOptions} tableSizing={tableSizing} value={line.manufacturer} onChange={(value) => onTextChange(line.lineKey, 'manufacturer', value)} />;
     case 'mfgPartNumber':
       return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'mfgPartNumber')} columnKey="mfgPartNumber" editable={editable} line={line} tableSizing={tableSizing} value={line.mfgPartNumber} onChange={(value) => onTextChange(line.lineKey, 'mfgPartNumber', value)} />;
     case 'supplierOrderCode':
@@ -2917,7 +3621,7 @@ function SourceLineCell({
     case 'importPermit':
       return <LineYesNoCell changed={hasChanged(changedCellKeys, line.lineKey, 'importPermit')} columnKey="importPermit" editable={editable} line={line} tableSizing={tableSizing} value={line.importPermit} onChange={(value) => onTextChange(line.lineKey, 'importPermit', value)} />;
     case 'permitType':
-      return <LineSelectTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'permitType')} columnKey="permitType" editable={editable} line={line} options={ensureLookupOption(permitTypeOptions, line.permitType)} tableSizing={tableSizing} value={line.permitType} onChange={(value) => onTextChange(line.lineKey, 'permitType', value)} />;
+      return <LineLookupTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'permitType')} columnKey="permitType" editable={editable} line={line} options={ensureLookupOption(permitTypeOptions, line.permitType)} tableSizing={tableSizing} value={line.permitType} onChange={(value) => onTextChange(line.lineKey, 'permitType', value)} />;
     case 'shelfLife':
       return <LineYesNoCell changed={hasChanged(changedCellKeys, line.lineKey, 'shelfLifeRequire')} columnKey="shelfLife" editable={editable} line={line} tableSizing={tableSizing} value={line.shelfLifeRequire} onChange={(value) => onTextChange(line.lineKey, 'shelfLifeRequire', value)} />;
     case 'itemWeight':
@@ -3222,28 +3926,73 @@ function LineLookupTextCell({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const selectOptions = options.some((option) => option.value === value)
-    ? options
-    : [{ value, label: value || '-' }, ...options];
+  const [isOpen, setIsOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value || '');
 
-  if (!editable || options.length === 0) {
+  useEffect(() => {
+    setInputValue(value || '');
+  }, [value]);
+
+  const filtered = useMemo(() => {
+    const q = inputValue.toLowerCase().trim();
+    if (!q) return options;
+    return options.filter((opt) =>
+      (opt.label || '').toLowerCase().includes(q) ||
+      (opt.value || '').toLowerCase().includes(q)
+    );
+  }, [options, inputValue]);
+
+  if (!editable) {
     return <LineTextCell changed={changed} columnKey={columnKey} editable={editable} line={line} tableSizing={tableSizing} value={value} onChange={onChange} />;
   }
 
   return (
-    <td {...tableSizing.getCellProps(columnKey)} className={cellChangedClass(changed, 'center-cell')}>
-      <select
-        id={`latest-${line.lineKey}-${columnKey}`}
-        name={`latest.${line.lineKey}.${columnKey}`}
-        className="line-edit-input"
-        value={value}
-        onMouseDownCapture={(e) => ensureSelectSpaceBelow(e.currentTarget)}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {selectOptions.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
+    <td {...tableSizing.getCellProps(columnKey)} className={cellChangedClass(changed, 'center-cell relative')}>
+      <div className="searchable-lookup-container w-full">
+        <input
+          id={`latest-${line.lineKey}-${columnKey}`}
+          name={`latest.${line.lineKey}.${columnKey}`}
+          type="text"
+          className="line-edit-input w-full"
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            onChange(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={(e) => {
+            ensureSelectSpaceBelow(e.currentTarget);
+            setIsOpen(true);
+          }}
+          onBlur={() => {
+            setTimeout(() => setIsOpen(false), 200);
+          }}
+          placeholder="Select or type..."
+        />
+        {isOpen && (
+          <div className="searchable-lookup-dropdown">
+            {filtered.map((opt) => (
+              <div
+                key={opt.value}
+                className={`searchable-lookup-option ${value === opt.value ? 'searchable-lookup-option--selected' : ''}`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setInputValue(opt.label || opt.value);
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+              >
+                {opt.label || opt.value}
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="searchable-lookup-no-results">
+                No match found
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </td>
   );
 }
@@ -3756,7 +4505,7 @@ function ResultTable({
               <ResizableHeader columnKey="qty" label="Qty" rowSpan={2} sizing={formulaTableSizing} />
               <ResizableHeader columnKey="uom" label="UOM" rowSpan={2} sizing={formulaTableSizing} />
               <ResizableHeader columnKey="amount" label="Amount" rowSpan={2} sizing={formulaTableSizing} />
-              <th colSpan={ALLOC_COLS.length} className="th-group">Allocation</th>
+              <th colSpan={ALLOC_COLS.length} className="th-group">Allocated Costs</th>
               <th colSpan={FORMULA_RESULT_KEYS.length} className="th-group th-final">Formula Check</th>
               <ResizableHeader className="th-final" columnKey="status" label="Status" rowSpan={2} sizing={formulaTableSizing} />
             </tr>
@@ -3819,7 +4568,7 @@ function ResultTable({
             <ResizableHeader columnKey="qty" label="Qty" rowSpan={2} sizing={fullTableSizing} />
             <ResizableHeader columnKey="uom" label="UOM" rowSpan={2} sizing={fullTableSizing} />
             <ResizableHeader columnKey="amount" label="Amount" rowSpan={2} sizing={fullTableSizing} />
-            <th colSpan={ALLOC_COLS.length} className="th-group">Allocation</th>
+            <th colSpan={ALLOC_COLS.length} className="th-group">Allocated Costs</th>
             <th colSpan={FINAL_RESULT_COLS.length} className="th-group th-final">Final Result (one row = one item/term)</th>
             <ResizableHeader className="th-final" columnKey="status" label="Status" rowSpan={2} sizing={fullTableSizing} />
           </tr>

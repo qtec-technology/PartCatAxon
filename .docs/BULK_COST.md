@@ -174,6 +174,7 @@ of the AY-CP table.
 - **Quote-level context:** Currency, Order Term, Location, Exchange Rate, Ship Mode
 - Last-line residual correction — แก้ rounding ให้ sum ตรง
 - Weight Validation: Block CAL immediately if weight-based costs (PKH, SOC, Freight, CC) are > 0 and any selected line is missing weight/dimensions.
+- Contact Person Validation: If contact person name is set in costs but contact code (cntctCode) is unresolved from DB lookup, a warning is raised during Review & Finalize stage.
 
 ### OP1 Formula (confirmed by manager)
 

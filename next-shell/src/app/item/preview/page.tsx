@@ -24,7 +24,7 @@ function ItemPreviewContent() {
         }
         const loaded = loadBulkCostPreview(key);
         if (!loaded || loaded.type !== 'item') {
-            setError('Preview data not found or expired. Please reopen from the Bulk Cost workspace.');
+            setError('Preview data not found or expired. Please reopen from the Cost Workspace.');
             return;
         }
         setPayload(loaded as BulkCostItemPreviewPayload);
@@ -62,7 +62,7 @@ function ItemPreviewContent() {
         <div className="h-full overflow-y-auto">
             <div className="bulk-cost-preview-banner">
                 <div className="bulk-cost-preview-banner-content">
-                    <span className="bulk-cost-preview-banner-title">Bulk Cost Preview — Item</span>
+                    <span className="bulk-cost-preview-banner-title">Cost Workspace Preview - Item</span>
                     <span className="bulk-cost-preview-banner-sub">
                         {meta.description || meta.lineKey} · {meta.supplierName} · Read-only · Not saved
                     </span>

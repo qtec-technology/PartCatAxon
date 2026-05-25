@@ -44,6 +44,7 @@ These belong to `CostWorkspaceRun` or the run section of the snapshot.
 Open run-level gap:
 
 - Exchange rate date/source is not clearly captured.
+- Contact Person Code is stored only as a name in the revision; code resolution to contact code (cntctCode) is validated via review warning.
 - Header-vs-line cost marker from AXON is pending final view columns.
 - Other supplier costs beyond current named fields need a transparent storage
   shape before SAP/Term compression.
@@ -280,3 +281,11 @@ These must be answered before schema rebuild is final:
    `CostWorkspaceSnapshot`.
 4. Do not design real Item/Term master write until Review/Finalize rules,
    reverse mapping rules, and the business/order gate are approved.
+
+## 12. AXON Awarded Intake UI Placeholder
+
+- Placed under the "Import AXON Awarded" tab.
+- Form inputs: ChainId / AIX ID, SourceRevision.
+- Mock layout attributes shown: customer RFQ info, awarded supplier summaries, cost markers, and dummy grid lines.
+- No DB queries or backend mappings are active yet.
+- All actions are currently disabled (UI placeholder only).

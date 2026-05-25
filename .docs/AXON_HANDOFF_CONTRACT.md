@@ -273,3 +273,11 @@ filtered by `ChainId`, not a standalone supplier picker that loses RFQ context.
 - Preserve `ChainId`, source revision, and source line ids on every snapshot and
   audit record.
 - Treat AXON and AI values as suggestions until sales verifies them.
+
+## AXON Awarded Intake Placeholder UI Status
+
+- **Status**: UI Placeholder Only (Not Connected)
+- **UI Tab**: "Import AXON Awarded" (integrated into the Cost Workspace page `/bulk-cost`).
+- **Functionality**: Demonstrates the target intake workflow by accepting a `ChainId` (AIX ID) and `SourceRevision`, showing a mock preview shell of customer metadata, supplier summary, cost markers, and skeleton lines. The active button is disabled, showing the reason: *"Waiting for AXON final awarded SQL view contract"*.
+- **Database Access**: There is no database view connection, backend API, or SQL query configured for this flow yet. The final view schemas and column mappings are pending from the AXON team (Pi-Jo).
+- **Identity Model**: `ChainId` / AIX ID is utilized purely as a correlation and search field; it is not a primary key for calculations.

@@ -9,7 +9,7 @@ import type { AuthContext } from '@/features/auth/auth-model';
 // ── Top-level tabs (main modes) ─────────────────────────────────────────────
 const mainTabs = [
   { href: '/partcatalog', label: 'Part Catalog', icon: Search },
-  { href: '/bulk-cost', label: 'Bulk Cost', icon: Boxes },
+  { href: '/bulk-cost', label: 'Cost Workspace', icon: Boxes },
 ] as const;
 
 // ── Utility nav (secondary) ─────────────────────────────────────────────────
@@ -28,12 +28,12 @@ export function AppShell({
     return pathname.startsWith(href);
   };
   const lockWorkspace = pathname === '/partcatalog' || pathname.startsWith('/bulk-cost');
-  const productTitle = isBulkCostPath ? 'QTEC PartCatalog' : 'QTEC AXON SYSTEM';
-  const productSubtitle = isBulkCostPath ? 'Manual Bulk Cost Workspace' : 'Part Catalog & Cost Intelligence';
+  const productTitle = isBulkCostPath ? 'QTEC Cost Workspace' : 'QTEC AXON SYSTEM';
+  const productSubtitle = isBulkCostPath ? 'Manual + AXON Awarded cost preparation' : 'Part Catalog & Cost Intelligence';
 
   useEffect(() => {
     if (!isBulkCostPath) return;
-    document.title = 'QTEC Bulk Cost';
+    document.title = 'QTEC Cost Workspace';
   }, [isBulkCostPath]);
 
   const topbar = (

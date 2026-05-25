@@ -1,24 +1,61 @@
 'use client';
 
-import { Suspense, useCallback } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Boxes, FileSpreadsheet, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plus, Upload } from 'lucide-react';
 import { AllocationList } from '@/features/bulk-cost/AllocationList';
 import { BulkCostWorkspace } from '@/features/bulk-cost/BulkCostWorkspace';
 import { SupplierSelection } from '@/features/bulk-cost/SupplierSelection';
+import { AxonAwardedIntake } from '@/features/bulk-cost/AxonAwardedIntake';
 import type { BulkCostRunSummary } from '@/features/bulk-cost/bulk-cost.types';
+
+type WorkspaceView = 'runs' | 'new' | 'axon';
+
+const WORKSPACE_VIEWS = new Set<WorkspaceView>(['runs', 'new', 'axon']);
+
+function normalizeWorkspaceView(value: string | null): WorkspaceView {
+  if (value === 'allocations') return 'runs';
+  if (value && WORKSPACE_VIEWS.has(value as WorkspaceView)) return value as WorkspaceView;
+  return 'runs';
+}
 
 function BulkCostContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const codeFromUrl = searchParams.get('supplier') ?? '';
   const nameFromUrl = searchParams.get('supplierName') ?? '';
-  const tabFromUrl = searchParams.get('tab') ?? 'allocations';
+  const tabFromUrl = normalizeWorkspaceView(searchParams.get('tab'));
   const runIdFromUrl = searchParams.get('runId') ?? '';
-  const fromTab = searchParams.get('from') ?? 'allocations';
+  const fromTab = normalizeWorkspaceView(searchParams.get('from'));
 
   const selectedSupplier = codeFromUrl ? { code: codeFromUrl, name: nameFromUrl } : null;
+  const activeView = selectedSupplier ? 'editor' : tabFromUrl;
+
+  const navItems = useMemo(
+    () => [
+      {
+        id: 'runs' as const,
+        label: 'Workspace Runs',
+        description: 'Saved revisions',
+        icon: LayoutDashboard,
+      },
+      {
+        id: 'new' as const,
+        label: 'New Manual',
+        description: 'Blank workspace',
+        icon: Plus,
+      },
+      {
+        id: 'axon' as const,
+        label: 'AXON Awarded',
+        description: 'Future Award = Y intake',
+        icon: Upload,
+      },
+    ],
+    [],
+  );
 
   const setParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -32,7 +69,7 @@ function BulkCostContent() {
     [router, searchParams],
   );
 
-  // From New Allocation tab: open fresh workspace
+  // From New Manual tab: open fresh workspace
   const handleSelectSupplier = useCallback(
     (vendor: { code: string; name: string }) => {
       setParams({ supplier: vendor.code, supplierName: vendor.name, tab: null, from: 'new', runId: null });
@@ -40,10 +77,10 @@ function BulkCostContent() {
     [setParams],
   );
 
-  // From Allocations list: open existing run
+  // From Workspace Runs list: open existing run
   const handleOpenRun = useCallback(
     (run: BulkCostRunSummary) => {
-      setParams({ supplier: run.vendorCode, supplierName: run.vendorName, runId: String(run.runId), tab: null, from: 'allocations' });
+      setParams({ supplier: run.vendorCode, supplierName: run.vendorName, runId: String(run.runId), tab: null, from: 'runs' });
     },
     [setParams],
   );
@@ -53,44 +90,103 @@ function BulkCostContent() {
     setParams({ supplier: null, supplierName: null, runId: null, from: null, tab: fromTab });
   }, [setParams, fromTab]);
 
-  const handleTabChange = useCallback(
-    (value: string) => {
+  const handleViewChange = useCallback(
+    (value: WorkspaceView) => {
       setParams({ tab: value, supplier: null, supplierName: null, runId: null, from: null });
     },
     [setParams],
   );
 
-  // Supplier selected → show Workspace (bypasses tabs)
-  if (selectedSupplier) {
-    return (
-      <div className="bulk-cost-page-root">
-        <BulkCostWorkspace
-          supplierCode={selectedSupplier.code}
-          supplierName={selectedSupplier.name}
-          savedRunId={runIdFromUrl ? Number(runIdFromUrl) : null}
-          backLabel={fromTab === 'allocations' ? 'Back to Allocations' : 'Back to Supplier List'}
-          onBack={handleBack}
-        />
-      </div>
-    );
-  }
+  const viewContent = selectedSupplier ? (
+    <BulkCostWorkspace
+      supplierCode={selectedSupplier.code}
+      supplierName={selectedSupplier.name}
+      savedRunId={runIdFromUrl ? Number(runIdFromUrl) : null}
+      backLabel={fromTab === 'runs' ? 'Back to Workspace Runs' : 'Back to Supplier List'}
+      onBack={handleBack}
+    />
+  ) : tabFromUrl === 'new' ? (
+    <SupplierSelection onSelectSupplier={handleSelectSupplier} />
+  ) : tabFromUrl === 'axon' ? (
+    <AxonAwardedIntake />
+  ) : (
+    <AllocationList onOpen={handleOpenRun} />
+  );
 
   return (
     <div className="bulk-cost-page-root">
-      <Tabs value={tabFromUrl} onValueChange={handleTabChange} className="bulk-cost-tabs-root">
-        <TabsList>
-          <TabsTrigger value="allocations" className="data-[state=active]:bg-[#2264A0] data-[state=active]:text-white px-4 py-3 h-auto rounded-none">Allocations</TabsTrigger>
-          <TabsTrigger value="new" className="data-[state=active]:bg-[#2264A0] data-[state=active]:text-white px-4 py-3 h-auto rounded-none">New Allocation</TabsTrigger>
-        </TabsList>
+      <div className={`cost-workspace-shell ${sidebarCollapsed ? 'cost-workspace-shell--collapsed' : ''}`}>
+        <aside className="cost-workspace-sidebar" aria-label="Cost Workspace navigation">
+          <div className="cost-workspace-sidebar-header">
+            <div className="cost-workspace-sidebar-brand" aria-hidden="true">
+              <Boxes size={18} />
+            </div>
+            {!sidebarCollapsed && (
+              <div className="cost-workspace-sidebar-title">
+                <strong>Cost Workspace</strong>
+                <span>Manual + AXON awarded sources</span>
+              </div>
+            )}
+            <button
+              aria-label={sidebarCollapsed ? 'Expand Cost Workspace sidebar' : 'Collapse Cost Workspace sidebar'}
+              className="cost-workspace-sidebar-toggle"
+              type="button"
+              onClick={() => setSidebarCollapsed((value) => !value)}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            </button>
+          </div>
 
-        <TabsContent value="allocations" className="bulk-cost-tab-content">
-          <AllocationList onOpen={handleOpenRun} />
-        </TabsContent>
+          <nav className="cost-workspace-sidebar-nav">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeView === item.id;
+              return (
+                <button
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`cost-workspace-nav-item ${isActive ? 'cost-workspace-nav-item--active' : ''}`}
+                  key={item.id}
+                  onClick={() => handleViewChange(item.id)}
+                  title={sidebarCollapsed ? item.label : undefined}
+                  type="button"
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  {!sidebarCollapsed && (
+                    <span>
+                      <strong>{item.label}</strong>
+                      <small>{item.description}</small>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
 
-        <TabsContent value="new" className="bulk-cost-tab-content">
-          <SupplierSelection onSelectSupplier={handleSelectSupplier} />
-        </TabsContent>
-      </Tabs>
+            {selectedSupplier && (
+              <div className="cost-workspace-nav-item cost-workspace-nav-item--active cost-workspace-nav-item--readonly" title={sidebarCollapsed ? 'Editor' : undefined}>
+                <FileSpreadsheet size={18} aria-hidden="true" />
+                {!sidebarCollapsed && (
+                  <span>
+                    <strong>Editor</strong>
+                    <small>{selectedSupplier.name || selectedSupplier.code}</small>
+                  </span>
+                )}
+              </div>
+            )}
+          </nav>
+
+          {!sidebarCollapsed && (
+            <div className="cost-workspace-sidebar-note">
+              <strong>Safety Gate</strong>
+              <span>No Item/Term master write until Review/Finalize, reverse mapping, and business/order gate are approved.</span>
+            </div>
+          )}
+        </aside>
+
+        <section className="cost-workspace-main" aria-label="Cost Workspace content">
+          {viewContent}
+        </section>
+      </div>
     </div>
   );
 }

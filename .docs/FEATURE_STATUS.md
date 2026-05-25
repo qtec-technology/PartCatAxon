@@ -17,10 +17,10 @@
 | Item/Term attachment flow | ✅ Active | ใช้งานได้ |
 | Next.js Phase 1 (BFF proxy) | ✅ Done | `/api/*` route handler พร้อม |
 | Next.js Phase 2 (native pages) | ✅ Done | Item, Term, PartCatalog native แล้ว |
-| Bulk Cost UI + DB live | ✅ Active | UI พร้อม, DB connected (mock fallbacks removed), Step 1 Purchase Sub Location uses the same AP-filtered lookup pattern as Term, current verification: next-shell 70 tests, server 120 tests |
-| Bulk Cost Run List + Status | ✅ Done | 2 tabs (Allocations / New Allocation), GET /runs, GET /runs/:id, PATCH /runs/:id/status, restore saved run, saleIncharge filter |
-| Bulk Cost backend API + DB | ✅ Phase 3A Live | Manual Bulk Cost save/load uses `BulkCostRun` / `DraftItem` / `DraftTerm` snapshots with `BulkCostRun` revision metadata; POST /api/bulk-cost/calculate + POST /api/bulk-cost/runs revision save, mock fallbacks removed; legacy `AxonExtractionQueue` queue route removed from active surface |
-| Bulk Cost viewport-locked layout | ✅ Done | `/bulk-cost` pages use app-shell-locked layout (internal scroll, no page scroll) matching `/partcatalog` |
+| Cost Workspace UI + DB live | ✅ Active | Manual Cost Workspace UI พร้อม, DB connected (mock fallbacks removed), Step 1 Purchase Sub Location uses the same AP-filtered lookup pattern as Term, current verification: next-shell 71 tests, server 121 tests |
+| Cost Workspace Run List + Status | ✅ Done | Left sidebar navigation (Workspace Runs / New Manual / AXON Awarded / Editor), GET /runs, GET /runs/:id, PATCH /runs/:id/status, restore saved run, saleIncharge filter |
+| Cost Workspace backend API + DB | ✅ Phase 3A Live | Manual Cost Workspace save/load uses `BulkCostRun` / `DraftItem` / `DraftTerm` snapshots with `BulkCostRun` revision metadata; POST /api/bulk-cost/calculate + POST /api/bulk-cost/runs revision save, mock fallbacks removed; legacy `AxonExtractionQueue` queue route removed from active surface |
+| Cost Workspace viewport-locked layout | ✅ Done | `/bulk-cost` pages use app-shell-locked layout (internal scroll, no page scroll) matching `/partcatalog` |
 | Architecture Stabilization | 🔄 Active | Reset boundary around AXON owner/PartCatalogAxon consumer, `ChainId` handoff, Nginx/NSSM deploy, module boundaries, and automation-ready operation layer |
 | Cost Workspace redesign | 🔄 Active | Decision locked: one Cost Workspace supports `SINGLE` + `BULK` and `MANUAL` + `AXON_AWARDED`; Manual is completed first to validate formulas, required columns, UI, and revision snapshots before real AXON awarded view integration |
 | AI-assisted workflow | ⏸ Out of active architecture | `ai-services/` research is not part of the current PartCatalogAxon runtime; HS Code, Duty, Permit, Shelf Life are AXON/team scope |
@@ -47,11 +47,11 @@
 - `/bulk-cost` — Bulk Cost workspace (connected to real DB, viewport-locked layout)
 - `/api/*` BFF proxy → Express
 
-### Bulk Cost (Prototype)
+### Cost Workspace (Manual Phase 3A)
 - SupplierSelection table (400 records per page, resizable columns, expandable item preview)
-- BulkCostWorkspace: Steps 1-3 (Cost Bar → Source Lines → Result Review)
+- BulkCostWorkspace: Steps 1-3 (Shared Cost Setup → Source Lines → Cost Result Review)
 - Origin / Latest / Changes views
-- Live preview calculation now calls backend `POST /api/bulk-cost/calculate`; active New Allocation starts from a blank manual workspace; mock fixtures are tests/demo only
+- Live preview calculation now calls backend `POST /api/bulk-cost/calculate`; active New Manual starts from a blank manual workspace; mock fixtures are tests/demo only
 - Per-line document fees, editable final result
 - Pure document-fee basis helper/tests: Per Each, item-total normalization, By Lot / Batch service-line candidates
 - AY-CP final-result schema module: full final CAL table is locked to exactly 44 Excel columns (AY-CP); formula diagnostics stay separate; Term preview now receives ET/MT/preQLC/STK/QLC2 instead of zeros
@@ -64,8 +64,8 @@
 
 ## 3. สิ่งที่ยังไม่มีในระบบ
 
-- Bulk Cost Award/Reverse-map endpoint
-- Bulk Cost master write flow to Item/Term after Awarded
+- Cost Workspace reverse-map endpoint after AXON awarded/business gate approval
+- Cost Workspace master write flow to Item/Term after Review/Finalize and business/order gate approval
 - Real AXON/UI/API persistence for explicit `DocumentFeeBasis` and generated
   By Lot / Batch document-fee line candidates
 - Real SQL Server `PART_CATALOG_AIX` DB: Manual Bulk Cost requires `BulkCostRun` revision metadata plus `DraftItem` / `DraftTerm` snapshots; `server/sql/20260519_bulk_cost_manual_revision.sql` adds only revision metadata
@@ -83,6 +83,10 @@
 
 | วันที่ | การเปลี่ยนแปลง | Verification |
 |---|---|---|
+| 2026-05-25 | Cost Workspace Hybrid Sidebar Layout: เปลี่ยนหน้า `/bulk-cost` จากแท็บด้านบนเป็น left sidebar เฉพาะ Cost Workspace ตาม Option A โดยยังคง global topbar เดิมของ Part Catalog ไว้, เพิ่ม collapse mode, แยกเมนู Workspace Runs / New Manual / AXON Awarded / Editor, ปรับ collapsed sidebar ไม่ให้ปุ่มถูกบีบ และแก้ Currency/Ex. Rate row ให้แสดงรหัสสกุลเงินครบ โดยคง route/schema/API เดิมทั้งหมด | Browser UI check ✅, `npm run typecheck` ✅, `npm test` ✅ (server 121 + next-shell 71), `npm run build` ✅, `git diff --check` ✅ |
+| 2026-05-25 | AXON Awarded Intake Placeholder UI: สร้างคอมโพเนนต์ AxonAwardedIntake.tsx เพื่อจำลองหน้ารับข้อมูลของ AXON โดยแสดง ChainId, SourceRevision, ข้อมูลสรุป และตารางพรีวิวแบบ mock (obvious dummy placeholders) โดยปุ่ม Load/Import ถูก disabled พร้อมระบุเหตุผลว่ารอดำเนินการเรื่อง SQL View contract ทั้งนี้ไม่มีการเพิ่ม/แก้ backend API หรือ SQL queries จริง | `npm run typecheck` ✅, `npm test` ✅ (server 121 + next-shell 71), `npm run build` ✅, `git diff --check` ✅ |
+| 2026-05-25 | ปรับปรุงคำบน UI และเอกสารให้สอดคล้องกับชื่อ "Cost Workspace" (Cost Workspace Naming & Copy Cleanup): (1) ปรับ visible copy จาก Bulk Cost / Allocation เป็น Cost Workspace, (2) เปลี่ยนชื่อแท็บและปุ่มลัดต่างๆ บน UI เช่น Allocations -> Workspace Runs, (3) ตรวจสอบและเปลี่ยนปุ่มสถานะของ Manual Workspace จาก Awarded/Lost เป็น Mark Won/Lost (ระบุเป็น local workspace status เพื่อไม่ให้สับสนกับ AXON Award) โดยไม่กระทบสกีมาฐานข้อมูลและเส้นทาง routing `/bulk-cost` เดิม | `npm run typecheck` ✅, `npm test` ✅ (server 121 + next-shell 71), `npm run build` ✅, `git diff --check` ✅ |
+| 2026-05-25 | ปรับปรุงเสถียรภาพ Manual Cost Workspace (UAT Hardening): (1) พัฒนาคอมโพเนนต์ค้นหาและเลือกแบบพิมพ์คำค้นหาพร้อมระบุค่าอิสระ (LineSearchableLookupCell) สำหรับฟิลด์ Mfr Brand, Country of Origin, Item Category และ Permit Type, (2) เพิ่มความแม่นยำและการตรวจสอบความพร้อมรหัสผู้ติดต่อ (Contact Person Code warning) ในส่วน Review/Finalize | `npm run typecheck` ✅, `npm test` ✅ (server 121 + next-shell 71), `npm run build` ✅, `git diff --check` ✅ |
 | 2026-05-25 | อัปเดตและปรับปรุง Manual Cost Workspace: (1) เปลี่ยนฟิลด์ผู้ติดต่อ (Contact Person) ในขั้นตอนที่ 1 จาก Text input เป็น Dropdown lookup ดึงรายชื่อจาก Vendor Master (`lookupApi.getContacts`), (2) เพิ่มกลไกการตรวจสอบน้ำหนักแบบเข้มงวด (Strict Weight Validation) ในขั้นตอนการคำนวณ โดยจะบล็อกการกดปุ่ม CAL ทันทีหากน้ำหนักรายการไม่ครบในกรณีที่มีการป้อนต้นทุนตามน้ำหนัก (PKH, SOC, Freight, CC), (3) ปรับปรุงให้ฟังก์ชัน Apply Order Settings ทำการดึงและอัปเดต zoneRate ของ Location ไปยังรายการย่อยทั้งหมดอย่างถูกต้อง | `npm run typecheck` ✅, `npm test` ✅ (server 121 + next-shell 71), `npm run build` ✅ |
 | 2026-05-25 | Updated `.docs/COST_WORKSPACE_FIELD_COVERAGE.md` into a concrete Item/Term comparison matrix with field placement labels (`Main Grid`, `Step 1 Default`, `Review/Finalize`, `System`, `Trace Only`, `Deferred`), Item gaps, Term header gaps, calculation input gaps, calculated output snapshot requirements, and Workspace-only trace fields. | Docs-only |
 | 2026-05-25 | Closed the main documentation set for agent handoff: removed stale AXON/API, AI-briefing, test-handoff, and standalone validation docs; moved validation guidance into `AGENT_START_HERE.md`; made `AXON_HANDOFF_CONTRACT.md` the only AXON handoff source; and updated `AGENTS.md`, `CLAUDE.md`, Copilot instructions, README, roadmap, docs index, cleanup inventory, and Bulk Cost references accordingly. | Docs-only |

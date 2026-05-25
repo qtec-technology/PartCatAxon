@@ -31,7 +31,7 @@ const STATUS_FILTERS: { label: string; value: AllocationRunStatus | undefined }[
   { label: 'All',            value: undefined },
   { label: 'Draft',          value: 'DRAFT' },
   { label: 'Quoted',         value: 'QUOTED' },
-  { label: 'Awarded',        value: 'AWARDED' },
+  { label: 'Won',            value: 'AWARDED' },
   { label: 'Reverse Mapped', value: 'REVERSE_MAPPED' },
   { label: 'Lost',           value: 'LOST' },
   { label: 'Archived',       value: 'ARCHIVED' },
@@ -96,7 +96,7 @@ export function AllocationList({ onOpen }: AllocationListProps) {
       setRuns(result.runs);
       setTotalRuns(result.total);
     } catch {
-      setError('Failed to load allocations. Please try again.');
+      setError('Failed to load workspace runs. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -192,7 +192,7 @@ export function AllocationList({ onOpen }: AllocationListProps) {
           </select>
 
           <span className="supplier-filter-result-count" style={{ marginLeft: 'auto' }}>
-            {!isInitialLoading && `${totalRuns} allocation${totalRuns !== 1 ? 's' : ''}`}
+            {!isInitialLoading && `${totalRuns} workspace run${totalRuns !== 1 ? 's' : ''}`}
           </span>
         </div>
       </section>
@@ -214,8 +214,8 @@ export function AllocationList({ onOpen }: AllocationListProps) {
         ) : !isInitialLoading && runs.length === 0 ? (
           <div className="preview-empty">
             <ClipboardList size={32} aria-hidden="true" />
-            <p>No allocations found.</p>
-            <small>Try a different search or filter, or create a new allocation.</small>
+            <p>No workspace runs found.</p>
+            <small>Try a different search or filter, or create a new manual workspace.</small>
           </div>
         ) : (
           <>
@@ -224,7 +224,7 @@ export function AllocationList({ onOpen }: AllocationListProps) {
                 className="prototype-table allocation-list-table"
                 style={tableSizing.tableStyle}
                 data-resizable-table={tableSizing.tableId}
-                aria-label="Bulk cost allocations"
+                aria-label="Cost workspace runs"
               >
                 <colgroup>
                   {ALLOCATION_TABLE_COLUMNS.map((col) => (
@@ -303,7 +303,7 @@ function RunStatusBadge({ status }: { status: AllocationRunStatus }) {
     return (
       <span className="run-status-badge run-status-badge--awarded">
         <Trophy size={12} aria-hidden="true" />
-        Awarded
+        Won
       </span>
     );
   }

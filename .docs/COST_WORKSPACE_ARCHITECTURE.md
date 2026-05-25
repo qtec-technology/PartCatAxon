@@ -200,8 +200,9 @@ PartCatalog Review / Finalize
   -> decide New Item + New Term / Existing Item + New Term / Update Term
 ```
 
-The existing `/bulk-cost` route can continue temporarily as the implementation
-surface, but copy/docs should move toward Cost Workspace terminology.
+The existing `/bulk-cost` route continues temporarily as the implementation surface to avoid affecting next-shell routing. The visible product name on the UI has been changed to 'Cost Workspace', with 'Bulk Cost' serving as the internal calculation mode. The underlying database tables, schemas, folder structures, and API routes retain their original names (e.g., `BulkCostRun`, `DraftItem`, `DraftTerm`) until a formal migration design is approved.
+
+UI navigation uses the approved hybrid layout: the global Part Catalog topbar stays in `AppShell`, and Cost Workspace owns a route-local left sidebar for `Workspace Runs`, `New Manual`, `AXON Awarded`, and the active `Editor`. This keeps Part Catalog pages stable while giving the 40+ column workspace more horizontal room than the previous top-tab layout.
 
 ## 10. Cleanup Direction
 

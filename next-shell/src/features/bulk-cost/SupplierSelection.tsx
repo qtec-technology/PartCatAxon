@@ -84,8 +84,8 @@ export function SupplierSelection({ onSelectSupplier }: SupplierSelectionProps) 
       <section className="panel supplier-search-panel">
         <div className="supplier-selection-copy">
           <div>
-            <p className="eyebrow">Manual Bulk Cost</p>
-            <h2>Select supplier to start a blank run</h2>
+            <p className="eyebrow">Manual Cost Workspace</p>
+            <h2>Select supplier to start a manual workspace</h2>
           </div>
           <span>Search vendor master, then open an empty workspace for manual line entry.</span>
         </div>
@@ -183,7 +183,7 @@ export function SupplierSelection({ onSelectSupplier }: SupplierSelectionProps) 
             className="primary-button compact-btn bulk-supplier-open-btn"
             disabled={!selected}
             onClick={handleOpen}
-            title="Open a blank manual Bulk Cost workspace"
+            title="Open a blank manual Cost Workspace"
           >
             Open Workspace
             <ChevronRight size={15} aria-hidden="true" />

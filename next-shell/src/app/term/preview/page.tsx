@@ -33,7 +33,7 @@ function TermPreviewContent() {
         }
         const loaded = loadBulkCostPreview(key);
         if (!loaded || loaded.type !== 'term') {
-            setError('Preview data not found or expired. Please reopen from the Bulk Cost workspace.');
+            setError('Preview data not found or expired. Please reopen from the Cost Workspace.');
             return;
         }
         const termPayload = loaded as BulkCostTermPreviewPayload;
@@ -101,7 +101,7 @@ function TermPreviewContent() {
         <div className="bg-[#F0F2F5] font-sans text-gray-900">
             <div className="bulk-cost-preview-banner">
                 <div className="bulk-cost-preview-banner-content">
-                    <span className="bulk-cost-preview-banner-title">Bulk Cost Preview — Term</span>
+                    <span className="bulk-cost-preview-banner-title">Cost Workspace Preview - Term</span>
                     <span className="bulk-cost-preview-banner-sub">
                         {meta.description || meta.lineKey} · {meta.supplierName} · Read-only · Not saved
                     </span>
