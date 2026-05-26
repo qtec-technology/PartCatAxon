@@ -3667,6 +3667,32 @@ tfoot .sticky-col-last {
   min-width: 0;
 }
 
+.workspace-run-control-row {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workspace-run-search-bar {
+  flex: 1 1 420px;
+  min-width: 280px;
+}
+
+.workspace-run-owner-filter {
+  flex: 0 0 auto;
+}
+
+.workspace-run-owner-filter .supplier-filter-select {
+  min-width: 160px;
+}
+
+.workspace-run-result-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .bulk-cost-supplier-page {
   height: 100%;
   min-height: 0;
@@ -4353,7 +4379,7 @@ tfoot .sticky-col-last {
 .workspace-run-summary-grid {
   display: grid;
   flex: 1 1 100%;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
 }
 
@@ -4421,6 +4447,11 @@ tfoot .sticky-col-last {
   color: var(--pc-blue);
   font-size: 15px;
   font-weight: 800;
+}
+
+.workspace-run-summary-card--all .workspace-run-summary-value {
+  background: #edf5fc;
+  color: var(--pc-blue);
 }
 
 .workspace-run-summary-card--awarded .workspace-run-summary-value {

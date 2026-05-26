@@ -16,7 +16,7 @@ const ALLOCATION_TABLE_COLUMNS: ResizableTableColumn[] = [
   { key: 'currency',    defaultWidth: 80,  minWidth: 60 },
   { key: 'updatedAt',   defaultWidth: 110, minWidth: 80 },
   { key: 'updatedBy',   defaultWidth: 120, minWidth: 80 },
-  { key: 'status',      defaultWidth: 110, minWidth: 90 },
+  { key: 'status',      defaultWidth: 170, minWidth: 150 },
   { key: 'referenceNo', defaultWidth: 160, minWidth: 80 },
   { key: 'action',      defaultWidth: 80,  minWidth: 70 },
 ];
@@ -27,14 +27,12 @@ const COL_LABELS: Record<string, string> = {
   updatedBy: 'Updated By', status: 'Status', referenceNo: 'Reference No.', action: '',
 };
 
-const STATUS_FILTERS: { label: string; value: AllocationRunStatus | undefined }[] = [
-  { label: 'All',            value: undefined },
-  { label: 'Draft',          value: 'DRAFT' },
-  { label: 'Quoted',         value: 'QUOTED' },
-  { label: 'Sales Won',      value: 'AWARDED' },
-  { label: 'Sales Lost',     value: 'LOST' },
-  { label: 'Archived',       value: 'ARCHIVED' },
-];
+type WorkspaceRunSummaryCard = {
+  label: string;
+  description: string;
+  value: number;
+  status?: AllocationRunStatus;
+};
 
 const PAGE_SIZE = 400;
 
@@ -110,30 +108,36 @@ export function AllocationList({ onOpen }: AllocationListProps) {
     return acc;
   }, {});
 
-  const summaryCards = [
+  const summaryCards: WorkspaceRunSummaryCard[] = [
+    {
+      label: 'All Runs',
+      description: 'งานทั้งหมด',
+      value: totalRuns,
+      status: undefined,
+    },
     {
       label: 'Drafts',
       description: 'งานที่ยังเป็นแบบร่าง',
       value: counts.DRAFT ?? 0,
-      status: 'DRAFT' as const,
+      status: 'DRAFT',
     },
     {
       label: 'Quoted',
       description: 'ส่งราคาแล้ว',
       value: counts.QUOTED ?? 0,
-      status: 'QUOTED' as const,
+      status: 'QUOTED',
     },
     {
       label: 'Sales Won',
       description: 'ลูกค้าตกลง / งานขายชนะ',
       value: counts.AWARDED ?? 0,
-      status: 'AWARDED' as const,
+      status: 'AWARDED',
     },
     {
       label: 'Sales Lost',
       description: 'ลูกค้าไม่ซื้อ / งานขายแพ้',
       value: counts.LOST ?? 0,
-      status: 'LOST' as const,
+      status: 'LOST',
     },
   ];
 
@@ -160,35 +164,17 @@ export function AllocationList({ onOpen }: AllocationListProps) {
     <div className="page-stack bulk-cost-supplier-page">
       {/* Search & filter panel */}
       <section className="panel supplier-search-panel">
-        <div className="supplier-search-bar">
-          <Search size={18} aria-hidden="true" />
-          <input
-            type="text"
-            placeholder="Search supplier name, reference no., run #…"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="supplier-search-input"
-          />
-          <button
-            type="button"
-            className="secondary-button compact-btn"
-            onClick={() => void fetchRuns()}
-            title="Refresh list"
-          >
-            <RefreshCw size={14} aria-hidden="true" />
-            Refresh
-          </button>
-        </div>
-
         <div className="workspace-run-summary-grid" aria-label="Workspace run status summary">
           {summaryCards.map((card) => {
             const isActive = statusFilter === card.status;
+            const summaryKey = card.status ?? 'ALL';
             return (
               <button
-                key={card.status}
+                key={summaryKey}
                 type="button"
-                className={`workspace-run-summary-card workspace-run-summary-card--${card.status.toLowerCase()}${isActive ? ' workspace-run-summary-card--active' : ''}`}
+                className={`workspace-run-summary-card workspace-run-summary-card--${summaryKey.toLowerCase()}${isActive ? ' workspace-run-summary-card--active' : ''}`}
                 onClick={() => handleFilterChange(card.status)}
+                aria-pressed={isActive}
               >
                 <span className="workspace-run-summary-copy">
                   <strong>{card.label}</strong>
@@ -200,44 +186,50 @@ export function AllocationList({ onOpen }: AllocationListProps) {
           })}
         </div>
 
-        <div className="supplier-filter-bar">
-          <span className="allocation-filter-label">Status</span>
-          {STATUS_FILTERS.map((filter) => {
-            const isActive = statusFilter === filter.value;
-            const count = filter.value ? (counts[filter.value] ?? 0) : runs.length;
-            return (
-              <button
-                key={filter.label}
-                type="button"
-                className={`allocation-filter-btn${isActive ? ' allocation-filter-btn--active' : ''}`}
-                onClick={() => handleFilterChange(filter.value)}
-              >
-                {filter.label}
-                <span className="allocation-filter-count">{isInitialLoading ? '…' : count}</span>
-              </button>
-            );
-          })}
+        <div className="workspace-run-control-row">
+          <div className="supplier-search-bar workspace-run-search-bar">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="text"
+              placeholder="Search supplier name, reference no., run #…"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="supplier-search-input"
+            />
+          </div>
 
-          <span className="allocation-filter-label" style={{ marginLeft: '12px' }}>ผู้รับผิดชอบ</span>
-          <select
-            className="supplier-filter-select"
-            value={saleInchargeFilter}
-            onMouseDownCapture={(e) => {
-              const el = e.currentTarget;
-              if (typeof window === 'undefined') return;
-              const rect = el.getBoundingClientRect();
-              const vSpace = window.innerHeight - rect.bottom;
-              if (vSpace < 260) window.scrollBy({ top: 260 - vSpace + 8, behavior: 'auto' });
-            }}
-            onChange={(e) => { setSaleInchargeFilter(e.target.value); setCurrentPage(1); }}
+          <label className="supplier-filter-select-wrap workspace-run-owner-filter">
+            <span>ผู้รับผิดชอบ</span>
+            <select
+              className="supplier-filter-select"
+              value={saleInchargeFilter}
+              onMouseDownCapture={(e) => {
+                const el = e.currentTarget;
+                if (typeof window === 'undefined') return;
+                const rect = el.getBoundingClientRect();
+                const vSpace = window.innerHeight - rect.bottom;
+                if (vSpace < 260) window.scrollBy({ top: 260 - vSpace + 8, behavior: 'auto' });
+              }}
+              onChange={(e) => { setSaleInchargeFilter(e.target.value); setCurrentPage(1); }}
+            >
+              <option value="">ทั้งหมด</option>
+              {saleInchargeOptions.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            className="secondary-button compact-btn"
+            onClick={() => void fetchRuns()}
+            title="Refresh list"
           >
-            <option value="">ทั้งหมด</option>
-            {saleInchargeOptions.map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
+            <RefreshCw size={14} aria-hidden="true" />
+            Refresh
+          </button>
 
-          <span className="supplier-filter-result-count" style={{ marginLeft: 'auto' }}>
+          <span className="supplier-filter-result-count workspace-run-result-count">
             {!isInitialLoading && `${totalRuns} workspace run${totalRuns !== 1 ? 's' : ''}`}
           </span>
         </div>
