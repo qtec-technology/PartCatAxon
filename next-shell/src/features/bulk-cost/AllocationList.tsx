@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardList, Loader2, RefreshCw, Search, Trophy, XCircle } from 'lucide-react';
+import { Archive, ClipboardList, FileCheck2, Loader2, RefreshCw, Search, Send, Trophy, XCircle } from 'lucide-react';
 import { listBulkCostRuns } from './bulk-cost.api';
 import type { AllocationRunStatus, BulkCostRunSummary } from './bulk-cost.types';
 import { useResizableTableColumns } from './useResizableTableColumns';
@@ -31,9 +31,8 @@ const STATUS_FILTERS: { label: string; value: AllocationRunStatus | undefined }[
   { label: 'All',            value: undefined },
   { label: 'Draft',          value: 'DRAFT' },
   { label: 'Quoted',         value: 'QUOTED' },
-  { label: 'Won',            value: 'AWARDED' },
-  { label: 'Reverse Mapped', value: 'REVERSE_MAPPED' },
-  { label: 'Lost',           value: 'LOST' },
+  { label: 'Sales Won',      value: 'AWARDED' },
+  { label: 'Sales Lost',     value: 'LOST' },
   { label: 'Archived',       value: 'ARCHIVED' },
 ];
 
@@ -111,6 +110,33 @@ export function AllocationList({ onOpen }: AllocationListProps) {
     return acc;
   }, {});
 
+  const summaryCards = [
+    {
+      label: 'Drafts',
+      description: 'งานที่ยังเป็นแบบร่าง',
+      value: counts.DRAFT ?? 0,
+      status: 'DRAFT' as const,
+    },
+    {
+      label: 'Quoted',
+      description: 'ส่งราคาแล้ว',
+      value: counts.QUOTED ?? 0,
+      status: 'QUOTED' as const,
+    },
+    {
+      label: 'Sales Won',
+      description: 'ลูกค้าตกลง / งานขายชนะ',
+      value: counts.AWARDED ?? 0,
+      status: 'AWARDED' as const,
+    },
+    {
+      label: 'Sales Lost',
+      description: 'ลูกค้าไม่ซื้อ / งานขายแพ้',
+      value: counts.LOST ?? 0,
+      status: 'LOST' as const,
+    },
+  ];
+
   const saleInchargeOptions = useMemo(() => {
     const seen = new Set<string>();
     const options: string[] = [];
@@ -152,6 +178,26 @@ export function AllocationList({ onOpen }: AllocationListProps) {
             <RefreshCw size={14} aria-hidden="true" />
             Refresh
           </button>
+        </div>
+
+        <div className="workspace-run-summary-grid" aria-label="Workspace run status summary">
+          {summaryCards.map((card) => {
+            const isActive = statusFilter === card.status;
+            return (
+              <button
+                key={card.status}
+                type="button"
+                className={`workspace-run-summary-card workspace-run-summary-card--${card.status.toLowerCase()}${isActive ? ' workspace-run-summary-card--active' : ''}`}
+                onClick={() => handleFilterChange(card.status)}
+              >
+                <span className="workspace-run-summary-copy">
+                  <strong>{card.label}</strong>
+                  <small>{card.description}</small>
+                </span>
+                <span className="workspace-run-summary-value">{isInitialLoading ? '…' : card.value}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="supplier-filter-bar">
@@ -299,11 +345,19 @@ export function AllocationList({ onOpen }: AllocationListProps) {
 }
 
 function RunStatusBadge({ status }: { status: AllocationRunStatus }) {
+  if (status === 'QUOTED') {
+    return (
+      <span className="run-status-badge run-status-badge--quoted">
+        <FileCheck2 size={12} aria-hidden="true" />
+        Quoted
+      </span>
+    );
+  }
   if (status === 'AWARDED') {
     return (
       <span className="run-status-badge run-status-badge--awarded">
         <Trophy size={12} aria-hidden="true" />
-        Won
+        Sales Won
       </span>
     );
   }
@@ -311,11 +365,32 @@ function RunStatusBadge({ status }: { status: AllocationRunStatus }) {
     return (
       <span className="run-status-badge run-status-badge--lost">
         <XCircle size={12} aria-hidden="true" />
-        Lost
+        Sales Lost
       </span>
     );
   }
-  return <span className="run-status-badge run-status-badge--draft">Draft</span>;
+  if (status === 'REVERSE_MAPPED') {
+    return (
+      <span className="run-status-badge run-status-badge--mapped">
+        <Send size={12} aria-hidden="true" />
+        Sent to PartCatalog
+      </span>
+    );
+  }
+  if (status === 'ARCHIVED') {
+    return (
+      <span className="run-status-badge run-status-badge--archived">
+        <Archive size={12} aria-hidden="true" />
+        Archived
+      </span>
+    );
+  }
+  return (
+    <span className="run-status-badge run-status-badge--draft">
+      <ClipboardList size={12} aria-hidden="true" />
+      Draft
+    </span>
+  );
 }
 
 function TablePager({
