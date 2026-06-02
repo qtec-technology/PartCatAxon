@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type InputHTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -160,7 +160,7 @@ const SHIP_MODE_OPTIONS = [
  *  2. After walking ancestors, check raw viewport space and scroll the
  *     nearest scrollable ancestor once more if the viewport gap is still
  *     insufficient.
- *  3. MIN is set to 420 px โ€” enough for a 10-item option list on most screens.
+ *  3. MIN is set to 420 px — enough for a 10-item option list on most screens.
  */
 export const ensureSelectSpaceBelow = (el: HTMLElement): void => {
   if (typeof window === 'undefined') return;
@@ -212,7 +212,7 @@ interface BulkCostWorkspaceProps {
   supplierName: string;
   /** When re-opening a saved run from the list, pass its runId here. */
   savedRunId?: number | null;
-  /** Label for the back button โ€” defaults to 'Back to Allocations'. */
+  /** Label for the back button — defaults to 'Back to Allocations'. */
   backLabel?: string;
   onBack: () => void;
 }
@@ -830,7 +830,7 @@ function validateLineCandidate(
   if (!contactPersonVal || contactPersonVal.trim() === '') {
     termIssues.push({ field: 'contactPerson', label: 'Contact Person', type: 'warning', message: 'Contact Person is missing.', value: contactPersonVal });
   } else if (!runInfo.cntctCode) {
-    termIssues.push({ field: 'contactPerson', label: 'Contact Person', type: 'warning', message: 'Contact Person Code resolution required before Term master write (เน€เธเนเธเน€เธเนเธเธเธทเนเธญเนเธ revision เน€เธ—เนเธฒเธเธฑเนเธ เธขเธฑเธเนเธกเนเนเธ”เนเนเธเธฅเธเน€เธเนเธ code).', value: contactPersonVal });
+    termIssues.push({ field: 'contactPerson', label: 'Contact Person', type: 'warning', message: 'Contact Person Code resolution required before Term master write (เก็บเป็นชื่อใน revision เท่านั้น ยังไม่ได้แปลงเป็น code).', value: contactPersonVal });
   }
 
   const orderTerm = line.orderTerm || costs.orderTerm;
@@ -1008,7 +1008,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       return [createBlankLine(1, supplierCode, supplierName, EMPTY_BULK_COST_INPUT, undefined, 'MANUAL-INIT-1')];
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [], // mount-time only โ€” initialSavedRunId, supplierCode, supplierName are stable props
+    [], // mount-time only — initialSavedRunId, supplierCode, supplierName are stable props
   );
   const initialCosts = useMemo<BulkCostInput>(() => ({ ...EMPTY_BULK_COST_INPUT }), []);
   const isRestoringMode = initialSavedRunId !== null;
@@ -1114,7 +1114,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
     });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only on mount โ€” initialSavedRunId is stable
+  }, []); // Only on mount — initialSavedRunId is stable
 
   useEffect(() => {
     let cancelled = false;
@@ -1550,7 +1550,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       markupPercent: globalDefaults.markupPercent,
     })));
     resetPreview();
-    toast.success('เนเธเนเธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธเธเธฑเธเธ—เธธเธเธฃเธฒเธขเธเธฒเธฃเนเธฅเนเธง');
+    toast.success('ใช้ค่าเริ่มต้นกับทุกรายการแล้ว');
   }, [globalDefaults, resetPreview]);
 
   const applyOrderSettingsToAllLines = useCallback((onlyUnchanged: boolean = false) => {
@@ -1572,7 +1572,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       };
     }));
     resetPreview();
-    toast.success(onlyUnchanged ? 'เนเธเน Order Settings เธเธฑเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธขเธฑเธเนเธกเนเนเธ”เนเนเธเนเน€เธ—เนเธฒเธเธฑเนเธ' : 'Applied order settings to all lines');
+    toast.success(onlyUnchanged ? 'ใช้ Order Settings กับรายการที่ยังไม่ได้แก้เท่านั้น' : 'Applied order settings to all lines');
   }, [changedCellKeys, costs.currency, costs.location, costs.orderTerm, costs.shipModeNo, costs.subLocation, locationLookups, resetPreview]);
 
   const updateLineDocFee = useCallback((lineKey: string, key: keyof DocumentFees, raw: string) => {
@@ -1839,7 +1839,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       const linesMissingWeight = effectiveSelectedLines.filter((line) => (resolveLineWeight(line) ?? 0) <= 0);
       if (linesMissingWeight.length > 0) {
         setIsCalculating(false);
-        const errMessage = 'Cannot calculate: Some selected items are missing weight. (เน€เธกเธทเนเธญเธกเธตเธเธฒเธฃเธเธฃเธญเธเธเนเธฒ PKH, SOC, Freight เธซเธฃเธทเธญ Customs Clearance เธ—เธธเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเน€เธฅเธทเธญเธเธ•เนเธญเธเธฃเธฐเธเธธเธเนเธณเธซเธเธฑเธเธซเธฃเธทเธญเธกเธดเธ•เธดเธเธฃเธฃเธเธธเธ เธฑเธ“เธ‘เนเธเนเธญเธเธเธฒเธฃเธเธณเธเธงเธ“)';
+        const errMessage = 'Cannot calculate: Some selected items are missing weight. (เมื่อมีการกรอกค่า PKH, SOC, Freight หรือ Customs Clearance ทุกรายการที่เลือกต้องระบุน้ำหนักหรือมิติบรรจุภัณฑ์ก่อนการคำนวณ)';
         setCalcError(errMessage);
         toast.error(errMessage);
         return;
@@ -1934,7 +1934,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
   const handleSandboxFinalize = useCallback(async () => {
     if (!savedRunId) {
-      toast.error('เธ•เนเธญเธเธเธฑเธเธ—เธถเธ Revision เธเนเธญเธเธเธถเธเธเธฐเธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเนเธ”เน');
+      toast.error('ต้องบันทึก Revision ก่อนจึงจะทดสอบการเขียนข้อมูลได้');
       return;
     }
     setIsSandboxFinalizing(true);
@@ -1944,13 +1944,13 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       const result = await sandboxFinalizeLines(savedRunId, costs.saleIncharge || 'unknown');
       setSandboxFinalizeResult(result);
       if (result.success) {
-        toast.success(`เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเธชเธณเน€เธฃเนเธ: ${result.written.length} เธฃเธฒเธขเธเธฒเธฃ`);
+        toast.success(`ทดสอบการเขียนข้อมูลสำเร็จ: ${result.written.length} รายการ`);
       } else {
-        toast.error(`เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเธกเธตเธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: ${result.errors?.length ?? 0} เธฃเธฒเธขเธเธฒเธฃ`);
+        toast.error(`ทดสอบการเขียนข้อมูลมีข้อผิดพลาด: ${result.errors?.length ?? 0} รายการ`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเธฅเนเธกเน€เธซเธฅเธง: ${message}`);
+      toast.error(`ทดสอบการเขียนข้อมูลล้มเหลว: ${message}`);
     } finally {
       setIsSandboxFinalizing(false);
     }
@@ -1964,14 +1964,14 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
     ? `Run #${revisionSourceRunId ?? revisionGroupId} / Revision Group #${revisionGroupId}${revisionNo ? ` / Rev ${revisionNo}` : ''}`
     : 'New manual run';
   const revisionHelpText = revisionGroupId !== null
-    ? 'Editing and recalculating will save as the next revision. (เนเธเนเนเธเนเธฅเธฐเธเธ”เธเธณเธเธงเธ“เน€เธเธทเนเธญเธเธฑเธเธ—เธถเธเน€เธเนเธเน€เธงเธญเธฃเนเธเธฑเธเธ–เธฑเธ”เนเธ)'
-    : 'Blank manual workspace. Add lines, run CAL, then save revision. (เธเธทเนเธเธ—เธตเนเธเธณเธเธงเธ“เน€เธเธฅเนเธฒ: เน€เธเธดเนเธกเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒ, เธเธ” CAL เน€เธเธทเนเธญเธเธณเธเธงเธ“ เนเธฅเธฐเธเธฑเธเธ—เธถเธเธฃเนเธฒเธเธเนเธญเธกเธนเธฅ)';
+    ? 'Editing and recalculating will save as the next revision. (แก้ไขและกดคำนวณเพื่อบันทึกเป็นเวอร์ชันถัดไป)'
+    : 'Blank manual workspace. Add lines, run CAL, then save revision. (พื้นที่คำนวณเปล่า: เพิ่มรายการสินค้า, กด CAL เพื่อคำนวณ และบันทึกร่างข้อมูล)';
   const calculateTitle = canCalculate
-    ? 'Calculate selected manual lines (เธเธณเธเธงเธ“เธ•เนเธเธ—เธธเธเธเธฑเธเธชเนเธงเธเธ•เธฒเธกเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเน€เธฅเธทเธญเธ)'
-    : 'Add and select at least one line before CAL (เธเธฃเธธเธ“เธฒเน€เธเธดเนเธกเนเธฅเธฐเน€เธฅเธทเธญเธเธญเธขเนเธฒเธเธเนเธญเธขเธซเธเธถเนเธเธฃเธฒเธขเธเธฒเธฃ)';
+    ? 'Calculate selected manual lines (คำนวณต้นทุนปันส่วนตามรายการที่เลือก)'
+    : 'Add and select at least one line before CAL (กรุณาเพิ่มและเลือกอย่างน้อยหนึ่งรายการ)';
   const saveTitle = canSaveDraft
-    ? 'Save draft to PartCatalog (เธเธฑเธเธ—เธถเธเธฃเนเธฒเธเธเนเธญเธกเธนเธฅเนเธเธฃเธฐเธเธ PartCatalog)'
-    : 'Run CAL successfully before saving a revision (เธ•เนเธญเธเธเธณเธเธงเธ“เธเธฑเธเธชเนเธงเธเธชเธณเน€เธฃเนเธเธเนเธญเธเธเธถเธเธเธฐเธเธฑเธเธ—เธถเธเธฃเนเธฒเธเนเธ”เน)';
+    ? 'Save draft to PartCatalog (บันทึกร่างข้อมูลในระบบ PartCatalog)'
+    : 'Run CAL successfully before saving a revision (ต้องคำนวณปันส่วนสำเร็จก่อนจึงจะบันทึกร่างได้)';
   const saveButtonText = isSavingDraft
     ? 'Saving...'
     : savedRunId
@@ -2024,7 +2024,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   onClick={() => prevLine && setEditingLineKey(prevLine.lineKey)}
                   title="Previous item"
                 >
-                  โ€น
+                  ‹
                 </button>
                 <span className="line-edit-modal-nav-count">{currentLineIndex + 1} / {allLines.length}</span>
                 <button
@@ -2034,13 +2034,13 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   onClick={() => nextLine && setEditingLineKey(nextLine.lineKey)}
                   title="Next item"
                 >
-                  โ€บ
+                  ›
                 </button>
               </div>
               <div>
                 <h3 style={{ margin: 0 }}>
                   <Edit3 size={16} />
-                  #{line.no} โ€” {line.mfgPartNumber || 'New Item'}
+                  #{line.no} — {line.mfgPartNumber || 'New Item'}
                 </h3>
                 {totalIssues > 0 && (
                   <div className="line-edit-modal-status-warn">
@@ -2207,7 +2207,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors uppercase tracking-wider focus:outline-none py-2 px-1 text-left w-full hover:bg-slate-50 rounded"
                     onClick={() => setIsItemDetailsExpanded(!isItemDetailsExpanded)}
                   >
-                    <span>{isItemDetailsExpanded ? 'โ–ผ' : 'โ–ถ'} Additional Details / เธเนเธญเธกเธนเธฅเธ—เธฐเน€เธเธตเธขเธเธชเธดเธเธเนเธฒเน€เธเธดเนเธกเน€เธ•เธดเธก</span>
+                    <span>{isItemDetailsExpanded ? '▼' : '▶'} Additional Details / ข้อมูลทะเบียนสินค้าเพิ่มเติม</span>
                   </button>
                 </div>
 
@@ -2524,7 +2524,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                       type="text"
                       className="line-edit-modal-input w-28 shrink-0 bg-slate-100 text-slate-500 cursor-not-allowed"
                       disabled
-                      value={costs.exchangeRate ? `${fmt(costs.exchangeRate)} THB` : 'โ€”'}
+                      value={costs.exchangeRate ? `${fmt(costs.exchangeRate)} THB` : '—'}
                     />
                   </div>
                 </div>
@@ -2536,7 +2536,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors uppercase tracking-wider focus:outline-none py-2 px-1 text-left w-full hover:bg-slate-50 rounded"
                     onClick={() => setIsDocFeesExpanded(!isDocFeesExpanded)}
                   >
-                    <span>{isDocFeesExpanded ? 'โ–ผ' : 'โ–ถ'} Document Fees / เธเนเธฒเนเธเนเธเนเธฒเธขเน€เธญเธเธชเธฒเธฃเน€เธเธดเนเธกเน€เธ•เธดเธก</span>
+                    <span>{isDocFeesExpanded ? '▼' : '▶'} Document Fees / ค่าใช้จ่ายเอกสารเพิ่มเติม</span>
                   </button>
                 </div>
 
@@ -2563,7 +2563,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   </div>
                 )}
 
-                {/* 5. PKH เธ—เธตเนเธเธฃเธฐเธเธฒเธขเนเธฅเนเธง */}
+                {/* 5. PKH ที่กระจายแล้ว */}
                 <div className="line-edit-modal-field">
                   <label>Packing Handling (PKH) [Allocated]</label>
                   <input
@@ -2576,7 +2576,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
                       // Live calculation
                       const isSelected = selectedKeys.has(line.lineKey);
-                      if (!isSelected) return 'โ€”';
+                      if (!isSelected) return '—';
                       const weight = resolveLineWeight(line) ?? 0;
                       const lineWeight = weight * line.qty;
                       const weightRatio = totalWeight > 0 ? lineWeight / totalWeight : 0;
@@ -2587,7 +2587,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   />
                 </div>
 
-                {/* 6. SOC เธ—เธตเนเธเธฃเธฐเธเธฒเธขเนเธฅเนเธง */}
+                {/* 6. SOC ที่กระจายแล้ว */}
                 <div className="line-edit-modal-field">
                   <label>Supplier Outb Cost (SOC) [Allocated]</label>
                   <input
@@ -2600,7 +2600,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
                       // Live calculation
                       const isSelected = selectedKeys.has(line.lineKey);
-                      if (!isSelected) return 'โ€”';
+                      if (!isSelected) return '—';
                       const weight = resolveLineWeight(line) ?? 0;
                       const lineWeight = weight * line.qty;
                       const weightRatio = totalWeight > 0 ? lineWeight / totalWeight : 0;
@@ -2779,7 +2779,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                         placeholder="Valid From"
                       />
                     </div>
-                    <span className="text-xs text-gray-400 shrink-0">โ€”</span>
+                    <span className="text-xs text-gray-400 shrink-0">—</span>
                     <div className="flex-1 min-w-0">
                       <DatePicker
                         value={line.validTo}
@@ -2932,7 +2932,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     type="text"
                     className="line-edit-modal-input"
                     disabled
-                    value={line.dimensionWeightPerEach !== null ? fmtWeight(line.dimensionWeightPerEach) : 'โ€”'}
+                    value={line.dimensionWeightPerEach !== null ? fmtWeight(line.dimensionWeightPerEach) : '—'}
                   />
                 </div>
 
@@ -2970,7 +2970,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                       const iw = line.itemWeightPerEach ?? 0;
                       const cw = line.shippingWeightPerEach ?? 0;
                       const maxVal = Math.max(dw, iw, cw);
-                      return maxVal > 0 ? fmt(ceilToHalf(maxVal)) : 'โ€”';
+                      return maxVal > 0 ? fmt(ceilToHalf(maxVal)) : '—';
                     })()}
                   />
                 </div>
@@ -3045,9 +3045,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
             {editingModalTab === 'landed-sales-price' && (
               <div className="line-edit-modal-grid">
-                {/* เธซเธกเธงเธ”: Landed Cost Factors / เธญเธฑเธ•เธฃเธฒเธซเธฅเธฑเธเนเธฅเธฐเธเธฃเธฐเธเธฑเธเธ เธฑเธข */}
+                {/* หมวด: Landed Cost Factors / อัตราหลักและประกันภัย */}
                 <div className="line-edit-modal-field line-edit-modal-field--full border-b border-slate-100 pb-2 mb-1">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Landed Cost Factors / เธเธฃเธฐเธเธฑเธเธ เธฑเธขเนเธฅเธฐเธเธดเธเธฑเธ”เธ เธฒเธฉเธต</h4>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Landed Cost Factors / ประกันภัยและพิกัดภาษี</h4>
                 </div>
 
                 {/* 1. Insurance (INS %) */}
@@ -3142,7 +3142,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
                 {/* REMARK box at the bottom */}
                 <div className="line-edit-modal-field line-edit-modal-field--full border-t border-slate-100 pt-4 mt-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remarks / เธซเธกเธฒเธขเน€เธซเธ•เธธ</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remarks / หมายเหตุ</label>
                   <textarea
                     rows={2}
                     className="line-edit-modal-input"
@@ -3189,9 +3189,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   </select>
                 </div>
 
-                {/* 3. Purchase UOM (เธซเธเนเธงเธขเธเธทเนเธญ) */}
+                {/* 3. Purchase UOM (หน่วยซื้อ) */}
                 <div className="line-edit-modal-field">
-                  <label>Purchase UOM (เธซเธเนเธงเธขเธเธทเนเธญ) <span>*</span></label>
+                  <label>Purchase UOM (หน่วยซื้อ) <span>*</span></label>
                   <select
                     className="line-edit-modal-input"
                     value={line.purchaseUOM}
@@ -3214,9 +3214,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   />
                 </div>
 
-                {/* 5. Stock UOM (เธซเธเนเธงเธขเน€เธเนเธ) */}
+                {/* 5. Stock UOM (หน่วยเก็บ) */}
                 <div className="line-edit-modal-field">
-                  <label>Stock UOM (เธซเธเนเธงเธขเน€เธเนเธ)</label>
+                  <label>Stock UOM (หน่วยเก็บ)</label>
                   <input
                     type="text"
                     className="line-edit-modal-input bg-slate-50 cursor-not-allowed"
@@ -3235,9 +3235,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   />
                 </div>
 
-                {/* 7. Sales UOM (เธซเธเนเธงเธขเธเธฒเธข) */}
+                {/* 7. Sales UOM (หน่วยขาย) */}
                 <div className="line-edit-modal-field">
-                  <label>Sales UOM (เธซเธเนเธงเธขเธเธฒเธข) <span>*</span></label>
+                  <label>Sales UOM (หน่วยขาย) <span>*</span></label>
                   <select
                     className="line-edit-modal-input"
                     value={line.saleUOM}
@@ -3303,7 +3303,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     onClick={() => prevTab && setEditingModalTab(prevTab.key)}
                     title={prevTab ? `Go to ${prevTab.label}` : undefined}
                   >
-                    โ Prev Tab
+                    ← Prev Tab
                   </button>
                   <button
                     type="button"
@@ -3312,7 +3312,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     onClick={() => nextTab && setEditingModalTab(nextTab.key)}
                     title={nextTab ? `Go to ${nextTab.label}` : undefined}
                   >
-                    Next Tab โ’
+                    Next Tab →
                   </button>
                 </div>
                 <button
@@ -3348,9 +3348,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           </div>
           <div className="line-edit-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <p style={{ fontSize: '13px', margin: 0, color: '#475569' }}>
-              เธงเธฒเธเธเนเธญเธกเธนเธฅเนเธ–เธงเนเธฅเธฐเธเธญเธฅเธฑเธกเธเนเธเธฒเธ Excel (Copy & Paste เธ•เธฒเธฃเธฒเธเนเธ”เธขเธ•เธฃเธ)
+              วางข้อมูลแถวและคอลัมน์จาก Excel (Copy & Paste ตารางโดยตรง)
               <br />
-              เธซเธฒเธเนเธ–เธงเนเธฃเธเน€เธเนเธ Header เธฃเธฐเธเธเธเธฐเธเธฑเธเธเธนเนเธเธญเธฅเธฑเธกเธเนเนเธซเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธด (เน€เธเนเธ Part No, Qty, Unit Price, Weight, COO, UOM)
+              หากแถวแรกเป็น Header ระบบจะจับคู่คอลัมน์ให้อัตโนมัติ (เช่น Part No, Qty, Unit Price, Weight, COO, UOM)
             </p>
             <textarea
               className="line-edit-modal-input"
@@ -3363,13 +3363,13 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 resize: 'none',
                 lineHeight: '1.4',
               }}
-              placeholder="เธงเธฒเธเธ•เธฒเธฃเธฒเธ Excel เธ—เธตเนเธเธตเน..."
+              placeholder="วางตาราง Excel ที่นี่..."
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
             />
             {rowsCount > 0 && (
               <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#2264a0' }}>
-                เธเธ {rowsCount} เนเธ–เธงเธ—เธตเนเธ•เธฃเธงเธเธเธ
+                พบ {rowsCount} แถวที่ตรวจพบ
               </div>
             )}
           </div>
@@ -3409,7 +3409,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           <div className="pc-drawer-header">
             <h3 className="flex items-center gap-2">
               <FileText size={18} className="text-emerald-600" />
-              Item Details โ€” #{line.no}
+              Item Details — #{line.no}
             </h3>
             <button className="pc-drawer-close" onClick={() => setActiveRegistrationDrawerLineKey(null)}>&times;</button>
           </div>
@@ -3621,13 +3621,13 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             </button>
             <div>
               <p className="eyebrow">Cost Workspace</p>
-              <h1>Loading Run #{initialSavedRunId}โ€ฆ</h1>
+              <h1>Loading Run #{initialSavedRunId}…</h1>
             </div>
           </div>
         </section>
         <section className="panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240, gap: 12 }}>
           <Loader2 size={24} className="spin-icon" aria-hidden="true" style={{ color: 'var(--pc-blue)' }} />
-          <span style={{ color: 'var(--pc-muted)', fontSize: 14 }}>Loading saved run dataโ€ฆ</span>
+          <span style={{ color: 'var(--pc-muted)', fontSize: 14 }}>Loading saved run data…</span>
         </section>
       </div>
     );
@@ -3724,7 +3724,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     type="button"
                     disabled={isUpdatingStatus}
                     onClick={() => { void handleMarkStatus('AWARDED'); }}
-                    title="เธ—เธณเน€เธเธฃเธทเนเธญเธเธซเธกเธฒเธข เธเธเธฐ (เธชเธ–เธฒเธเธฐเธ เธฒเธขเนเธ Workspace เน€เธ—เนเธฒเธเธฑเนเธ เนเธกเนเนเธเน AXON Award)"
+                    title="ทำเครื่องหมาย ชนะ (สถานะภายใน Workspace เท่านั้น ไม่ใช่ AXON Award)"
                   >
                     {isUpdatingStatus ? (
                       <Loader2 size={13} className="spin-icon" aria-hidden="true" />
@@ -3738,7 +3738,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     type="button"
                     disabled={isUpdatingStatus}
                     onClick={() => { void handleMarkStatus('LOST'); }}
-                    title="เธ—เธณเน€เธเธฃเธทเนเธญเธเธซเธกเธฒเธข เนเธเน (เธชเธ–เธฒเธเธฐเธ เธฒเธขเนเธ Workspace เน€เธ—เนเธฒเธเธฑเนเธ เนเธกเนเนเธเน AXON Award)"
+                    title="ทำเครื่องหมาย แพ้ (สถานะภายใน Workspace เท่านั้น ไม่ใช่ AXON Award)"
                   >
                     {isUpdatingStatus ? (
                       <Loader2 size={13} className="spin-icon" aria-hidden="true" />
@@ -3764,9 +3764,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           {/* Left panel: Lines List */}
           <div className="review-sidebar">
             <div className="review-sidebar-header">
-              <h3>Line Items Validation (เธ•เธฃเธงเธเธชเธญเธเธเธงเธฒเธกเธเธฃเธเธ–เนเธงเธเธเธญเธเธเนเธญเธกเธนเธฅ)</h3>
+              <h3>Line Items Validation (ตรวจสอบความครบถ้วนของข้อมูล)</h3>
               <p style={{ margin: 0, fontSize: 11, color: 'var(--pc-muted)' }}>
-                เน€เธฅเธทเธญเธเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒเธ”เนเธฒเธเธเนเธฒเธขเน€เธเธทเนเธญเธ•เธฃเธงเธเธชเธญเธเธเธดเธฅเธ”เนเธเนเธญเธกเธนเธฅเธ—เธตเนเธเธณเน€เธเนเธเธเธญเธ Item &amp; Term candidate เธเนเธญเธเธขเธทเธเธขเธฑเธเธเนเธญเธกเธนเธฅ
+                เลือกรายการสินค้าด้านซ้ายเพื่อตรวจสอบฟิลด์ข้อมูลที่จำเป็นของ Item &amp; Term candidate ก่อนยืนยันข้อมูล
               </p>
             </div>
             <div className="review-line-list">
@@ -4171,7 +4171,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   {/* Disclaimer & Finalize button */}
                   <div className="review-disclaimer-panel">
                     <p>
-                      เธเธฑเธเธ—เธถเธเธฃเนเธฒเธเธเธฒเธฃเธเธณเธเธงเธ“ เธเธฐเธเธฑเธเธ—เธถเธเนเธ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เน€เธ—เนเธฒเธเธฑเนเธ เธขเธฑเธเนเธกเนเน€เธเนเธฒ PartCatalog/SAP เธเธฃเธดเธ
+                      บันทึกร่างการคำนวณ จะบันทึกใน พื้นที่ทดสอบ เท่านั้น ยังไม่เข้า PartCatalog/SAP จริง
                     </p>
                     <button
                       className="primary-button"
@@ -4182,19 +4182,19 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                       Master Write to PartCatalog/SAP (Blocked)
                     </button>
 
-                    {/* Sandbox Finalize โ€” เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เน€เธ—เนเธฒเธเธฑเนเธ */}
+                    {/* Sandbox Finalize — พื้นที่ทดสอบ เท่านั้น */}
                     <div className="sandbox-finalize-section">
                       <p className="sandbox-finalize-section__title">
-                        โ ๏ธ เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅ โ€” เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เน€เธ—เนเธฒเธเธฑเนเธ
+                        ⚠️ ทดสอบการเขียนข้อมูล — พื้นที่ทดสอบ เท่านั้น
                       </p>
                       <p className="sandbox-finalize-section__desc">
-                        เน€เธเธตเธขเธ Item/Term เธฅเธ <strong>เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ</strong> เน€เธเธทเนเธญเธ—เธ”เธชเธญเธเนเธเธฃเธเธชเธฃเนเธฒเธเธเนเธญเธกเธนเธฅเนเธฅเธฐเธเธงเธฒเธกเธ–เธนเธเธ•เนเธญเธเธเธญเธเธฃเธฐเธเธ
-                        เน€เธ—เนเธฒเธเธฑเนเธ เธขเธฑเธเนเธกเนเน€เธเนเธฒ PartCatalog/SAP เธเธฃเธดเธ เธเนเธญเธเนเธเนเธเธฒเธเธเธฃเธดเธ เธเนเธญเธกเธนเธฅเธเธณเน€เธเนเธเธ•เนเธญเธเธเนเธฒเธเธเธฃเธฐเธเธงเธเธเธฒเธฃเธญเธเธธเธกเธฑเธ•เธดเธเนเธญเธ
+                        เขียน Item/Term ลง <strong>พื้นที่ทดสอบ</strong> เพื่อทดสอบโครงสร้างข้อมูลและความถูกต้องของระบบ
+                        เท่านั้น ยังไม่เข้า PartCatalog/SAP จริง ก่อนใช้งานจริง ข้อมูลจำเป็นต้องผ่านกระบวนการอนุมัติก่อน
                       </p>
                       {sandboxFinalizeConfirming ? (
                         <div className="sandbox-finalize-confirm">
                           <p className="sandbox-finalize-confirm__text">
-                            เธขเธทเธเธขเธฑเธเธเธฒเธฃเน€เธเธตเธขเธเธฅเธ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เนเธเนเธซเธฃเธทเธญเนเธกเน?
+                            ยืนยันการเขียนลง พื้นที่ทดสอบ ใช่หรือไม่?
                           </p>
                           <div className="sandbox-finalize-confirm__actions">
                             <button
@@ -4204,8 +4204,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                               onClick={handleSandboxFinalize}
                             >
                               {isSandboxFinalizing
-                                ? <><Loader2 size={12} className="spin-icon" aria-hidden="true" />&nbsp;เธเธณเธฅเธฑเธเน€เธเธตเธขเธโ€ฆ</>
-                                : 'เธขเธทเธเธขเธฑเธเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเธฅเธเธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ'}
+                                ? <><Loader2 size={12} className="spin-icon" aria-hidden="true" />&nbsp;กำลังเขียน…</>
+                                : 'ยืนยันเขียนข้อมูลลงพื้นที่ทดสอบ'}
                             </button>
                             <button
                               className="secondary-button compact-btn"
@@ -4222,9 +4222,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                           type="button"
                           disabled={!savedRunId || isSandboxFinalizing}
                           onClick={() => setSandboxFinalizeConfirming(true)}
-                          title="เน€เธเธตเธขเธ Item/Term เธฅเธ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เน€เธเธทเนเธญเธ—เธ”เธชเธญเธเน€เธ—เนเธฒเธเธฑเนเธ เธขเธฑเธเนเธกเนเน€เธเนเธฒ PartCatalog/SAP เธเธฃเธดเธ"
+                          title="เขียน Item/Term ลง พื้นที่ทดสอบ เพื่อทดสอบเท่านั้น ยังไม่เข้า PartCatalog/SAP จริง"
                         >
-                          เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅ โ’ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ (เธ—เธ”เธชเธญเธ)
+                          ทดสอบการเขียนข้อมูล → พื้นที่ทดสอบ (ทดสอบ)
                         </button>
                       )}
                       {sandboxFinalizeResult && (
@@ -4232,10 +4232,10 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                           {sandboxFinalizeResult.success
                             ? (() => {
                                 const reusedCount = sandboxFinalizeResult.written.filter(w => w.reused).length;
-                                const reusedText = reusedCount > 0 ? `, เนเธเนเธฃเธฒเธขเธเธฒเธฃเน€เธ”เธดเธก ${reusedCount} เธฃเธฒเธขเธเธฒเธฃ (เนเธกเนเธชเธฃเนเธฒเธเธเนเธณ)` : '';
-                                return `โ… เธชเธณเน€เธฃเนเธ: ${sandboxFinalizeResult.written.length} เธฃเธฒเธขเธเธฒเธฃ${reusedText} โ’ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ (ItemID: ${sandboxFinalizeResult.written.map(w => w.sandboxItemId).join(', ')})`;
+                                const reusedText = reusedCount > 0 ? `, ใช้รายการเดิม ${reusedCount} รายการ (ไม่สร้างซ้ำ)` : '';
+                                return `✅ สำเร็จ: ${sandboxFinalizeResult.written.length} รายการ${reusedText} → พื้นที่ทดสอบ (ItemID: ${sandboxFinalizeResult.written.map(w => w.sandboxItemId).join(', ')})`;
                               })()
-                            : `โ เธกเธตเธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: ${sandboxFinalizeResult.errors?.map(e => e.message).join('; ')}`
+                            : `❌ มีข้อผิดพลาด: ${sandboxFinalizeResult.errors?.map(e => e.message).join('; ')}`
                           }
                         </div>
                       )}
@@ -4253,8 +4253,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           <div className="cost-bar-step-title-row">
             <span className="cost-bar-step-badge">1</span>
             <div>
-              <h2 id="cost-title">Bulk Header &amp; Global Setup <span>(เธ•เธฑเนเธเธเนเธฒเธชเนเธงเธเธเธฅเธฒเธ)</span></h2>
-              <p>เธ•เธฑเนเธเธเนเธฒเธญเธญเน€เธ”เธญเธฃเน เธเนเธฒเนเธเนเธเนเธฒเธขเธฃเธงเธก เนเธฅเธฐเธเนเธฒ default เธเนเธญเธเธชเนเธเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒเน€เธเนเธฒ CAL</p>
+              <h2 id="cost-title">Bulk Header &amp; Global Setup <span>(ตั้งค่าส่วนกลาง)</span></h2>
+              <p>ตั้งค่าออเดอร์ ค่าใช้จ่ายรวม และค่า default ก่อนส่งรายการสินค้าเข้า CAL</p>
             </div>
           </div>
           <div className="cost-bar-title-icon">
@@ -4287,7 +4287,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 id="bulk-cost-order-term"
                 value={orderTermSelectOptions.includes(costs.orderTerm) ? costs.orderTerm : costs.orderTerm}
                 onValueChange={(val) => {
-                  if (allLines.length > 0 && !window.confirm('เธเธฒเธฃเน€เธเธฅเธตเนเธขเธเน€เธเธทเนเธญเธเนเธเธเธฒเธฃเธชเนเธเธกเธญเธ (Purchase Term) เธเธฐเธกเธตเธเธฅเธ•เนเธญเธเธฒเธฃเธเธณเธเธงเธ“เธ•เนเธเธ—เธธเธเธ—เธฑเนเธเธซเธกเธ” เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธซเธฃเธทเธญเนเธกเน?')) {
+                  if (allLines.length > 0 && !window.confirm('การเปลี่ยนเงื่อนไขการส่งมอบ (Purchase Term) จะมีผลต่อการคำนวณต้นทุนทั้งหมด คุณต้องการดำเนินการต่อหรือไม่?')) {
                     return;
                   }
                   updateCost('orderTerm', val);
@@ -4303,7 +4303,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 id="bulk-cost-location"
                 value={selectedLocationValue}
                 onValueChange={(val) => {
-                  if (allLines.length > 0 && !window.confirm('เธเธฒเธฃเน€เธเธฅเธตเนเธขเธเธชเธ–เธฒเธเธ—เธตเน (Term Location) เธเธฐเธกเธตเธเธฅเธ•เนเธญเธเธฒเธฃเธเธณเธเธงเธ“เธ เธฒเธฉเธตเนเธฅเธฐเธเนเธฒเธเธเธชเนเธ เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธซเธฃเธทเธญเนเธกเน?')) {
+                  if (allLines.length > 0 && !window.confirm('การเปลี่ยนสถานที่ (Term Location) จะมีผลต่อการคำนวณภาษีและค่าขนส่ง คุณต้องการดำเนินการต่อหรือไม่?')) {
                     return;
                   }
                   updateCost('location', val);
@@ -4338,7 +4338,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 value={String(costs.shipModeNo)}
                 onValueChange={(val) => {
                   const num = parseInt(val, 10);
-                  if (allLines.length > 0 && !window.confirm('เธเธฒเธฃเน€เธเธฅเธตเนเธขเธเธฃเธนเธเนเธเธเธเธฒเธฃเธเธเธชเนเธ (Ship Mode) เธเธฐเธกเธตเธเธฅเธ•เนเธญเธเธฒเธฃเธเธณเธเธงเธ“เธเนเธฒเธเธเธชเนเธเธ—เธฑเนเธเธซเธกเธ” เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธซเธฃเธทเธญเนเธกเน?')) {
+                  if (allLines.length > 0 && !window.confirm('การเปลี่ยนรูปแบบการขนส่ง (Ship Mode) จะมีผลต่อการคำนวณค่าขนส่งทั้งหมด คุณต้องการดำเนินการต่อหรือไม่?')) {
                     return;
                   }
                   setCosts((prev) => ({ ...prev, shipModeNo: isNaN(num) ? -1 : num }));
@@ -4355,7 +4355,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 value={currencySelectOptions.some((row) => row.code === costs.currency) ? costs.currency : costs.currency}
                 onValueChange={(val) => {
                   if (val) {
-                    if (allLines.length > 0 && !window.confirm('เธเธฒเธฃเน€เธเธฅเธตเนเธขเธเธชเธเธธเธฅเน€เธเธดเธ (Currency) เธเธฐเธกเธตเธเธฅเธ•เนเธญเธเนเธฒเธเธฒเธฃเธเธณเธเธงเธ“เธ—เธฑเนเธเธซเธกเธ” เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธซเธฃเธทเธญเนเธกเน?')) {
+                    if (allLines.length > 0 && !window.confirm('การเปลี่ยนสกุลเงิน (Currency) จะมีผลต่อค่าการคำนวณทั้งหมด คุณต้องการดำเนินการต่อหรือไม่?')) {
                       return;
                     }
                     updateCurrency(val);
@@ -4382,7 +4382,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 type="button"
                 onClick={() => applyOrderSettingsToAllLines(false)}
                 disabled={allLines.length === 0}
-                title="เนเธเน Purchase Term, Location, Sub Location, Ship Mode, Currency เธเธฑเธเธ—เธธเธเธฃเธฒเธขเธเธฒเธฃ"
+                title="ใช้ Purchase Term, Location, Sub Location, Ship Mode, Currency กับทุกรายการ"
               >
                 <Sparkles size={13} />
                 Apply Order Settings to All
@@ -4392,7 +4392,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   className="cost-bar-apply-defaults cost-bar-apply-defaults--secondary"
                   type="button"
                   onClick={() => applyOrderSettingsToAllLines(true)}
-                  title="เนเธเนเน€เธเธเธฒเธฐเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธขเธฑเธเนเธกเนเนเธ”เนเนเธเนเนเธเธเนเธฒ Order Settings เน€เธญเธ"
+                  title="ใช้เฉพาะรายการที่ยังไม่ได้แก้ไขค่า Order Settings เอง"
                 >
                   <CheckCircle2 size={13} />
                   To Unedited Only
@@ -4566,7 +4566,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
         </div>
 
         <details className="cost-bar-run-details" open>
-          <summary>Run Info (optional) - เธเนเธญเธกเธนเธฅเธเธฒเธเธ—เธตเนเนเธกเนเธเธฃเธฐเธ—เธเธชเธนเธ•เธฃเธเธณเธเธงเธ“</summary>
+          <summary>Run Info (optional) - ข้อมูลงานที่ไม่กระทบสูตรคำนวณ</summary>
           <div className="cost-bar-run-details-grid">
             <label className="cost-bar-field">
               <span>Reference No. / Job Name</span>
@@ -4576,7 +4576,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 type="text"
                 value={costs.referenceNo}
                 onChange={(event) => updateCost('referenceNo', event.target.value)}
-                placeholder="เน€เธเนเธ RFQ-001"
+                placeholder="เช่น RFQ-001"
               />
             </label>
             <label className="cost-bar-field">
@@ -4609,7 +4609,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 type="text"
                 value={costs.remark}
                 onChange={(event) => updateCost('remark', event.target.value)}
-                placeholder="เธเธฑเธเธ—เธถเธเนเธงเนเธเธฑเธ revision"
+                placeholder="บันทึกไว้กับ revision"
               />
             </label>
           </div>
@@ -4617,7 +4617,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
         <div className="cost-bar-note">
           <Info size={16} aria-hidden="true" />
-          <span>PKH / SOC เธเธฃเธญเธเธ•เธฒเธก Currency เธเธญเธ Supplier เนเธฅเนเธงเนเธเธฅเธเธ”เนเธงเธข Ex. Rate เธชเนเธงเธ FR / CC / Wire TT เธเธฃเธญเธเน€เธเนเธ THB เนเธ”เธขเธ•เธฃเธ เนเธฅเธฐเธฃเธฐเธเธเธเธฐเธเธฑเธเธชเนเธงเธเธ•เนเธญเธเธดเนเธเธซเธฅเธฑเธ CAL</span>
+          <span>PKH / SOC กรอกตาม Currency ของ Supplier แล้วแปลงด้วย Ex. Rate ส่วน FR / CC / Wire TT กรอกเป็น THB โดยตรง และระบบจะปันส่วนต่อชิ้นหลัง CAL</span>
         </div>
       </section>
 
@@ -4627,8 +4627,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             <div className="cost-bar-step-title-row">
               <span className="cost-bar-step-badge">2</span>
               <div>
-                <h2 id="selector-title">Line Items Grid <span>(เธเนเธญเธกเธนเธฅเธฃเธฐเธ”เธฑเธเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒ)</span></h2>
-                <p>เธ”เธน/เนเธเนเนเธเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒ เน€เธฅเธทเธญเธ lines เธชเธณเธซเธฃเธฑเธ CAL เธเนเธญเธเธเธณเธเธงเธ“</p>
+                <h2 id="selector-title">Line Items Grid <span>(ข้อมูลระดับรายการสินค้า)</span></h2>
+                <p>ดู/แก้ไขรายการสินค้า เลือก lines สำหรับ CAL ก่อนคำนวณ</p>
               </div>
             </div>
             <div className="cost-bar-title-icon">
@@ -4658,7 +4658,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             />
             <SummaryItem
               label="Chargeable W"
-              value={totalChargeableWeight > 0 ? `${fmt(totalChargeableWeight)} kg` : 'โ€”'}
+              value={totalChargeableWeight > 0 ? `${fmt(totalChargeableWeight)} kg` : '—'}
               className="summary-item-chargeable"
             />
           </div>
@@ -4736,8 +4736,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           {allLines.length === 0 ? (
             <div className="empty-state">
               <Search size={32} aria-hidden="true" />
-              <p>เธขเธฑเธเนเธกเนเธกเธตเธฃเธฒเธขเธเธฒเธฃ</p>
-              <small>เธเธ” "+ Add Item" เน€เธเธทเนเธญเน€เธเธดเนเธกเธฃเธฒเธขเธเธฒเธฃเนเธฃเธ เธเธฒเธเธเธฑเนเธเธเธฃเธญเธ Qty / Price / Weight เธเนเธญเธเธเธ” CAL</small>
+              <p>ยังไม่มีรายการ</p>
+              <small>กด "+ Add Item" เพื่อเพิ่มรายการแรก จากนั้นกรอก Qty / Price / Weight ก่อนกด CAL</small>
               {isLatestView && (
                 <button
                   type="button"
@@ -4940,8 +4940,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           <div className="cost-bar-step-title-row">
             <span className="cost-bar-step-badge cost-bar-step-badge--green">3</span>
             <div>
-              <h2 id="preview-title">Cost Result Grid <span>(เนเธชเธ”เธเธเธฅเธฅเธฑเธเธเนเธเธฒเธฃเธเธฑเธเธชเนเธงเธเธ•เนเธญเธเธดเนเธ)</span></h2>
-              <p>เธเธฅเธเธฒเธฃเธเธฑเธเธชเนเธงเธเธเนเธฒเนเธเนเธเนเธฒเธขเธฃเธงเธกเธฅเธเนเธ•เนเธฅเธฐเธชเธดเธเธเนเธฒ เธเธฃเนเธญเธก preview Item/Term draft</p>
+              <h2 id="preview-title">Cost Result Grid <span>(แสดงผลลัพธ์การปันส่วนต่อชิ้น)</span></h2>
+              <p>ผลการปันส่วนค่าใช้จ่ายรวมลงแต่ละสินค้า พร้อม preview Item/Term draft</p>
             </div>
           </div>
           {preview !== null && !isCalculating && (

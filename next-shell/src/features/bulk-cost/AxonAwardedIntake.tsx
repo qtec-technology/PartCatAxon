@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useMemo, useState, useEffect, Fragment } from 'react';
 import {
@@ -332,25 +332,25 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
     return [
       {
         label: 'All Projects',
-        description: 'เนเธเธฃเธเธเธฒเธฃเธเธณเน€เธเนเธฒเธ—เธฑเนเธเธซเธกเธ”',
+        description: 'โครงการนำเข้าทั้งหมด',
         value: AXON_INBOX_PROJECTS.length,
         status: 'ALL' as const,
       },
       {
         label: 'New Comparisons',
-        description: 'เนเธเธฃเธเธเธฒเธฃเธกเธฒเนเธซเธกเน',
+        description: 'โครงการมาใหม่',
         value: counts.NEW ?? 0,
         status: 'NEW' as const,
       },
       {
         label: 'In Progress',
-        description: 'เธเธณเธฅเธฑเธเธเธฑเธเธชเนเธงเธเธ•เนเธเธ—เธธเธ',
+        description: 'กำลังปันส่วนต้นทุน',
         value: counts.IN_PROGRESS ?? 0,
         status: 'IN_PROGRESS' as const,
       },
       {
         label: 'Completed',
-        description: 'เธเธณเน€เธเนเธฒเธชเธณเน€เธฃเนเธเนเธฅเนเธง',
+        description: 'นำเข้าสำเร็จแล้ว',
         value: counts.COMPLETED ?? 0,
         status: 'COMPLETED' as const,
       },
@@ -419,8 +419,8 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
     } else if (simulationState === 'success') {
       const timeout = setTimeout(() => {
         if (onImportSupplier && simulatingSupplier) {
-          toast.success(`เธเธณเน€เธเนเธฒเธญเธญเน€เธ”เธญเธฃเนเธเธญเธเธเธฑเธเธเธฅเธฒเธขเน€เธญเธญเธฃเน ${simulatingSupplier.name} เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง!`, {
-            description: 'เธฃเธฐเธเธเธเธณเธฅเธฑเธเธเธณเธ—เธฒเธเธ—เนเธฒเธเนเธเธขเธฑเธเธเธญเธฃเนเธ”เธเธฒเธฃเนเธเนเธเธเธฑเธเธ•เนเธเธ—เธธเธเธซเธฅเธฑเธ...',
+          toast.success(`นำเข้าออเดอร์ของซัพพลายเออร์ ${simulatingSupplier.name} เรียบร้อยแล้ว!`, {
+            description: 'ระบบกำลังนำทางท่านไปยังบอร์ดการแบ่งปันต้นทุนหลัก...',
           });
           onImportSupplier({ code: simulatingSupplier.code, name: simulatingSupplier.name });
         }
@@ -526,7 +526,7 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
     }
   };
 
-  // โ”€โ”€โ”€ VIEW 1: INBOX PROJECTS LIST โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+  // ─── VIEW 1: INBOX PROJECTS LIST ──────────────────────────────────────────
   if (!selectedProject) {
     return (
       <div className="page-stack bulk-cost-supplier-page animated-fadeIn">
@@ -677,7 +677,7 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
     );
   }
 
-  // โ”€โ”€โ”€ VIEW 2: GROUPED DETAIL PREVIEW VIEW โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+  // ─── VIEW 2: GROUPED DETAIL PREVIEW VIEW ───────────────────────────────────
   return (
     <div className="page-stack bulk-cost-supplier-page animated-fadeIn">
       {/* Simulation Overlay Loader */}
@@ -686,7 +686,7 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
           <div className="axon-simulator-card p-8 rounded-xl shadow-2xl flex flex-col items-center text-center">
             <Loader2 size={44} className="animate-spin text-term-blue mb-4" />
             <h3 className="text-lg font-extrabold text-gray-900 mb-1">
-              เธเธณเธฅเธฑเธเน€เธเธทเนเธญเธกเธ•เนเธญเธเธณเธฅเธญเธเธเธฑเธ AXON Database View
+              กำลังเชื่อมต่อจำลองกับ AXON Database View
             </h3>
             <p className="text-sm text-gray-500 mb-6 font-mono">
               Chain ID: {selectedProject.chainId} | Supplier: {simulatingSupplier?.name}
@@ -704,7 +704,7 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
             <div className="flex flex-col gap-2.5 text-left w-full max-w-xs px-2">
               <div className="flex items-center gap-2 text-xs font-bold">
                 <span className={`w-4 h-4 rounded-full flex items-center justify-center ${simulationProgress >= 20 ? 'bg-green-500 text-white' : 'bg-term-blue text-white animate-pulse'}`}>
-                  {simulationProgress >= 20 ? 'โ“' : '1'}
+                  {simulationProgress >= 20 ? '✓' : '1'}
                 </span>
                 <span className={simulationProgress >= 20 ? 'text-gray-500' : 'text-gray-900'}>
                   Connecting to SBO Linked Server...
@@ -712,7 +712,7 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
               </div>
               <div className="flex items-center gap-2 text-xs font-bold">
                 <span className={`w-4 h-4 rounded-full flex items-center justify-center ${simulationProgress >= 60 ? 'bg-green-500 text-white' : simulationProgress >= 20 ? 'bg-term-blue text-white animate-pulse' : 'bg-gray-200 text-gray-400'}`}>
-                  {simulationProgress >= 60 ? 'โ“' : '2'}
+                  {simulationProgress >= 60 ? '✓' : '2'}
                 </span>
                 <span className={simulationProgress >= 60 ? 'text-gray-500' : simulationProgress >= 20 ? 'text-gray-900' : 'text-gray-400'}>
                   Pulling Awarded Line Candidates...
@@ -720,7 +720,7 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
               </div>
               <div className="flex items-center gap-2 text-xs font-bold">
                 <span className={`w-4 h-4 rounded-full flex items-center justify-center ${simulationProgress >= 100 ? 'bg-green-500 text-white' : simulationProgress >= 60 ? 'bg-term-blue text-white animate-pulse' : 'bg-gray-200 text-gray-400'}`}>
-                  {simulationProgress >= 100 ? 'โ“' : '3'}
+                  {simulationProgress >= 100 ? '✓' : '3'}
                 </span>
                 <span className={simulationProgress >= 100 ? 'text-gray-900' : simulationProgress >= 60 ? 'text-gray-900' : 'text-gray-400'}>
                   Caching DraftItem/DraftTerm...
@@ -740,7 +740,7 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
             onClick={() => setSelectedProject(null)}
           >
             <ArrowLeft size={13} />
-            เธขเนเธญเธเธเธฅเธฑเธเนเธเธเธฅเนเธญเธเธฃเธฑเธเธเธ”เธซเธกเธฒเธข (Back to Inbox)
+            ย้อนกลับไปกล่องรับจดหมาย (Back to Inbox)
           </button>
         </div>
 
@@ -753,7 +753,7 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
               </span>
             </p>
             <h2 className="text-xl font-black text-gray-900">
-              เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เนเธฅเธฐเธชเธดเธ—เธเธดเนเธเธนเนเธเธเธฐเนเธเน€เธชเธเธญเธฃเธฒเธเธฒเนเธเธฃเธเธเธฒเธฃ {selectedProject.chainId}
+              รายละเอียดและสิทธิ์ผู้ชนะใบเสนอราคาโครงการ {selectedProject.chainId}
             </h2>
           </div>
           <div className="text-right text-[12.5px] font-semibold text-slate-600">
@@ -768,19 +768,19 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
           <div className="axon-intake-stepper-row" style={{ margin: 0, height: '100%' }}>
             <div className="axon-intake-step axon-intake-step--active">
               <span className="axon-intake-step-circle">1</span>
-              <strong>เธ”เธถเธเธเนเธญเธกเธนเธฅเธเธนเนเธเธเธฐ</strong>
+              <strong>ดึงข้อมูลผู้ชนะ</strong>
               <small>AXON Stream</small>
             </div>
             <div className="axon-intake-step-line" />
             <div className="axon-intake-step">
               <span className="axon-intake-step-circle">2</span>
-              <strong>เธเธฑเธ”เนเธขเธเธเธนเนเธเธฒเธข</strong>
+              <strong>คัดแยกผู้ขาย</strong>
               <small>Supplier Isolation</small>
             </div>
             <div className="axon-intake-step-line" />
             <div className="axon-intake-step">
               <span className="axon-intake-step-circle">3</span>
-              <strong>เน€เธเนเธฒเธเธฃเธฐเธ”เธฒเธเธเธฑเธเธชเนเธงเธ</strong>
+              <strong>เข้ากระดานปันส่วน</strong>
               <small>Bulk calculation</small>
             </div>
           </div>
@@ -790,17 +790,17 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
             <AlertTriangle size={18} className="axon-intake-alert-icon text-amber-500" aria-hidden="true" style={{ marginTop: 0 }} />
             <div className="flex flex-col gap-1.5 text-slate-700 w-full">
               <span className="font-extrabold text-sm text-slate-850">
-                เธซเธกเธฒเธขเน€เธซเธ•เธธเธเธฒเธฃเธเธฑเธ’เธเธฒเธฃเธฐเธเธเธเธณเธเธงเธ“เนเธเธเธเธณเธฅเธญเธ (Simulation Mode)
+                หมายเหตุการพัฒนาระบบคำนวณแบบจำลอง (Simulation Mode)
               </span>
               <ul className="list-disc pl-5 text-xs space-y-1 font-semibold leading-relaxed" style={{ margin: 0 }}>
                 <li>
-                  เธเนเธญเธเธ—เธฒเธเน€เธเธทเนเธญเธกเนเธขเธเธเธฒเธเธเนเธญเธกเธนเธฅเธเธฒเธฃเน€เธเธทเนเธญเธกเธ•เนเธญเนเธเธเน€เธฃเธตเธขเธฅเนเธ—เธกเน <code className="text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded font-bold text-[11px]">Live Sync</code> เธขเธฑเธเธญเธขเธนเนเธฃเธฐเธซเธงเนเธฒเธเธฃเธญเธเธฒเธฃเธชเธฃเนเธฒเธ SQL View <code className="text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded font-mono font-bold text-[11px]">vw_comparisons</code> เธเธฒเธเธ—เธตเธก <strong className="text-blue-800 font-extrabold">AXON</strong>
+                  ช่องทางเชื่อมโยงฐานข้อมูลการเชื่อมต่อแบบเรียลไทม์ <code className="text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded font-bold text-[11px]">Live Sync</code> ยังอยู่ระหว่างรอการสร้าง SQL View <code className="text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded font-mono font-bold text-[11px]">vw_comparisons</code> จากทีม <strong className="text-blue-800 font-extrabold">AXON</strong>
                 </li>
                 <li>
-                  เธ—เนเธฒเธเธชเธฒเธกเธฒเธฃเธ–เธเธฅเธดเธเธเธธเนเธก <strong className="text-blue-800 font-extrabold">"เธเธณเธฅเธญเธเธเธณเธเธงเธ“"</strong> (เธเธธเนเธกเธชเธตเธเนเธณเน€เธเธดเธเธเธงเธฒเธเธเธเธญเธเธเธฒเธฃเนเธ”เนเธ•เนเธฅเธฐเธเธนเนเธเธฒเธข) เน€เธเธทเนเธญเธเธณเธฅเธญเธเนเธเธฅเธงเนเธเธฒเธฃเธเธณเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒเธงเธดเนเธเธเนเธฒเธเธเธฒเธเธเนเธญเธกเธนเธฅเธเธณเธฅเธญเธ <code className="text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded font-mono font-bold text-[11px]">AIX Draft Snapshots</code>
+                  ท่านสามารถคลิกปุ่ม <strong className="text-blue-800 font-extrabold">"จำลองคำนวณ"</strong> (ปุ่มสีน้ำเงินขวาบนของการ์ดแต่ละผู้ขาย) เพื่อจำลองโฟลว์การนำรายการสินค้าวิ่งผ่านฐานข้อมูลจำลอง <code className="text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded font-mono font-bold text-[11px]">AIX Draft Snapshots</code>
                 </li>
                 <li>
-                  เธฃเธฐเธเธเธเธฐเธเธณเธ—เธฒเธเธ—เนเธฒเธเนเธเธขเธฑเธ <strong className="text-blue-800 font-extrabold">เธเธฃเธฐเธ”เธฒเธเธเธณเธเธงเธ“เธซเธฅเธฑเธ (Bulk Cost Workspace)</strong> เน€เธเธทเนเธญเนเธซเนเน€เธซเนเธเธเธฑเนเธเธ•เธญเธเธเธฒเธฃเธงเธดเน€เธเธฃเธฒเธฐเธซเนเน€เธเธฃเธตเธขเธเน€เธ—เธตเธขเธเนเธฅเธฐเธเธฒเธฃเธเธฑเธเธชเนเธงเธเธ•เนเธเธ—เธธเธเธเธฃเธดเธเนเธ”เนเธเธฃเธเธ–เนเธงเธ
+                  ระบบจะนำทางท่านไปยัง <strong className="text-blue-800 font-extrabold">กระดานคำนวณหลัก (Bulk Cost Workspace)</strong> เพื่อให้เห็นขั้นตอนการวิเคราะห์เปรียบเทียบและการปันส่วนต้นทุนจริงได้ครบถ้วน
                 </li>
               </ul>
             </div>
@@ -897,7 +897,7 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
                           className="axon-simulate-btn"
                         >
                           <Play size={10} fill="currentColor" />
-                          เธเธณเธฅเธญเธเธเธณเธเธงเธ“
+                          จำลองคำนวณ
                         </button>
                       </td>
                     </tr>
@@ -909,11 +909,11 @@ export function AxonAwardedIntake({ onImportSupplier }: AxonAwardedIntakeProps) 
                           <div className="bg-white rounded border border-gray-300 overflow-hidden shadow-sm">
                             <div className="bg-[#E8F0F8] px-4 py-1.5 border-b border-blue-200 flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="text-[#2264A0] font-extrabold text-xs">เธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒเธเธนเนเน€เธชเธเธญเธฃเธฒเธเธฒ ({suppName})</span>
-                                <span className="text-[11px] text-slate-500 font-bold">({lines.length} เธฃเธฒเธขเธเธฒเธฃ)</span>
+                                <span className="text-[#2264A0] font-extrabold text-xs">รายการสินค้าผู้เสนอราคา ({suppName})</span>
+                                <span className="text-[11px] text-slate-500 font-bold">({lines.length} รายการ)</span>
                               </div>
                               <span className="text-[11px] text-slate-400 font-semibold">
-                                เธเธฅเธดเธเธ—เธตเนเนเธ–เธงเธชเธดเธเธเนเธฒเธ”เนเธฒเธเธฅเนเธฒเธเน€เธเธทเนเธญเน€เธฅเธทเธญเธ/เธขเธเน€เธฅเธดเธเธเธฒเธฃเธเธฑเธเธชเนเธงเธ
+                                คลิกที่แถวสินค้าด้านล่างเพื่อเลือก/ยกเลิกการปันส่วน
                               </span>
                             </div>
                             <div className="overflow-x-auto">
@@ -1028,7 +1028,7 @@ function TablePager({
         </button>
         {pageButtons.map((page, index) =>
           typeof page === 'string' ? (
-            <span className="bulk-page-ellipsis" key={`ellipsis-${index}`}>โ€ฆ</span>
+            <span className="bulk-page-ellipsis" key={`ellipsis-${index}`}>…</span>
           ) : (
             <button
               type="button"

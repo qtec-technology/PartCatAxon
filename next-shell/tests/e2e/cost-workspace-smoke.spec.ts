@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const MANUAL_WORKSPACE_URL =
   '/bulk-cost?tab=new&supplier=VF0072&supplierName=GRAINGER%20INTERNATIONAL';
+const MOJIBAKE_PATTERN = /[\u0080-\u009F\uFFFD]|\u0E42\u20AC|\u0E42\u201D|\u0E42\u2013|\u0E42\u009C/;
 
 async function fillCostField(page: Page, id: string, value: string) {
   const input = page.locator(`#${id}`);
@@ -56,6 +57,25 @@ async function fillFirstLineBaseData(page: Page, withWeight: boolean) {
 }
 
 test.describe('Cost Workspace smoke QA', () => {
+  test('renders Thai workspace copy without mojibake', async ({ page }) => {
+    await page.goto('/bulk-cost');
+
+    await expect(page.getByText('รายการคำนวณที่บันทึกไว้')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('รายการผู้ขายที่ได้รับเลือก')).toBeVisible();
+    await expect(page.getByText('สร้างรายการคำนวณใหม่ (ป้อนข้อมูลเอง)')).toBeVisible();
+
+    const bodyText = await page.locator('body').innerText();
+    expect(bodyText).not.toMatch(MOJIBAKE_PATTERN);
+
+    await page.getByRole('button', { name: 'AXON Awarded' }).click();
+    await expect(page.getByText('โครงการนำเข้าทั้งหมด')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('โครงการมาใหม่')).toBeVisible();
+    await expect(page.getByText('กำลังปันส่วนต้นทุน')).toBeVisible();
+
+    const axonText = await page.locator('body').innerText();
+    expect(axonText).not.toMatch(MOJIBAKE_PATTERN);
+  });
+
   test('new manual workspace is ready for user entry without page-level horizontal scroll', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(MANUAL_WORKSPACE_URL);
