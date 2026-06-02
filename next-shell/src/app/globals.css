@@ -2159,6 +2159,7 @@ button:disabled {
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 12.5px;
+  contain: layout paint;
 }
 
 .prototype-table.wide-table {
@@ -5960,37 +5961,75 @@ tfoot .sticky-col-last {
   align-items: center;
   gap: 4px;
   padding: 6px;
-  background: rgba(241, 245, 249, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
   margin-bottom: 12px;
-  width: max-content;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  width: 100%;
+  min-height: 46px;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
 }
 
 .line-column-preset-btn {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   padding: 6px 14px;
-  border-radius: 8px;
+  border-radius: 7px;
   font-size: 13px;
   font-weight: 600;
   color: #64748b;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
   white-space: nowrap;
+  min-height: 32px;
 }
 
 .line-column-preset-btn:hover {
-  background: rgba(255, 255, 255, 0.6);
+  background: #ffffff;
   color: #0f172a;
 }
 
 .line-column-preset-btn--active {
   background: #ffffff;
+  border-color: #bfdbfe;
   color: var(--pc-blue, #2264a0);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 -2px 0 var(--pc-blue, #2264a0);
+}
+
+.line-add-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bulk-add-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.bulk-add-count-input {
+  width: 58px;
+  height: 28px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bulk-add-count-input:focus {
+  outline: none;
+  border-color: var(--pc-blue, #2264a0);
+  box-shadow: 0 0 0 2px rgba(34, 100, 160, 0.14);
 }
 
 /* ─── Modern Slide-in Side Drawer ───────────────────────────────────────── */

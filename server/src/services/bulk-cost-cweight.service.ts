@@ -49,6 +49,8 @@ export function toCWeightLookupInput(
             latest.vendorStockItemNo,
             latest.BPStockItemNo,
         ),
+        // ggCode is Grainger's catalog number (E6: GG CODE); graingerNo is generic fallback key
+        graingerNo: firstText(latest.ggCode, latest.graingerNo),
         manufacturerPartNo: firstText(
             latest.mfgPartNumber,
             latest.manufacturerPartNo,
@@ -61,16 +63,15 @@ export function toCWeightLookupInput(
             latest.mfrBrand,
             latest.U_Brand,
         ),
-        itemWeightKg: firstNumber(
-            latest.itemWeightKg,
-            latest.itemWeightPerEach,
-            latest.weight,
-            latest.U_Weight,
-        ),
-        length: firstNumber(latest.length, latest.dimensionL, latest.U_Length),
-        width: firstNumber(latest.width, latest.dimensionW, latest.U_Width),
-        height: firstNumber(latest.height, latest.dimensionH, latest.U_Height),
-        dimUnit: firstDimUnit(latest.dimUnit, latest.dimUnitNo, latest.U_DimUnitNo),
+        description: firstText(latest.sapDescription, latest.description, latest.itemDescription),
+        category1: firstText(latest.itemCategory, latest.category1),
+        category2: firstText(latest.category2),
+        category3: firstText(latest.category3),
+        // Intentionally omit itemWeightKg / length / width / height / dimUnit here.
+        // CWeight prefill is a DB identifier lookup — it must not short-circuit via
+        // resolveDirectFormula when the user already has an item weight on the form.
+        // Direct-formula mode is reserved for when the user explicitly supplies
+        // dimensions to compute a dimensional weight, not for prefill.
         shipModeNo: firstTextOrNumber(latest.shipModeNo, latest.U_ShipModeNo, defaults?.shipModeNo),
     };
 }
@@ -100,11 +101,5 @@ function firstTextOrNumber(...values: unknown[]): string | number | null {
         const normalized = value.trim();
         if (normalized.length > 0) return normalized;
     }
-    return null;
-}
-
-function firstDimUnit(...values: unknown[]): string | 1 | 2 | null {
-    const value = firstTextOrNumber(...values);
-    if (value === 1 || value === 2 || typeof value === 'string') return value;
     return null;
 }

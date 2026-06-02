@@ -47,6 +47,7 @@ export const dbObjects = {
             itemCategory: sapObject('DB_TABLE_ITEM_CATEGORY', '@ITEMCATEGORY'),
         },
         qtec: {
+            cweight: qtecObject('DB_TABLE_GRAINGER_CWEIGHT', '@GRAINGER_CWEIGHT'),
             itemGroup: qtecObject('DB_TABLE_ITEM_GROUP', '@ITEMGROUP'),
             location: qtecObject('DB_TABLE_LOCATION', '@LOCATION'),
             permitType: qtecObject('DB_TABLE_PERMIT_TYPE', '@PERMITTYPE'),
@@ -64,9 +65,7 @@ export const dbObjects = {
             costWorkspaceLine: qtecObject('DB_TABLE_CW_LINE', 'CostWorkspaceLine'),
             costWorkspaceSnapshot: qtecObject('DB_TABLE_CW_SNAPSHOT', 'CostWorkspaceSnapshot'),
         },
-        grainger: {
-            cweight: graingerObject('DB_TABLE_GRAINGER_CWEIGHT', '@GRAINGER_CWEIGHT'),
-        },
+        // grainger: future tables in [GRAINGER].[dbo] if needed
         // Sandbox mirror — PART_CATALOG_AIX only — never SBOQTEC
         sandbox: {
             poitm: sandboxObject('DB_TABLE_SANDBOX_POITM', '@POITM'),

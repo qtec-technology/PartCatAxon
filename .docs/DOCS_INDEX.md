@@ -1,6 +1,6 @@
 # Documentation Index And Cleanup Map
 
-Last updated: 2026-05-25
+Last updated: 2026-06-02
 
 Purpose: keep agents from reading stale documents as if they were current
 truth. This file classifies docs by status and tells agents what to read first.
@@ -60,6 +60,7 @@ truth. This file classifies docs by status and tells agents what to read first.
 | `.docs/DEPLOYMENT_RUNBOOK.md` | ACTIVE | Nginx/NSSM/proxy target |
 | `.docs/CWEIGHT_DECISION_NOTE.md` | ACTIVE | CWeight module decision |
 | `.docs/CWEIGHT_EVALUATION.md` | ACTIVE | CWeight evaluation notes |
+| `.docs/implementation_Cweight_Plan.md` | ACTIVE | Current CWeight SQL pipeline and deferred Vector Search plan |
 
 ## Handoff / Session Utilities
 

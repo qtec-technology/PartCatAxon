@@ -1,11 +1,19 @@
 export type CWeightDecision = 'AUTO_ACCEPT' | 'REVIEW_SUGGESTION' | 'NOT_FOUND';
 export type CWeightDimUnit = 'CM' | 'INCH';
-export type CWeightSource = 'direct_formula' | 'local_exact_match' | 'local_semantic_match' | 'not_found';
+export type CWeightSource =
+    | 'direct_formula'
+    | 'local_exact_match'
+    | 'local_semantic_match'
+    | 'vector_candidate'
+    | 'internet_candidate'
+    | 'not_found';
 
 export interface CWeightLocalResearchMatch {
     decision: Exclude<CWeightDecision, 'NOT_FOUND'>;
     chargeableWeightKg: number | null;
     itemWeightKg: number | null;
+    /** Dimensional (volumetric) weight in kg from the matched row, if available. */
+    dimensionalWeightKg: number | null;
     dimensionL: number | null;
     dimensionW: number | null;
     dimensionH: number | null;
@@ -13,6 +21,24 @@ export interface CWeightLocalResearchMatch {
     source: Exclude<CWeightSource, 'direct_formula' | 'not_found'>;
     confidence: number;
     reason: string;
+    /** Grainger No from the matched database row, if resolved via a product lookup. */
+    matchedGraingerNo: string | null;
+    /** Manufacturer part number from the matched row. */
+    matchedMfgPartNo: string | null;
+    /** Brand / manufacturer name from the matched row. */
+    matchedBrand: string | null;
+    /** Free-text evidence or source URL (null for local DB matches). */
+    evidence: string | null;
+}
+
+/** A single candidate row for user selection when the match is ambiguous. */
+export interface CWeightCandidate {
+    chargeableWeightKg: number;
+    itemWeightKg: number | null;
+    matchedGraingerNo: string | null;
+    matchedMfgPartNo: string | null;
+    matchedBrand: string | null;
+    evidence: string | null;
 }
 
 export interface CWeightResolveInput {
@@ -29,6 +55,8 @@ export interface CWeightResult {
     decision: CWeightDecision;
     chargeableWeightKg: number | null;
     itemWeightKg: number | null;
+    /** Computed dimensional weight in kg. Null when dimensions are not available. */
+    dimensionalWeightKg: number | null;
     dimensionL: number | null;
     dimensionW: number | null;
     dimensionH: number | null;
@@ -36,6 +64,16 @@ export interface CWeightResult {
     source: CWeightSource;
     confidence: number;
     reason: string;
+    /** Grainger No from the matched database row. Null for direct_formula and not_found paths. */
+    matchedGraingerNo: string | null;
+    /** Manufacturer part number from the matched row. */
+    matchedMfgPartNo: string | null;
+    /** Brand / manufacturer name from the matched row. */
+    matchedBrand: string | null;
+    /** Free-text evidence or source URL. */
+    evidence: string | null;
+    /** Alternative candidates when the match is ambiguous. Present only for REVIEW_SUGGESTION semantic matches. */
+    candidates?: CWeightCandidate[] | null;
 }
 
 const ROUNDING_STEP_KG = 0.5;
@@ -73,6 +111,7 @@ function resolveDirectFormula(input: CWeightResolveInput): CWeightResult | null 
         decision: 'AUTO_ACCEPT',
         chargeableWeightKg: ceilTo(Math.max(itemWeightKg ?? 0, dimensionalWeightKg ?? 0), ROUNDING_STEP_KG),
         itemWeightKg,
+        dimensionalWeightKg,
         dimensionL,
         dimensionW,
         dimensionH,
@@ -80,6 +119,10 @@ function resolveDirectFormula(input: CWeightResolveInput): CWeightResult | null 
         source: 'direct_formula',
         confidence: 0.99,
         reason: 'Calculated locally from supplied actual weight and/or dimensional weight inputs.',
+        matchedGraingerNo: null,
+        matchedMfgPartNo: null,
+        matchedBrand: null,
+        evidence: null,
     };
 }
 
@@ -93,6 +136,7 @@ function normalizeLocalMatch(match: CWeightLocalResearchMatch): CWeightResult {
         decision: match.decision,
         chargeableWeightKg,
         itemWeightKg: positiveOrNull(match.itemWeightKg),
+        dimensionalWeightKg: positiveOrNull(match.dimensionalWeightKg),
         dimensionL: positiveOrNull(match.dimensionL),
         dimensionW: positiveOrNull(match.dimensionW),
         dimensionH: positiveOrNull(match.dimensionH),
@@ -100,6 +144,10 @@ function normalizeLocalMatch(match: CWeightLocalResearchMatch): CWeightResult {
         source: match.source,
         confidence: clamp(match.confidence, 0, 1),
         reason: match.reason.trim() === '' ? 'Resolved from approved local CWeight research match.' : match.reason.trim(),
+        matchedGraingerNo: match.matchedGraingerNo ?? null,
+        matchedMfgPartNo: match.matchedMfgPartNo ?? null,
+        matchedBrand: match.matchedBrand ?? null,
+        evidence: match.evidence ?? null,
     };
 }
 
@@ -152,6 +200,7 @@ function notFound(reason: string): CWeightResult {
         decision: 'NOT_FOUND',
         chargeableWeightKg: null,
         itemWeightKg: null,
+        dimensionalWeightKg: null,
         dimensionL: null,
         dimensionW: null,
         dimensionH: null,
@@ -159,6 +208,10 @@ function notFound(reason: string): CWeightResult {
         source: 'not_found',
         confidence: 0,
         reason,
+        matchedGraingerNo: null,
+        matchedMfgPartNo: null,
+        matchedBrand: null,
+        evidence: null,
     };
 }
 

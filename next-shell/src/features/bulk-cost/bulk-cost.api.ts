@@ -247,6 +247,74 @@ export interface SandboxFinalizeResult {
   sandboxDb: string;
 }
 
+// ─── CWeight Prefill ─────────────────────────────────────────────────────────
+
+export type CWeightDecision = 'AUTO_ACCEPT' | 'REVIEW_SUGGESTION' | 'NOT_FOUND';
+
+export interface CWeightCandidate {
+  chargeableWeightKg: number;
+  itemWeightKg: number | null;
+  matchedGraingerNo: string | null;
+  matchedMfgPartNo: string | null;
+  matchedBrand: string | null;
+  evidence: string | null;
+}
+
+export interface CWeightSuggestion {
+  lineKey: string;
+  prefillAllowed: boolean;
+  decision: CWeightDecision;
+  source: string;
+  chargeableWeightKg: number | null;
+  itemWeightKg: number | null;
+  dimensionalWeightKg: number | null;
+  confidence: number;
+  reason: string;
+  matchedGraingerNo: string | null;
+  matchedMfgPartNo: string | null;
+  matchedBrand: string | null;
+  evidence: string | null;
+  /** Alternative candidates when the match is ambiguous (REVIEW_SUGGESTION + semantic source). */
+  candidates?: CWeightCandidate[] | null;
+}
+
+/**
+ * POST /api/bulk-cost/cweight-prefill (single-line call from the edit modal).
+ * Returns null when the server returns no suggestions.
+ */
+export async function lookupCWeightPrefill(
+  line: AllocationLineSource,
+  shipModeNo?: number | null,
+): Promise<CWeightSuggestion | null> {
+  const response = await requestJson<CWeightSuggestion[]>('/api/bulk-cost/cweight-prefill', {
+    method: 'POST',
+    body: {
+      defaults: { shipModeNo: shipModeNo ?? null },
+      lines: [{ lineKey: line.lineKey, latest: line, lockedByUser: false }],
+    },
+  });
+  return response.data[0] ?? null;
+}
+
+/**
+ * POST /api/bulk-cost/cweight-prefill (batch — all lines at once).
+ */
+export async function lookupCWeightPrefillBatch(
+  lines: AllocationLineSource[],
+  shipModeNo?: number | string | null,
+): Promise<CWeightSuggestion[]> {
+  const response = await requestJson<CWeightSuggestion[]>('/api/bulk-cost/cweight-prefill', {
+    method: 'POST',
+    body: {
+      defaults: { shipModeNo: shipModeNo ?? null },
+      lines: lines.map((line) => ({ lineKey: line.lineKey, latest: line, lockedByUser: false })),
+    },
+  });
+  return response.data ?? [];
+}
+
+// ─── Sandbox Finalize ────────────────────────────────────────────────────────
+
 /**
  * POST /api/bulk-cost/runs/:runId/sandbox-finalize
  * Writes Item/Term to PART_CATALOG_AIX mirror — Sandbox Finalize / Dry-run only.

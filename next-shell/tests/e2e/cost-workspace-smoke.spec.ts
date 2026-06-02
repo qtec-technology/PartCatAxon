@@ -20,6 +20,15 @@ async function chooseFirstNonEmptyOption(locator: Locator) {
   });
 }
 
+async function chooseFirstInlineSelectOption(page: Page, id: string) {
+  const trigger = page.locator(`#${id}`);
+  await expect(trigger).toBeVisible({ timeout: 10_000 });
+  await trigger.click();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(100);
+}
+
 async function openFirstLineEditor(page: Page) {
   const editButton = page.getByRole('button', { name: 'Edit line details' }).first();
   await expect(editButton).toBeVisible({ timeout: 20_000 });
@@ -85,11 +94,34 @@ test.describe('Cost Workspace smoke QA', () => {
     });
     await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('.add-item-btn')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Paste from Excel/i })).toHaveCount(0);
 
     const hasPageHorizontalScroll = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
     );
     expect(hasPageHorizontalScroll).toBe(false);
+  });
+
+  test('changing Step 1 selectors does not open blocking browser dialogs', async ({ page }) => {
+    const dialogs: string[] = [];
+    page.on('dialog', async (dialog) => {
+      dialogs.push(dialog.message());
+      await dialog.dismiss();
+    });
+
+    await page.goto(MANUAL_WORKSPACE_URL);
+
+    await expect(page.getByRole('heading', { name: 'Manual Cost Workspace' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await chooseFirstInlineSelectOption(page, 'bulk-cost-currency');
+    await chooseFirstInlineSelectOption(page, 'bulk-cost-order-term');
+    await chooseFirstInlineSelectOption(page, 'bulk-cost-location');
+    await chooseFirstInlineSelectOption(page, 'bulk-cost-sub-location');
+    await chooseFirstInlineSelectOption(page, 'bulk-cost-ship-mode');
+
+    expect(dialogs).toEqual([]);
   });
 
   test('does not expose database implementation names to users', async ({ page }) => {

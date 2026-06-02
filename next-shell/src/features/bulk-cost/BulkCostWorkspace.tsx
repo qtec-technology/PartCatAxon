@@ -11,7 +11,6 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  Clipboard,
   Edit3,
   Eye,
   FileText,
@@ -45,8 +44,8 @@ import {
   type FinalResultColumnDefinition,
   type FinalResultKey,
 } from './bulk-cost.final-result';
-import { buildBulkCostRunDraftPayload, calculateBulkCostPreview, loadBulkCostRun, saveBulkCostRunDraft, sandboxFinalizeLines, updateBulkCostRunStatus } from './bulk-cost.api';
-import type { SandboxFinalizeResult } from './bulk-cost.api';
+import { buildBulkCostRunDraftPayload, calculateBulkCostPreview, loadBulkCostRun, lookupCWeightPrefill, lookupCWeightPrefillBatch, saveBulkCostRunDraft, sandboxFinalizeLines, updateBulkCostRunStatus } from './bulk-cost.api';
+import type { CWeightCandidate, CWeightSuggestion, SandboxFinalizeResult } from './bulk-cost.api';
 import { useResizableTableColumns, type ResizableTableColumn } from './useResizableTableColumns';
 import {
   fmt,
@@ -481,116 +480,6 @@ const recalcLineDerivedValues = (line: AllocationLineSource): AllocationLineSour
   };
 };
 
-function parsePastedText(text: string): Partial<AllocationLineSource>[] {
-  const lines = text.split(/\r?\n/).map(line => line.split('\t').map(cell => cell.trim()));
-  if (lines.length === 0 || (lines.length === 1 && lines[0].length === 1 && lines[0][0] === '')) {
-    return [];
-  }
-
-  // Detect header row
-  const firstRow = lines[0];
-  const isHeader = firstRow.some(cell => {
-    const c = cell.toLowerCase();
-    return (
-      c.includes('part') || c.includes('pn') || c.includes('number') || c.includes('catalog') || c.includes('model') ||
-      c.includes('mfg') || c.includes('mfr') || c.includes('brand') || c.includes('band') || c.includes('manufacturer') ||
-      c.includes('desc') || c.includes('qty') || c.includes('quant') ||
-      c.includes('price') || c.includes('unit') || c.includes('pcs') || c.includes('rate') ||
-      c.includes('weight') || c.includes('wt') || c.includes('kg') ||
-      c.includes('uom') || c.includes('coo') || c.includes('origin') ||
-      c.includes('group') || c.includes('category') || c.includes('hs') || c.includes('harmonized') ||
-      c.includes('stock') || c.includes('customer') || c.includes('term') || c.includes('location') ||
-      c.includes('loc') || c.includes('supp') || c.includes('gg') || c.includes('lead') ||
-      c.includes('permit') || c.includes('shelf') || c.includes('curr')
-    );
-  });
-
-  let dataRows = lines;
-  let colMap: Record<number, keyof AllocationLineSource> = {};
-
-  if (isHeader) {
-    dataRows = lines.slice(1);
-    firstRow.forEach((cell, idx) => {
-      const c = cell.toLowerCase();
-      if (c.includes('part') || c.includes('pn') || c.includes('number') || c.includes('catalog') || c.includes('model')) {
-        colMap[idx] = 'mfgPartNumber';
-      } else if (c.includes('desc')) {
-        colMap[idx] = 'sapDescription';
-      } else if (c.includes('qty') || c.includes('quant')) {
-        colMap[idx] = 'qty';
-      } else if (c.includes('price') || c.includes('unit') || c.includes('pcs') || c.includes('rate')) {
-        colMap[idx] = 'unitPrice';
-      } else if (c.includes('weight') || c.includes('wt') || c.includes('kg')) {
-        colMap[idx] = 'itemWeightPerEach';
-      } else if (c.includes('coo') || c.includes('origin')) {
-        colMap[idx] = 'countryOfOrigin';
-      } else if (c.includes('uom') || c.includes('unit of measure')) {
-        colMap[idx] = 'uom';
-      } else if (c.includes('manufacturer') || c.includes('mfg') || c.includes('mfr') || c.includes('brand') || c.includes('band')) {
-        colMap[idx] = 'manufacturer';
-      } else if (c.includes('group')) {
-        colMap[idx] = 'itemGroup';
-      } else if (c.includes('category')) {
-        colMap[idx] = 'itemCategory';
-      } else if (c.includes('hs') || c.includes('harmonized')) {
-        colMap[idx] = 'hsCode';
-      } else if (c.includes('stock') || c.includes('customer')) {
-        colMap[idx] = 'customerStockCode';
-      } else if (c.includes('term') || c.includes('incoterm') || c.includes('purchase')) {
-        colMap[idx] = 'orderTerm';
-      } else if (c.includes('sub location') || c.includes('sub loc') || c.includes('sublocation')) {
-        colMap[idx] = 'subLocation';
-      } else if (c.includes('location') || c.includes('loc')) {
-        colMap[idx] = 'location';
-      } else if (c.includes('supp') || c.includes('gg') || c.includes('supplier') || c.includes('order code')) {
-        colMap[idx] = 'supplierOrderCode';
-      } else if (c.includes('lead') || c.includes('delivery')) {
-        colMap[idx] = 'deliveryLeadTime';
-      } else if (c.includes('permit')) {
-        colMap[idx] = 'importPermit';
-      } else if (c.includes('shelf') || c.includes('life')) {
-        colMap[idx] = 'shelfLifeRequire';
-      } else if (c.includes('curr')) {
-        colMap[idx] = 'currency';
-      }
-    });
-  } else {
-    // Positional fallback
-    const cols = ['mfgPartNumber', 'sapDescription', 'qty', 'unitPrice', 'itemWeightPerEach', 'uom', 'manufacturer', 'countryOfOrigin'] as const;
-    cols.forEach((col, idx) => {
-      colMap[idx] = col;
-    });
-  }
-
-  const results: Partial<AllocationLineSource>[] = [];
-  dataRows.forEach(row => {
-    if (row.length === 1 && row[0] === '') return; // Skip blank rows
-    const item: Partial<AllocationLineSource> = {};
-    row.forEach((cell, idx) => {
-      const field = colMap[idx];
-      if (!field) return;
-
-      if (field === 'qty') {
-        const val = parseInt(cell.replace(/,/g, ''), 10);
-        item.qty = isNaN(val) ? 1 : val;
-      } else if (field === 'unitPrice') {
-        const val = parseFloat(cell.replace(/,/g, '').replace(/[^0-9.]/g, ''));
-        item.unitPrice = isNaN(val) ? 0 : val;
-      } else if (field === 'itemWeightPerEach') {
-        const val = parseFloat(cell.replace(/,/g, '').replace(/[^0-9.]/g, ''));
-        item.itemWeightPerEach = isNaN(val) ? null : val;
-      } else {
-        item[field] = cell as any;
-      }
-    });
-    if (Object.keys(item).length > 0) {
-      results.push(item);
-    }
-  });
-
-  return results;
-}
-
 let _lineSeq = 0;
 const createBlankLine = (
   no: number,
@@ -683,6 +572,13 @@ const createBlankLine = (
     validFrom: '',
     validTo: '',
   };
+};
+
+const formatCWeightDecisionLabel = (decision: CWeightSuggestion['decision'] | undefined | null): string => {
+  if (decision === 'AUTO_ACCEPT') return 'พบตรง';
+  if (decision === 'REVIEW_SUGGESTION') return 'ให้ตรวจ';
+  if (decision === 'NOT_FOUND') return 'ไม่พบ';
+  return '-';
 };
 
 const trackedLineFields: { key: LineFieldKey; label: string; format: (line: AllocationLineSource) => string }[] = [
@@ -1062,9 +958,12 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   const [sandboxFinalizeResult, setSandboxFinalizeResult] = useState<SandboxFinalizeResult | null>(null);
   const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
   const [editingModalTab, setEditingModalTab] = useState<LineColumnPreset>('item-data');
+  const [cweightResults, setCweightResults] = useState<Record<string, CWeightSuggestion | null>>({});
+  const [cweightLoadingKey, setCweightLoadingKey] = useState<string | null>(null);
+  const [cweightBatchLoading, setCweightBatchLoading] = useState(false);
+  const [cweightBatchStats, setCweightBatchStats] = useState<{ total: number; exact: number; semantic: number; notFound: number } | null>(null);
   const [activeRegistrationDrawerLineKey, setActiveRegistrationDrawerLineKey] = useState<string | null>(null);
-  const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
-  const [pasteText, setPasteText] = useState('');
+  const [bulkAddCount, setBulkAddCount] = useState('5');
 
   // Restore saved run state on mount
   useEffect(() => {
@@ -1618,15 +1517,13 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   }, [allLines.length, costs, globalDefaults, resetPreview, supplierCode, supplierName, setEditingLineKey]);
 
   const addMultipleLines = useCallback(() => {
-    const countStr = window.prompt('Enter number of items to add:', '5');
-    if (!countStr) return;
-    const count = parseInt(countStr, 10);
+    const count = parseInt(bulkAddCount, 10);
     if (isNaN(count) || count <= 0) {
-      alert('Please enter a valid positive number.');
+      toast.error('กรุณาระบุจำนวนรายการเป็นตัวเลขมากกว่า 0');
       return;
     }
     if (count > 100) {
-      alert('You can add up to 100 items at a time.');
+      toast.error('เพิ่มได้สูงสุด 100 รายการต่อครั้ง');
       return;
     }
     setAllLines((prev) => {
@@ -1646,47 +1543,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       return currentLines;
     });
     resetPreview();
-  }, [allLines.length, costs, globalDefaults, resetPreview, supplierCode, supplierName]);
-
-  const importPastedLines = useCallback((tsvText: string) => {
-    if (!tsvText.trim()) return;
-    const parsed = parsePastedText(tsvText);
-    if (parsed.length === 0) {
-      alert('No rows detected. Please make sure you copied from Excel.');
-      return;
-    }
-
-    setAllLines((prev) => {
-      let currentLines = [...prev];
-      const newKeys: string[] = [];
-      parsed.forEach((itemData) => {
-        const nextNo = currentLines.length + 1;
-        const baseLine = createBlankLine(nextNo, supplierCode, supplierName, costs, globalDefaults);
-        const newLine = {
-          ...baseLine,
-          ...itemData,
-          docFee: {
-            ...baseLine.docFee,
-            ...(itemData.docFee || {}),
-          },
-          amount: (itemData.qty !== undefined ? itemData.qty : baseLine.qty) *
-                  (itemData.unitPrice !== undefined ? itemData.unitPrice : baseLine.unitPrice)
-        };
-        currentLines.push(newLine);
-        newKeys.push(newLine.lineKey);
-      });
-      setSelectedKeys((s) => {
-        const next = new Set(s);
-        newKeys.forEach(k => next.add(k));
-        return next;
-      });
-      return currentLines;
-    });
-
-    setPasteText('');
-    setIsPasteModalOpen(false);
-    resetPreview();
-  }, [costs, globalDefaults, resetPreview, supplierCode, supplierName]);
+  }, [allLines.length, bulkAddCount, costs, globalDefaults, resetPreview, supplierCode, supplierName]);
 
   const deleteLine = useCallback((lineKey: string) => {
     setAllLines((prev) => {
@@ -1797,6 +1654,63 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       }),
     );
     resetPreview();
+  }, [resetPreview]);
+
+  const handleCWeightLookup = useCallback(async (line: AllocationLineSource) => {
+    setCweightLoadingKey(line.lineKey);
+    try {
+      const result = await lookupCWeightPrefill(line, costs.shipModeNo ?? null);
+      setCweightResults((prev) => ({ ...prev, [line.lineKey]: result }));
+    } catch (err) {
+      clientLogger.error('CWeight lookup failed', err);
+      toast.error('ค้นหา CWeight ไม่สำเร็จ');
+    } finally {
+      setCweightLoadingKey(null);
+    }
+  }, [costs.shipModeNo]);
+
+  const handleCWeightLookupAll = useCallback(async () => {
+    if (allLines.length === 0) return;
+    setCweightBatchLoading(true);
+    try {
+      const results = await lookupCWeightPrefillBatch(allLines, costs.shipModeNo ?? null);
+      const map: Record<string, CWeightSuggestion | null> = {};
+      for (const r of results) map[r.lineKey] = r;
+      setCweightResults((prev) => ({ ...prev, ...map }));
+      const all = results;
+      const exact = all.filter((r) => r.source === 'local_exact_match').length;
+      const semantic = all.filter((r) => r.decision === 'REVIEW_SUGGESTION').length;
+      const notFound = all.filter((r) => r.decision === 'NOT_FOUND').length;
+      setCweightBatchStats({ total: all.length, exact, semantic, notFound });
+    } catch (err) {
+      clientLogger.error('CWeight batch lookup failed', err);
+      toast.error('ค้นหา CWeight ทั้งหมดไม่สำเร็จ');
+    } finally {
+      setCweightBatchLoading(false);
+    }
+  }, [allLines, costs.shipModeNo]);
+
+  const applyCWeightSuggestion = useCallback((lineKey: string, suggestion: CWeightSuggestion) => {
+    if (!suggestion.prefillAllowed || suggestion.chargeableWeightKg === null) return;
+    setAllLines((prev) =>
+      prev.map((line) => {
+        if (line.lineKey !== lineKey) return line;
+        return recalcLineDerivedValues({ ...line, shippingWeightPerEach: suggestion.chargeableWeightKg });
+      }),
+    );
+    resetPreview();
+    toast.success(`ใส่ Ship Wt/Ea ${suggestion.chargeableWeightKg} kg แล้ว`);
+  }, [resetPreview]);
+
+  const applyCWeightCandidate = useCallback((lineKey: string, candidate: CWeightCandidate) => {
+    setAllLines((prev) =>
+      prev.map((line) => {
+        if (line.lineKey !== lineKey) return line;
+        return recalcLineDerivedValues({ ...line, shippingWeightPerEach: candidate.chargeableWeightKg });
+      }),
+    );
+    resetPreview();
+    toast.success(`ใส่ Ship Wt/Ea ${candidate.chargeableWeightKg} kg แล้ว`);
   }, [resetPreview]);
 
   const resetLatestFieldToOrigin = useCallback((lineKey: string, fieldKey: LineFieldKey) => {
@@ -2975,6 +2889,94 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   />
                 </div>
 
+                {/* CWeight Lookup */}
+                <div className="line-edit-modal-field line-edit-modal-field--full">
+                  {(() => {
+                    const isLoading = cweightLoadingKey === line.lineKey;
+                    const cw = cweightResults[line.lineKey];
+                    const decisionColor =
+                      cw?.decision === 'AUTO_ACCEPT' ? 'bg-emerald-100 text-emerald-800' :
+                      cw?.decision === 'REVIEW_SUGGESTION' ? 'bg-amber-100 text-amber-800' :
+                      cw?.decision === 'NOT_FOUND' ? 'bg-slate-100 text-slate-500' : '';
+                    return (
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          disabled={isLoading}
+                          className="flex items-center gap-1.5 self-start px-3 py-1.5 text-xs font-medium rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={() => handleCWeightLookup(line)}
+                        >
+                          {isLoading
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <Search className="w-3 h-3" />}
+                          {isLoading ? 'กำลังค้นหา...' : 'ค้นหา CWeight'}
+                        </button>
+                        {cw && (
+                          <div className="rounded border border-slate-200 bg-slate-50 p-2 text-xs flex flex-col gap-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold ${decisionColor}`}>
+                                {formatCWeightDecisionLabel(cw.decision)}
+                              </span>
+                              {cw.chargeableWeightKg !== null && (
+                                <span className="font-mono font-bold text-slate-700">{cw.chargeableWeightKg} kg</span>
+                              )}
+                              <span className="text-slate-400">{Math.round(cw.confidence * 100)}%</span>
+                              {cw.matchedGraingerNo && (
+                                <span className="text-slate-500">GG: <span className="font-mono text-slate-700">{cw.matchedGraingerNo}</span></span>
+                              )}
+                              {cw.matchedMfgPartNo && (
+                                <span className="text-slate-500">MFG: <span className="font-mono text-slate-700">{cw.matchedMfgPartNo}</span></span>
+                              )}
+                              {cw.matchedBrand && (
+                                <span className="text-slate-500">Brand: <span className="text-slate-700">{cw.matchedBrand}</span></span>
+                              )}
+                            </div>
+                            <p className="text-slate-500 leading-snug">{cw.reason}</p>
+                            {cw.evidence && (() => {
+                              const [desc, url] = cw.evidence.split(' | ');
+                              return (
+                                <p className="text-slate-400 leading-snug text-[11px]">
+                                  {desc}
+                                  {url && (
+                                    <> · <a href={url} target="_blank" rel="noreferrer" className="underline hover:text-slate-600">{url}</a></>
+                                  )}
+                                </p>
+                              );
+                            })()}
+                            {cw.candidates && cw.candidates.length > 1 && (
+                              <div className="mt-1 flex flex-col gap-1">
+                                <p className="text-[11px] text-slate-500 font-medium">พบหลายรายการใกล้เคียง เลือกน้ำหนักที่ถูกต้อง:</p>
+                                {cw.candidates.map((c, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    className="text-left px-2 py-1 text-[11px] rounded border border-slate-200 hover:bg-slate-100 flex items-center gap-2"
+                                    onClick={() => applyCWeightCandidate(line.lineKey, c)}
+                                  >
+                                    <span className="font-mono font-bold text-slate-700">{c.chargeableWeightKg} kg</span>
+                                    {c.matchedGraingerNo && <span className="text-slate-500">GG: {c.matchedGraingerNo}</span>}
+                                    {c.matchedBrand && <span className="text-slate-500">{c.matchedBrand}</span>}
+                                    {c.evidence && <span className="text-slate-400 truncate">{c.evidence.split(' | ')[0]}</span>}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {cw.prefillAllowed && cw.chargeableWeightKg !== null && (
+                              <button
+                                type="button"
+                                className="self-start mt-0.5 px-2 py-1 text-[11px] font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                                onClick={() => applyCWeightSuggestion(line.lineKey, cw)}
+                              >
+                                ใช้ {cw.chargeableWeightKg} kg เป็น Ship Wt/Ea
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+
                 {/* Freight/Courier Rate */}
                 <div className="line-edit-modal-field">
                   <label>Freight/Courier Rate</label>
@@ -3325,74 +3327,6 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               </div>
             );
           })()}
-        </div>
-      </div>
-    );
-  };
-
-  const renderPasteModal = () => {
-    if (!isPasteModalOpen) return null;
-
-    const rowsCount = pasteText.trim() ? pasteText.trim().split('\n').length : 0;
-
-    return (
-      <div className="line-edit-modal-overlay" onClick={() => setIsPasteModalOpen(false)}>
-        <div className="line-edit-modal-content" onClick={(e) => e.stopPropagation()} style={{ width: 600, height: 480 }}>
-          <div className="line-edit-modal-header">
-            <h3>
-              <Clipboard size={16} /> Paste Items from Excel
-            </h3>
-            <button className="line-edit-modal-close" onClick={() => setIsPasteModalOpen(false)}>
-              &times;
-            </button>
-          </div>
-          <div className="line-edit-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <p style={{ fontSize: '13px', margin: 0, color: '#475569' }}>
-              วางข้อมูลแถวและคอลัมน์จาก Excel (Copy & Paste ตารางโดยตรง)
-              <br />
-              หากแถวแรกเป็น Header ระบบจะจับคู่คอลัมน์ให้อัตโนมัติ (เช่น Part No, Qty, Unit Price, Weight, COO, UOM)
-            </p>
-            <textarea
-              className="line-edit-modal-input"
-              style={{
-                flex: 1,
-                minHeight: '200px',
-                padding: '12px',
-                fontFamily: 'monospace',
-                height: 'auto',
-                resize: 'none',
-                lineHeight: '1.4',
-              }}
-              placeholder="วางตาราง Excel ที่นี่..."
-              value={pasteText}
-              onChange={(e) => setPasteText(e.target.value)}
-            />
-            {rowsCount > 0 && (
-              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#2264a0' }}>
-                พบ {rowsCount} แถวที่ตรวจพบ
-              </div>
-            )}
-          </div>
-          <div className="line-edit-modal-footer">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => {
-                setPasteText('');
-                setIsPasteModalOpen(false);
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="primary-button"
-              disabled={!pasteText.trim()}
-              onClick={() => importPastedLines(pasteText)}
-            >
-              Import Rows
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -4286,12 +4220,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               <InlineSelect
                 id="bulk-cost-order-term"
                 value={orderTermSelectOptions.includes(costs.orderTerm) ? costs.orderTerm : costs.orderTerm}
-                onValueChange={(val) => {
-                  if (allLines.length > 0 && !window.confirm('การเปลี่ยนเงื่อนไขการส่งมอบ (Purchase Term) จะมีผลต่อการคำนวณต้นทุนทั้งหมด คุณต้องการดำเนินการต่อหรือไม่?')) {
-                    return;
-                  }
-                  updateCost('orderTerm', val);
-                }}
+                onValueChange={(val) => updateCost('orderTerm', val)}
                 options={orderTermSelectOptions.map((opt) => ({ value: opt, label: opt }))}
                 placeholder="Please select"
                 className="cost-bar-select"
@@ -4302,12 +4231,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               <InlineSelect
                 id="bulk-cost-location"
                 value={selectedLocationValue}
-                onValueChange={(val) => {
-                  if (allLines.length > 0 && !window.confirm('การเปลี่ยนสถานที่ (Term Location) จะมีผลต่อการคำนวณภาษีและค่าขนส่ง คุณต้องการดำเนินการต่อหรือไม่?')) {
-                    return;
-                  }
-                  updateCost('location', val);
-                }}
+                onValueChange={(val) => updateCost('location', val)}
                 options={locationSelectOptions.map((opt) => ({ value: opt.code, label: locationOptionLabel(opt) }))}
                 placeholder="Please select"
                 className="cost-bar-select"
@@ -4338,9 +4262,6 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 value={String(costs.shipModeNo)}
                 onValueChange={(val) => {
                   const num = parseInt(val, 10);
-                  if (allLines.length > 0 && !window.confirm('การเปลี่ยนรูปแบบการขนส่ง (Ship Mode) จะมีผลต่อการคำนวณค่าขนส่งทั้งหมด คุณต้องการดำเนินการต่อหรือไม่?')) {
-                    return;
-                  }
                   setCosts((prev) => ({ ...prev, shipModeNo: isNaN(num) ? -1 : num }));
                   resetPreview();
                 }}
@@ -4354,12 +4275,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 id="bulk-cost-currency"
                 value={currencySelectOptions.some((row) => row.code === costs.currency) ? costs.currency : costs.currency}
                 onValueChange={(val) => {
-                  if (val) {
-                    if (allLines.length > 0 && !window.confirm('การเปลี่ยนสกุลเงิน (Currency) จะมีผลต่อค่าการคำนวณทั้งหมด คุณต้องการดำเนินการต่อหรือไม่?')) {
-                      return;
-                    }
-                    updateCurrency(val);
-                  }
+                  if (val) updateCurrency(val);
                 }}
                 options={currencySelectOptions.map((opt) => ({ value: opt.code, label: currencyOptionLabel(opt) }))}
                 className="cost-bar-select"
@@ -4643,7 +4559,25 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               <small style={{ color: 'var(--pc-muted)', fontSize: '12px' }}>
                 Double-click a row or click <span className="inline-flex items-center justify-center" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 4px', margin: '0 2px' }}><Edit3 size={11} style={{ color: '#475569' }} /></span> to edit. Selected rows are sent to CAL.
               </small>
+              <button
+                type="button"
+                disabled={cweightBatchLoading || allLines.length === 0}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                onClick={handleCWeightLookupAll}
+              >
+                {cweightBatchLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                {cweightBatchLoading ? 'กำลังค้นหา...' : `ค้นหา CWeight (${allLines.length} รายการ)`}
+              </button>
             </div>
+            {cweightBatchStats && (
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 pt-0.5 pl-5">
+                <span>ผลค้นหา CWeight:</span>
+                <span className="text-emerald-700 font-medium">{cweightBatchStats.exact} พบตรง</span>
+                <span className="text-amber-700 font-medium">{cweightBatchStats.semantic} ให้ตรวจ</span>
+                <span className="text-slate-400">{cweightBatchStats.notFound} ไม่พบ</span>
+                <span className="text-slate-300">/ {cweightBatchStats.total} รายการ</span>
+              </div>
+            )}
           </div>
 
           <div className="summary-strip source-summary-strip">
@@ -4690,7 +4624,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               CAL uses selected Latest rows only.
             </small>
             {isLatestView && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div className="line-add-controls">
                 <button
                   type="button"
                   className="primary-button compact-btn add-item-btn"
@@ -4698,21 +4632,24 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 >
                   + Add Item
                 </button>
-                <button
-                  type="button"
-                  className="secondary-button compact-btn add-multiple-btn"
-                  onClick={addMultipleLines}
-                >
-                  + Add Multiple
-                </button>
-                <button
-                  type="button"
-                  className="secondary-button compact-btn paste-excel-btn"
-                  onClick={() => setIsPasteModalOpen(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <Clipboard size={14} /> Paste from Excel
-                </button>
+                <div className="bulk-add-control">
+                  <input
+                    aria-label="Number of items to add"
+                    className="bulk-add-count-input"
+                    min={1}
+                    max={100}
+                    type="number"
+                    value={bulkAddCount}
+                    onChange={(event) => setBulkAddCount(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="secondary-button compact-btn add-multiple-btn"
+                    onClick={addMultipleLines}
+                  >
+                    + Add
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -5094,7 +5031,6 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       </div>
       )}
       {renderLineEditModal()}
-      {renderPasteModal()}
     </div>
   );
 }

@@ -9,13 +9,18 @@ const cweightResult: CWeightResult = {
     decision: 'AUTO_ACCEPT',
     chargeableWeightKg: 53.92,
     itemWeightKg: 2.72,
+    dimensionalWeightKg: 53.92,
     dimensionL: null,
     dimensionW: null,
     dimensionH: null,
     dimUnit: null,
     source: 'local_exact_match',
     confidence: 0.97,
-    reason: 'Resolved from local GRAINGER @GRAINGER_CWEIGHT exact Grainger code match: 100G64.',
+    reason: 'Exact Grainger code match: 100G64.',
+    matchedGraingerNo: '100G64',
+    matchedMfgPartNo: '1292G',
+    matchedBrand: 'LIBMAN',
+    evidence: null,
 };
 
 describe('bulk-cost-cweight.service', () => {
@@ -31,15 +36,17 @@ describe('bulk-cost-cweight.service', () => {
             dimUnit: 'CM',
         }, { shipModeNo: 1 });
 
+        // itemWeightKg/length/width/height/dimUnit are intentionally excluded —
+        // cweight-prefill is an identifier lookup, not a direct-formula compute.
         expect(result).toEqual({
             supplierOrderCode: '100G64',
+            graingerNo: null,
             manufacturerPartNo: '1292G',
             manufacturerName: 'LIBMAN',
-            itemWeightKg: 2.72,
-            length: 10,
-            width: 20,
-            height: 30,
-            dimUnit: 'CM',
+            description: null,
+            category1: null,
+            category2: null,
+            category3: null,
             shipModeNo: 1,
         });
     });
@@ -56,13 +63,13 @@ describe('bulk-cost-cweight.service', () => {
 
         expect(resolveCWeight).toHaveBeenCalledWith({
             supplierOrderCode: '100G64',
+            graingerNo: null,
             manufacturerPartNo: null,
             manufacturerName: null,
-            itemWeightKg: null,
-            length: null,
-            width: null,
-            height: null,
-            dimUnit: null,
+            description: null,
+            category1: null,
+            category2: null,
+            category3: null,
             shipModeNo: null,
         });
         expect(result).toEqual([{ lineKey: 'L1', prefillAllowed: true, ...cweightResult }]);

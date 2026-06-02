@@ -1,6 +1,6 @@
 # Cleanup Inventory
 
-Last updated: 2026-05-25
+Last updated: 2026-06-02
 
 This inventory tracks dead-code, stale-doc, and architecture cleanup work for
 the stabilization phase. It separates safe cleanup from changes that need design
@@ -19,6 +19,8 @@ approval or runtime coordination.
 | Next.js App Router Cleanups | Obsolete empty folders (`auth-permission`, `migration`), legacy route `term/[termId]`, and dormant SPA files (`ProtectedRoute.tsx`, `PageLoader.tsx`) remained in next-shell | Safely deleted all empty routes and unused components to clean up workspace | Done 2026-05-27 |
 | BulkCostWorkspace Refactoring | BulkCostWorkspace.tsx was a ~6,300 line God component | Refactored by extracting cells, changes-panel, and result-panels to separate files, reducing it to ~4,300 lines | Done 2026-05-27 |
 | UI Responsive Height Fix | Containers on zoomed-out / high-resolution screens collapsed and left empty space at the bottom/sides | Patched app-shell-locked, content-area-locked, page-root, cost-workspace-shell, and cost-workspace-main to use flex column layout with stretch alignment and explicit heights | Done 2026-05-27 |
+| CWeight plan mojibake | `.docs/implementation_Cweight_Plan.md` was unreadable due to encoding corruption and contained superseded database direction | Rewrote the plan as a clean UTF-8 ASCII decision note: active SQL phase uses `PART_CATALOG_AIX.dbo.@GRAINGER_CWEIGHT`; Vector Search remains deferred | Done 2026-06-02 |
+| Performance cache scratch plan | `.docs/implementation_PerformanceCache_Plan.md` was a standalone implementation scratch file and is not referenced by active docs | Removed from working tree; keep cache-component direction in active roadmap/template docs if needed | Done 2026-06-02 |
 
 
 ## P1 — Inventory Before Editing
@@ -62,7 +64,7 @@ Current candidate direction:
 | Object | Direction | Reason |
 |---|---|---|
 | `AxonExtractionQueue` | Drop candidate after checks | Legacy queue/mock path; target AXON source is awarded SQL/shared view |
-| `GraingerWeightData` | Drop candidate after checks | Active CWeight source is `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]` |
+| `GraingerWeightData` | Drop candidate after checks | Active CWeight source is `[PART_CATALOG_AIX].[dbo].[@GRAINGER_CWEIGHT]` |
 | `GraingerWeightImportLog` | Drop candidate after checks | Paired with obsolete AIX staging table |
 | `BulkCostRun` | Keep until replacement | Current live save/load depends on it |
 | `DraftItem` | Keep until replacement | Current snapshot line data depends on it |

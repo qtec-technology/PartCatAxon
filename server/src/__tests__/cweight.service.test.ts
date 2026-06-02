@@ -16,6 +16,7 @@ describe('cweight.service', () => {
             decision: 'AUTO_ACCEPT',
             chargeableWeightKg: 10.5,
             itemWeightKg: 10.1,
+            dimensionalWeightKg: 10,
             dimensionL: 50,
             dimensionW: 40,
             dimensionH: 30,
@@ -23,7 +24,23 @@ describe('cweight.service', () => {
             source: 'direct_formula',
             confidence: 0.99,
             reason: 'Calculated locally from supplied actual weight and/or dimensional weight inputs.',
+            matchedGraingerNo: null,
+            matchedMfgPartNo: null,
+            matchedBrand: null,
+            evidence: null,
         });
+    });
+
+    it('returns dimensionalWeightKg null when only itemWeightKg is supplied', () => {
+        const result = resolveChargeableWeight({
+            itemWeightKg: 5.0,
+        });
+
+        expect(result.decision).toBe('AUTO_ACCEPT');
+        expect(result.source).toBe('direct_formula');
+        expect(result.chargeableWeightKg).toBe(5.0);
+        expect(result.dimensionalWeightKg).toBeNull();
+        expect(result.matchedGraingerNo).toBeNull();
     });
 
     it('preserves local semantic matches as review suggestions', () => {
@@ -32,6 +49,7 @@ describe('cweight.service', () => {
                 decision: 'REVIEW_SUGGESTION',
                 chargeableWeightKg: 0.5,
                 itemWeightKg: 0.08,
+                dimensionalWeightKg: null,
                 dimensionL: 5,
                 dimensionW: 2,
                 dimensionH: 2,
@@ -39,6 +57,10 @@ describe('cweight.service', () => {
                 source: 'local_semantic_match',
                 confidence: 0.68,
                 reason: 'Description-only local match requires user review.',
+                matchedGraingerNo: null,
+                matchedMfgPartNo: null,
+                matchedBrand: null,
+                evidence: null,
             },
         });
 
@@ -46,6 +68,7 @@ describe('cweight.service', () => {
             decision: 'REVIEW_SUGGESTION',
             chargeableWeightKg: 0.5,
             itemWeightKg: 0.08,
+            dimensionalWeightKg: null,
             dimensionL: 5,
             dimensionW: 2,
             dimensionH: 2,
@@ -53,6 +76,10 @@ describe('cweight.service', () => {
             source: 'local_semantic_match',
             confidence: 0.68,
             reason: 'Description-only local match requires user review.',
+            matchedGraingerNo: null,
+            matchedMfgPartNo: null,
+            matchedBrand: null,
+            evidence: null,
         });
     });
 
@@ -70,6 +97,7 @@ describe('cweight.service', () => {
             decision: 'NOT_FOUND',
             chargeableWeightKg: null,
             itemWeightKg: null,
+            dimensionalWeightKg: null,
             dimensionL: null,
             dimensionW: null,
             dimensionH: null,
@@ -77,6 +105,39 @@ describe('cweight.service', () => {
             source: 'not_found',
             confidence: 0,
             reason: 'No direct weight/dimension formula inputs or approved local match were provided.',
+            matchedGraingerNo: null,
+            matchedMfgPartNo: null,
+            matchedBrand: null,
+            evidence: null,
         });
+    });
+
+    it('does not use the local match when the user already supplied itemWeightKg (locked weight protection)', () => {
+        // Direct formula must take precedence over any lookup result
+        const result = resolveChargeableWeight({
+            itemWeightKg: 3.5,
+            localMatch: {
+                decision: 'AUTO_ACCEPT',
+                chargeableWeightKg: 99.9,
+                itemWeightKg: 99.9,
+                dimensionalWeightKg: null,
+                dimensionL: null,
+                dimensionW: null,
+                dimensionH: null,
+                dimUnit: null,
+                source: 'local_exact_match',
+                confidence: 0.97,
+                reason: 'Lookup result that should not overwrite user input.',
+                matchedGraingerNo: 'XYZ00',
+                matchedMfgPartNo: null,
+                matchedBrand: null,
+                evidence: null,
+            },
+        });
+
+        expect(result.source).toBe('direct_formula');
+        expect(result.chargeableWeightKg).toBe(3.5);
+        expect(result.itemWeightKg).toBe(3.5);
+        expect(result.matchedGraingerNo).toBeNull();
     });
 });
