@@ -465,7 +465,7 @@ export function TermInfoRow({
                     >
                       <SelectValue placeholder="Please select" className="text-sm font-normal" />
                     </SelectTrigger>
-                    <SelectContent side="bottom" avoidCollisions={false}>
+                    <SelectContent side="bottom">
                       {locationOptions.map((location) => (
                         <SelectItem
                           key={location.code}

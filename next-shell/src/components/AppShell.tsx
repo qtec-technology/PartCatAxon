@@ -28,12 +28,12 @@ export function AppShell({
     return pathname.startsWith(href);
   };
   const lockWorkspace = pathname === '/partcatalog' || pathname.startsWith('/bulk-cost');
-  const productTitle = isBulkCostPath ? 'QTEC Cost Workspace' : 'QTEC PartCatalog';
-  const productSubtitle = isBulkCostPath ? 'Manual costing & AXON awarded intake' : 'Item, Term & Catalog Management';
+  const productTitle = isBulkCostPath ? 'QTEC AXON SYSTEM' : 'QTEC PART CATALOG SYSTEM';
+  const productSubtitle = isBulkCostPath ? 'AXON Awarded & Cost Intelligence' : 'Part Catalog & Cost Workspace';
 
   useEffect(() => {
     const applyTitle = () => {
-      document.title = productTitle;
+      document.title = 'QTEC PARTCATALOG & AXON';
     };
 
     applyTitle();
@@ -44,7 +44,7 @@ export function AppShell({
       window.cancelAnimationFrame(frameId);
       window.clearTimeout(timerId);
     };
-  }, [productTitle]);
+  }, []);
 
   const topbar = (
     <header className="topbar">

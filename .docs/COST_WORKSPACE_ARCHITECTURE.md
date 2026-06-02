@@ -1,6 +1,6 @@
 # Cost Workspace Architecture Decision
 
-Last updated: 2026-05-22
+Last updated: 2026-05-27 (Business Decisions locked; M1 SQL script created)
 
 This document supersedes the older mental model where `Bulk Cost` was treated
 as the whole feature. The product target is now **Cost Workspace**: a temporary
@@ -220,3 +220,36 @@ Keep until the replacement schema is implemented or data is migrated:
 
 Do not drop tables directly from screenshots. First run row-count,
 foreign-key, object-dependency, and code-reference checks.
+
+---
+
+## 11. Business Decisions Locked (2026-05-27)
+
+| # | Decision | Implementation note |
+|---|---|---|
+| 1 | Draft persistence | `DraftJson` on `CostWorkspaceRun` is overwritable; immutable snapshot only on Save Revision |
+| 2 | 3 save actions | Draft (overwrite), Revision (new `SnapshotType=SAVE_REVISION`), Finalize (validate + prepare for SAP) |
+| 3 | Weight-missing policy | Block CAL 100% for bulk-by-weight; `U_CWeight` must not be NULL/0 for every selected line |
+| 4 | Mixed currency | Manual Convert/Reject in Phase 1; no auto-convert |
+| 5 | Doc fees | Service Line separate — `DocFee_*` fields on line, `DocFeeBasisJson` for basis config |
+| 6 | Existing item+term | Always Add New Term (`AwardedTermID` recorded on line after Finalize) |
+| 7 | Manual finalize timing | User-triggered immediately; Master Write only on Got Order |
+| 8 | ValidTo default | `U_ValidTo = U_ValidFrom + 1 month` (editable) |
+| 9 | SCC/ASP basis | Deferred — `U_ASP` column stored as NULL, not wired to CAL engine yet |
+| 10 | Merged line model | `CostWorkspaceLine` = unified DraftItem + DraftTerm; split to `@POITM`/`@PITM1` only at Finalize |
+
+## 12. M1 SQL Migration Script
+
+Script: `server/sql/migration/M1_create_cost_workspace.sql`
+
+Creates three tables in `PART_CATALOG_AIX`:
+
+| Table | Purpose |
+|---|---|
+| `CostWorkspaceRun` | Run header, revision tracking, draft JSON, supplier, header costs, defaults |
+| `CostWorkspaceLine` | Unified item+term line (Decision #10); all Item/Term/CAL/Allocation fields |
+| `CostWorkspaceSnapshot` | Immutable revision records for Save Revision + Finalize |
+
+Phase M2 (repository + dual-write) must not start until M1 is executed and verified on the `PART_CATALOG_AIX` test instance.
+
+`db-objects.ts` already contains `costWorkspaceRun`, `costWorkspaceLine`, and `costWorkspaceSnapshot` references using env keys `DB_TABLE_CW_RUN`, `DB_TABLE_CW_LINE`, `DB_TABLE_CW_SNAPSHOT`.

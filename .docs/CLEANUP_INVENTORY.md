@@ -16,6 +16,10 @@ approval or runtime coordination.
 | Bulk Cost draft schema wording | Agent quick refs still mentioned `BulkCostLine`; live schema uses `BulkCostRun` + `DraftItem` + `DraftTerm` | Update quick refs | Done 2026-05-19 |
 | Date/time write path | Main repo still passed Node `new Date()` for Item/Term `UpdatedDate`; deploy-proven `repos2` uses SQL `GETDATE()` | Port fix and add regression test | Done 2026-05-19 |
 | Bulk Cost obsolete line table path | Runtime config/write helpers and manual revision SQL still carried `BulkCostLine` remnants even though live snapshots are `DraftItem` / `DraftTerm` | Remove unused helper/config and keep revision SQL limited to `BulkCostRun` metadata | Done 2026-05-19 |
+| Next.js App Router Cleanups | Obsolete empty folders (`auth-permission`, `migration`), legacy route `term/[termId]`, and dormant SPA files (`ProtectedRoute.tsx`, `PageLoader.tsx`) remained in next-shell | Safely deleted all empty routes and unused components to clean up workspace | Done 2026-05-27 |
+| BulkCostWorkspace Refactoring | BulkCostWorkspace.tsx was a ~6,300 line God component | Refactored by extracting cells, changes-panel, and result-panels to separate files, reducing it to ~4,300 lines | Done 2026-05-27 |
+| UI Responsive Height Fix | Containers on zoomed-out / high-resolution screens collapsed and left empty space at the bottom/sides | Patched app-shell-locked, content-area-locked, page-root, cost-workspace-shell, and cost-workspace-main to use flex column layout with stretch alignment and explicit heights | Done 2026-05-27 |
+
 
 ## P1 — Inventory Before Editing
 

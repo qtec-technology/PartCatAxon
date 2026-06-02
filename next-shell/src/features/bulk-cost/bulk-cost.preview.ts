@@ -95,7 +95,8 @@ export function mapBulkCostToTermFormData(
     // Supplier / context
     supplier: source.vendorCode,
     suppOrderCode: source.supplierOrderCode,
-    validFrom: todayIsoDate(),
+    validFrom: source.validFrom || todayIsoDate(),
+    validTo: source.validTo || '',
     // Pricing
     prodCost: finalResult.productCost,
     currency: source.currency || costs.currency,
@@ -126,8 +127,8 @@ export function mapBulkCostToTermFormData(
     miscTax: source.miscTax,
     // Cost parameters
     stockFeePercent: source.stkPercent,
-    spk: source.sspk,
-    qoc: source.qoc,
+    spk: source.spkPercent,
+    qoc: source.qocRate,
     markup: source.markupPercent,
     // UOM & Conversion
     purchaseUOM: source.purchaseUOM,
@@ -191,15 +192,16 @@ function round6(value: number): number {
 
 /** Maps AllocationLineSource to ItemData for display in the Item preview. */
 export function mapBulkCostToItemData(source: AllocationLineSource): ItemData {
+  const yesNo = (value: unknown): boolean => {
+    const normalized = String(value ?? '').trim().toUpperCase();
+    return normalized === 'YES' || normalized === 'Y' || normalized === '1' || normalized === 'TRUE';
+  };
+
   const permitRequired =
-    source.importPermit === 'Yes' ||
-    source.importPermit === '1' ||
-    source.importPermit === 'true';
+    yesNo(source.importPermit);
 
   const shelfLifeRequired =
-    source.shelfLifeRequire === 'Yes' ||
-    source.shelfLifeRequire === '1' ||
-    source.shelfLifeRequire === 'true';
+    yesNo(source.shelfLifeRequire);
 
   return {
     itemGroup: source.itemGroup,
@@ -213,32 +215,32 @@ export function mapBulkCostToItemData(source: AllocationLineSource): ItemData {
     customerStockCode: source.customerStockCode || '',
     stockUOM: source.uom || 'EA',
     countryOfOrigin: source.countryOfOrigin,
-    eccn: '',
-    unspsc: '',
-    eProcurementCode: '',
+    eccn: source.eccn || '',
+    unspsc: source.unspsc || '',
+    eProcurementCode: source.eProcurementCode || '',
     remark: '',
     active: true,
     masterFG: false,
     shelfLifeRequired,
     punchOut: false,
     vmi: false,
-    customerBPA: false,
-    isQTECStock: false,
-    serialRequired: false,
-    sdsRequired: false,
-    certificateRequired: false,
-    eCommerce: false,
+    customerBPA: yesNo(source.customerBpa),
+    isQTECStock: yesNo(source.qtecStock),
+    serialRequired: yesNo(source.serialRequired),
+    sdsRequired: yesNo(source.sdsRequired),
+    certificateRequired: yesNo(source.certificateRequired),
+    eCommerce: yesNo(source.eCommerce),
     b1Item: false,
-    dgRequired: false,
+    dgRequired: yesNo(source.dgRequired),
     permitRequired,
     permitType: source.permitType || '',
     hsCode: source.hsCode,
-    longDesc1: '',
-    longDesc2: '',
-    longDesc3: '',
-    longDesc4: '',
-    generalSpec: '',
-    referenceUrl: '',
+    longDesc1: source.longDesc1 || '',
+    longDesc2: source.longDesc2 || '',
+    longDesc3: source.longDesc3 || '',
+    longDesc4: source.longDesc4 || '',
+    generalSpec: source.generalSpec || '',
+    referenceUrl: source.referenceUrl || '',
     updatedBy: '',
     updatedDate: '',
     hasImage: false,

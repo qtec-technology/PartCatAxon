@@ -12,6 +12,7 @@ const toQualifiedObject = (prefix: string, value: string | undefined, fallback: 
 export const QTEC_DB_PREFIX = `${toSqlIdentifier(env.DB_NAME_QTEC)}.[dbo]`;
 export const SAP_DB_PREFIX = `${toSqlIdentifier(env.DB_NAME_SAP)}.[dbo]`;
 export const GRAINGER_DB_PREFIX = `${toSqlIdentifier(process.env.DB_NAME_GRAINGER || 'GRAINGER')}.[dbo]`;
+export const SANDBOX_DB_PREFIX = `${toSqlIdentifier(env.DB_NAME_SANDBOX)}.[dbo]`;
 
 const qtecObject = (envKey: string, fallback: string): string =>
     toQualifiedObject(QTEC_DB_PREFIX, process.env[envKey], fallback);
@@ -27,6 +28,9 @@ const qtecProcedure = (envKey: string, fallback: string): string =>
 
 const qualifiedQtecProcedure = (envKey: string, fallback: string): string =>
     `${QTEC_DB_PREFIX}.${toSqlIdentifier(qtecProcedure(envKey, fallback))}`;
+
+const sandboxObject = (envKey: string, fallback: string): string =>
+    toQualifiedObject(SANDBOX_DB_PREFIX, process.env[envKey], fallback);
 
 export const dbObjects = {
     tables: {
@@ -56,9 +60,17 @@ export const dbObjects = {
             bulkCostRun: qtecObject('DB_TABLE_BULK_COST_RUN', 'BulkCostRun'),
             draftItem: qtecObject('DB_TABLE_DRAFT_ITEM', 'DraftItem'),
             draftTerm: qtecObject('DB_TABLE_DRAFT_TERM', 'DraftTerm'),
+            costWorkspaceRun: qtecObject('DB_TABLE_CW_RUN', 'CostWorkspaceRun'),
+            costWorkspaceLine: qtecObject('DB_TABLE_CW_LINE', 'CostWorkspaceLine'),
+            costWorkspaceSnapshot: qtecObject('DB_TABLE_CW_SNAPSHOT', 'CostWorkspaceSnapshot'),
         },
         grainger: {
             cweight: graingerObject('DB_TABLE_GRAINGER_CWEIGHT', '@GRAINGER_CWEIGHT'),
+        },
+        // Sandbox mirror — PART_CATALOG_AIX only — never SBOQTEC
+        sandbox: {
+            poitm: sandboxObject('DB_TABLE_SANDBOX_POITM', '@POITM'),
+            pitm1: sandboxObject('DB_TABLE_SANDBOX_PITM1', '@PITM1'),
         },
     },
     views: {

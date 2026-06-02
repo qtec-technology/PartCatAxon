@@ -23,6 +23,7 @@ import {
 
 const TOP_ITEMS_LIMIT = 400;
 const TOP_ITEMS_CACHE_TTL_MS = 60_000;
+const REFRESH_AHEAD_MS = 10_000; // เริ่ม background refresh เมื่อ cache เหลืออีก 10 วินาที
 const DEFAULT_VAT_GROUP_PU = 'AP-07';
 const DEFAULT_VAT_GROUP_SA = 'AR-07';
 const DEFAULT_NULL_LOOKUP_VALUE = '_Null';
@@ -35,6 +36,11 @@ let topItemsPromise: Promise<Item[]> | null = null;
 function invalidateTopItemsCache(): void {
     topItemsCache = null;
     topItemsPromise = null;
+}
+
+// ตรวจว่า cache ใกล้หมดอายุแล้วหรือยัง (แต่ยังไม่หมด) — ใช้สำหรับ background refresh
+function isNearExpiry(cache: { fetchedAt: number }): boolean {
+    return Date.now() - cache.fetchedAt > TOP_ITEMS_CACHE_TTL_MS - REFRESH_AHEAD_MS;
 }
 
 // ใช้สำหรับคืนชื่อตารางเขียนข้อมูล Item ในฐาน SAP
@@ -85,28 +91,41 @@ function getPunchOutValue(data: Partial<CreateItemDTO>): unknown {
     return data.U_Punchout;
 }
 
+// ใช้สำหรับ fetch ข้อมูล Top Items จาก DB และอัปเดต cache (มี stampede prevention)
+async function fetchAndCacheTopItems(): Promise<Item[]> {
+    if (!topItemsPromise) {
+        topItemsPromise = (async () => {
+            try {
+                const items = await query<Item>(buildHomeTopItemsQuery(TOP_ITEMS_LIMIT));
+                topItemsCache = { items, fetchedAt: Date.now() };
+                return items;
+            } finally {
+                topItemsPromise = null;
+            }
+        })();
+    }
+    return topItemsPromise;
+}
+
 // ใช้สำหรับดึงรายการ Item ล่าสุดจากแคช หรือโหลดใหม่จาก DB เมื่อแคชหมดอายุ
+// ใช้ Stale-While-Revalidate pattern: ส่ง cache เก่าให้ user ทันที + refresh ใน background
 async function getCachedTopItems(): Promise<Item[]> {
     const now = Date.now();
     if (topItemsCache && now - topItemsCache.fetchedAt < TOP_ITEMS_CACHE_TTL_MS) {
+
+        // กรณีย่อย: cache ใกล้หมดแล้ว — เริ่ม background refresh (fire-and-forget)
+        if (isNearExpiry(topItemsCache) && !topItemsPromise) {
+            fetchAndCacheTopItems().catch(err => {
+                console.error('[TopItems] Background refresh failed:', err);
+            });
+        }
+
+        // ส่ง cache เก่าให้ user ทันที (ไม่รอ background refresh)
         return topItemsCache.items;
     }
 
-    if (topItemsPromise) {
-        return topItemsPromise;
-    }
-
-    topItemsPromise = (async () => {
-        try {
-            const items = await query<Item>(buildHomeTopItemsQuery(TOP_ITEMS_LIMIT));
-            topItemsCache = { items, fetchedAt: Date.now() };
-            return items;
-        } finally {
-            topItemsPromise = null;
-        }
-    })();
-
-    return topItemsPromise;
+    // กรณี: cache หมดแล้ว (cold start ครั้งแรก หรือหลัง CUD invalidation)
+    return await fetchAndCacheTopItems();
 }
 
 /**

@@ -34,12 +34,12 @@ export function formatItemGroup(code: string): string {
 }
 
 export const SHIP_MODE_LABELS: Record<number, string> = {
-  1: 'Air FWD',
+  1: 'Air Forwarder',
   2: 'Sea',
   3: 'Truck',
-  4: 'QTEC-MC',
+  4: 'QTEC-Motorcycle',
   5: 'QTEC-Truck',
-  6: 'Air COUR',
+  6: 'Air Courier',
 };
 
 export function formatShipMode(shipModeNo: number): string {
@@ -119,12 +119,13 @@ export interface AllocationLineSource {
   saleUOM: string;                 // BQ6
   stockConversion: number;         // BR6
   saleConversion: number;          // BS6
-  moq: number | null;              // BT6
+  moq: string | null;              // BT6
 
   // ── Term calculation inputs (for final result) ────────────────────────────
   insPercent: number;              // BM6: Insurance (INS%)
   shipModeNo: number;              // Needed for Exwork Case calculation
   freightRate: number;             // For FR QTEC calc
+  freightType?: string;
   dimUnit: number;                 // 1=CM, 2=INCH
   length: number;
   width: number;
@@ -135,9 +136,34 @@ export interface AllocationLineSource {
   scc: number;                     // Special Custom Clear
   stkPercent: number;              // Stock Fee %
   markupPercent: number;           // CO6: Mark Up %
-  sspk: number;                    // CL6: SPK
-  qoc: number;                     // CM6: QOC
+  spkPercent: number;              // SPK percentage of QLC
+  qocRate: number;                 // QOC rate in THB/kg
+
+  // ── Registration Details (UI-only / Snapshot Persisted) ───────────────────
+  eccn?: string;
+  unspsc?: string;
+  eProcurementCode?: string;
+  longDesc1?: string;
+  longDesc2?: string;
+  longDesc3?: string;
+  longDesc4?: string;
+  generalSpec?: string;
+  referenceUrl?: string;
+  sdsRequired?: string;
+  certificateRequired?: string;
+  customerBpa?: string;
+  qtecStock?: string;
+  serialRequired?: string;
+  dgRequired?: string;
+  eCommerce?: string;
+  vmi?: string;
+  b1Item?: string;
+  specialRequirement?: string;
+  remark?: string;
+  validFrom?: string;
+  validTo?: string;
 }
+
 
 // ─── Document Fees ──────────────────────────────────────────────────────────
 // Columns K–V in PART 1. Each is per-each (UOM By Each only).
@@ -259,7 +285,7 @@ export interface FinalResultColumns {
   saleUOM: string;                 // BQ6
   stockConversion: number;         // BR6
   saleConversion: number;          // BS6
-  purchaseMOQ: number | null;      // BT6
+  purchaseMOQ: string | null;      // BT6
 
   wireTT: number;                  // BU6: Wire Transfer (TT) (THB) per each
   customClear: number;             // BV6: Custom Clear (CC) (THB) per each

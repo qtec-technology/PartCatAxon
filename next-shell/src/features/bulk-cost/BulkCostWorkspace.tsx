@@ -1,6 +1,7 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type InputHTMLAttributes, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -9,6 +10,8 @@ import {
   Calculator,
   Check,
   CheckCircle2,
+  ChevronDown,
+  Clipboard,
   Edit3,
   Eye,
   FileText,
@@ -18,6 +21,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  Sparkles,
   Trash2,
   Trophy,
   XCircle,
@@ -41,8 +45,51 @@ import {
   type FinalResultColumnDefinition,
   type FinalResultKey,
 } from './bulk-cost.final-result';
-import { buildBulkCostRunDraftPayload, calculateBulkCostPreview, loadBulkCostRun, saveBulkCostRunDraft, updateBulkCostRunStatus } from './bulk-cost.api';
+import { buildBulkCostRunDraftPayload, calculateBulkCostPreview, loadBulkCostRun, saveBulkCostRunDraft, sandboxFinalizeLines, updateBulkCostRunStatus } from './bulk-cost.api';
+import type { SandboxFinalizeResult } from './bulk-cost.api';
 import { useResizableTableColumns, type ResizableTableColumn } from './useResizableTableColumns';
+import {
+  fmt,
+  fmtWeight,
+  fmtAuditValue,
+  fmtPlain,
+  fmtNullablePlain,
+  fmtNullableWeightPlain,
+  formatDisplayNumber,
+  formatMatchStatus,
+  toEditableNumber,
+  pct,
+  round6,
+} from './bulk-cost.format';
+import {
+  ALLOC_COLS,
+  BASE_REVIEW_RESULT_COLUMNS,
+  canEditLineColumnInPreset,
+  COST_FIELDS,
+  DOC_FEE_FIELDS,
+  EDITABLE_LINE_COLUMNS_BY_PRESET,
+  FINAL_PREVIEW_TABLE_COLUMNS,
+  FORMULA_PREVIEW_TABLE_COLUMNS,
+  FORMULA_RESULT_KEYS,
+  REVIEW_RESULT_TABLE_COLUMNS,
+  getFinalResultColumnKey,
+  getDocFeeColumnKey,
+  getReviewColClass,
+  LANDED_KEYS,
+  LINE_COLUMN_LABELS,
+  LINE_COLUMN_PRESETS,
+  LINE_STICKY_KEYS,
+  LINE_TABLE_COLUMNS,
+  PRESET_TABS,
+  REVIEW_LABEL_OVERRIDE,
+  REVIEW_RESULT_GROUPS,
+  REVIEW_RESULT_KEYS,
+  SALE_PRICE_KEYS,
+  THBCIF_KEYS,
+  type DraftPreviewMode,
+  type LineColumnPreset,
+  type ResultView,
+} from './bulk-cost.columns';
 import {
   mapBulkCostToTermFormData,
   mapBulkCostToTermCalcResults,
@@ -57,9 +104,15 @@ import {
   type LocationLookupOption,
   type LookupOption,
   type SubLocationLookupOption,
+  type FreightTypeLookupOption,
 } from '../../services/lookup.api';
 import { InlineSelect } from '../../components/common/InlineSelect';
+import { DatePicker } from '../../components/ui/date-picker';
 import { clientLogger } from '../../utils/logger';
+import { ChangesTable, SummaryItem, FormattedNumberInput } from './bulk-cost.changes-panel';
+import { SourceLineCell, ResizableHeader, ModalLookupInput } from './bulk-cost.cells';
+import { ResultTable, DraftPreviewPanel } from './bulk-cost.result-panels';
+import { splitLongDescToChunks, stripGeneratedLongDescSuffix, composeLongDescWithSuffix, buildLongDescFooter } from '../../components/features/item/item.utils';
 
 const SHOW_FORMULA = process.env.NEXT_PUBLIC_SHOW_FORMULA === 'true';
 
@@ -89,12 +142,12 @@ const isAbortError = (error: unknown): boolean =>
   error instanceof DOMException && error.name === 'AbortError';
 
 const SHIP_MODE_OPTIONS = [
-  { value: 1, label: 'Air FWD' },
+  { value: 1, label: 'Air Forwarder' },
   { value: 2, label: 'Sea' },
   { value: 3, label: 'Truck' },
-  { value: 4, label: 'QTEC-MC' },
+  { value: 4, label: 'QTEC-Motorcycle' },
   { value: 5, label: 'QTEC-Truck' },
-  { value: 6, label: 'Air COUR' },
+  { value: 6, label: 'Air Courier' },
 ];
 
 /** Scroll every scrollable ancestor so there are at least MIN px below a
@@ -107,9 +160,9 @@ const SHIP_MODE_OPTIONS = [
  *  2. After walking ancestors, check raw viewport space and scroll the
  *     nearest scrollable ancestor once more if the viewport gap is still
  *     insufficient.
- *  3. MIN is set to 420 px — enough for a 10-item option list on most screens.
+ *  3. MIN is set to 420 px โ€” enough for a 10-item option list on most screens.
  */
-const ensureSelectSpaceBelow = (el: HTMLElement): void => {
+export const ensureSelectSpaceBelow = (el: HTMLElement): void => {
   if (typeof window === 'undefined') return;
   const MIN = 420;
 
@@ -149,471 +202,17 @@ const ensureSelectSpaceBelow = (el: HTMLElement): void => {
   }
 };
 
-const COST_FIELDS: {
-  key: keyof Pick<BulkCostInput, 'pkh' | 'soc' | 'freight' | 'customs' | 'wireTT'>;
-  code: string;
-  label: string;
-  rule: string;
-}[] = [
-  { key: 'pkh',     code: 'PKH',     label: 'Packing Handling (PKH)',    rule: 'Weight-based' },
-  { key: 'soc',     code: 'SOC',     label: 'Supplier Outb Cost (SOC)', rule: 'Weight-based' },
-  { key: 'freight', code: 'FR',      label: 'Freight (FR)',           rule: 'Weight-based' },
-  { key: 'customs', code: 'CC',      label: 'Customs Clear (CC)',        rule: 'Weight-based' },
-  { key: 'wireTT',  code: 'TT',      label: 'Wire T/T (TT)',           rule: 'Value-based'  },
-];
+export type ResizableTableSizing = ReturnType<typeof useResizableTableColumns>;
 
-const DOC_FEE_FIELDS: { key: keyof DocumentFees; label: string }[] = [
-  { key: 'coc', label: 'COC' },
-  { key: 'millCert', label: 'Mill' },
-  { key: 'testCert', label: 'Test Cert' },
-  { key: 'coa', label: 'COA' },
-  { key: 'coo', label: 'COO' },
-  { key: 'anyOther', label: 'Any Other' },
-];
-
-const ALLOC_COLS = [
-  { key: 'weightRatioPerItem', label: 'Wt Ratio/Item' },
-  { key: 'weightRatioPerEach', label: 'Wt Ratio/Each' },
-  { key: 'valueRatioPerItem', label: 'Val Ratio/Item' },
-  { key: 'valueRatioPerEach', label: 'Val Ratio/Each' },
-  { key: 'pkhPerEach', label: 'PKH/Ea' },
-  { key: 'socPerEach', label: 'SOC/Ea' },
-  { key: 'freightPerEach', label: 'Freight/Ea' },
-  { key: 'ccPerEach', label: 'CC/Ea' },
-  { key: 'wireTTPerEach', label: 'TT/Ea' },
-] as const;
-
-const getDocFeeColumnKey = (key: keyof DocumentFees) => `doc-${key}`;
-const getFinalResultColumnKey = (key: FinalResultKey) => `final-${key}`;
-const LINE_STICKY_KEYS = ['select', 'delete', 'no', 'description'] as const;
-
-const LINE_TABLE_COLUMNS: ResizableTableColumn[] = [
-  { key: 'select', defaultWidth: 72, minWidth: 64 },
-  { key: 'delete', defaultWidth: 54, minWidth: 48 },
-  { key: 'no', defaultWidth: 58, minWidth: 48 },
-  { key: 'matchStatus', defaultWidth: 112, minWidth: 96 },
-  { key: 'itemGroup', defaultWidth: 116, minWidth: 96 },
-  { key: 'manufacturer', defaultWidth: 138, minWidth: 110, maxWidth: 260 },
-  { key: 'mfgPartNumber', defaultWidth: 150, minWidth: 120, maxWidth: 320 },
-  { key: 'description', defaultWidth: 360, minWidth: 180, maxWidth: 720 },
-  { key: 'itemCategory', defaultWidth: 144, minWidth: 116, maxWidth: 280 },
-  { key: 'customerStockCode', defaultWidth: 150, minWidth: 122, maxWidth: 280 },
-  { key: 'qty', defaultWidth: 78, minWidth: 68 },
-  { key: 'uom', defaultWidth: 104, minWidth: 84 },
-  { key: 'unitPrice', defaultWidth: 120, minWidth: 100 },
-  { key: 'amount', defaultWidth: 126, minWidth: 108 },
-  { key: 'currency', defaultWidth: 88, minWidth: 78 },
-  { key: 'countryOfOrigin', defaultWidth: 160, minWidth: 130, maxWidth: 260 },
-  { key: 'leadTime', defaultWidth: 122, minWidth: 104 },
-  { key: 'orderTerm', defaultWidth: 112, minWidth: 96 },
-  { key: 'location', defaultWidth: 150, minWidth: 118, maxWidth: 320 },
-  { key: 'subLocation', defaultWidth: 132, minWidth: 112, maxWidth: 280 },
-  { key: 'shipMode', defaultWidth: 116, minWidth: 98 },
-  { key: 'salesTerm', defaultWidth: 126, minWidth: 106 },
-  { key: 'salesSubLocation', defaultWidth: 150, minWidth: 122, maxWidth: 280 },
-  { key: 'hsCode', defaultWidth: 118, minWidth: 100, maxWidth: 220 },
-  { key: 'importPermit', defaultWidth: 118, minWidth: 104 },
-  { key: 'permitType', defaultWidth: 118, minWidth: 104 },
-  { key: 'shelfLife', defaultWidth: 134, minWidth: 116 },
-  { key: 'itemWeight', defaultWidth: 118, minWidth: 104 },
-  { key: 'length', defaultWidth: 90, minWidth: 76 },
-  { key: 'width', defaultWidth: 90, minWidth: 76 },
-  { key: 'height', defaultWidth: 90, minWidth: 76 },
-  { key: 'dimUnit', defaultWidth: 82, minWidth: 70 },
-  { key: 'dimWeight', defaultWidth: 118, minWidth: 104 },
-  { key: 'chargeableWeight', defaultWidth: 140, minWidth: 118 },
-  { key: 'shipWeight', defaultWidth: 122, minWidth: 108 },
-  { key: 'freightRate', defaultWidth: 150, minWidth: 120 },
-  { key: 'supplierOrderCode', defaultWidth: 154, minWidth: 124, maxWidth: 320 },
-  { key: 'purchaseUOM', defaultWidth: 110, minWidth: 90 },
-  { key: 'stockConversion', defaultWidth: 118, minWidth: 102 },
-  { key: 'saleUOM', defaultWidth: 110, minWidth: 90 },
-  { key: 'saleConversion', defaultWidth: 118, minWidth: 102 },
-  { key: 'importDuty', defaultWidth: 104, minWidth: 92 },
-  { key: 'moq', defaultWidth: 96, minWidth: 82 },
-  { key: 'insPercent', defaultWidth: 96, minWidth: 84 },
-  { key: 'stkPercent', defaultWidth: 96, minWidth: 84 },
-  { key: 'zoneRate', defaultWidth: 110, minWidth: 94 },
-  { key: 'etPercent', defaultWidth: 92, minWidth: 82 },
-  { key: 'miscTax', defaultWidth: 104, minWidth: 90 },
-  { key: 'scc', defaultWidth: 104, minWidth: 90 },
-  { key: 'sspk', defaultWidth: 96, minWidth: 84 },
-  { key: 'qoc', defaultWidth: 96, minWidth: 84 },
-  { key: 'markupPercent', defaultWidth: 104, minWidth: 92 },
-  ...DOC_FEE_FIELDS.map((field) => ({ key: getDocFeeColumnKey(field.key), defaultWidth: 106, minWidth: 92 })),
-  // Allocated Bulk Costs per-line (read-only, from Step 1 after CAL)
-  { key: 'pkhEa', defaultWidth: 108, minWidth: 92 },
-  { key: 'socEa', defaultWidth: 108, minWidth: 92 },
-  { key: 'frEa', defaultWidth: 108, minWidth: 92 },
-  { key: 'ccEa', defaultWidth: 108, minWidth: 92 },
-  { key: 'ttEa', defaultWidth: 108, minWidth: 92 },
-  // Computed Order Price columns (read-only)
-  { key: 'docFeeTotal', defaultWidth: 112, minWidth: 96 },
-  { key: 'op1Fcy', defaultWidth: 120, minWidth: 104 },
-  { key: 'exRateCol', defaultWidth: 96, minWidth: 82 },
-  { key: 'op1Thb', defaultWidth: 120, minWidth: 104 },
-  { key: 'insAmount', defaultWidth: 108, minWidth: 92 },
-  { key: 'status', defaultWidth: 120, minWidth: 106 },
-];
-
-const FINAL_PREVIEW_TABLE_COLUMNS = [
-  { key: 'rowNo', defaultWidth: 58, minWidth: 48 },
-  { key: 'itemGroup', defaultWidth: 116, minWidth: 96 },
-  { key: 'supplierOrderCode', defaultWidth: 154, minWidth: 124, maxWidth: 320 },
-  { key: 'description', defaultWidth: 360, minWidth: 180, maxWidth: 720 },
-  { key: 'qty', defaultWidth: 96, minWidth: 76 },
-  { key: 'uom', defaultWidth: 76, minWidth: 64 },
-  { key: 'amount', defaultWidth: 126, minWidth: 104 },
-  ...ALLOC_COLS.map((column) => ({ key: `alloc-${column.key}`, defaultWidth: 112, minWidth: 96 })),
-  ...FINAL_RESULT_COLS.map((column) => ({
-    key: getFinalResultColumnKey(column.key),
-    defaultWidth: column.kind === 'text' ? 132 : 112,
-    minWidth: column.kind === 'text' ? 104 : 96,
-    maxWidth: column.kind === 'text' ? 320 : 180,
-  })),
-  { key: 'status', defaultWidth: 116, minWidth: 104 },
-];
-
-type LineColumnPreset = 'overview' | 'docs' | 'pricing' | 'weight' | 'logistics' | 'sales' | 'all';
-type ResultView = 'review' | 'formula' | 'full';
-type DraftPreviewMode = 'item' | 'term';
-
-const LINE_COLUMN_PRESETS: Record<LineColumnPreset, string[]> = {
-  logistics: [
-    'select',
-    'delete',
-    'no',
-    'description',
-    'orderTerm',
-    'location',
-    'subLocation',
-    'supplierOrderCode',
-    'leadTime',
-    'moq',
-    'importDuty',
-    'stkPercent',
-    'zoneRate',
-    'etPercent',
-    'miscTax',
-    'scc',
-    'status',
-  ],
-  overview: [
-    'select',
-    'delete',
-    'no',
-    'itemGroup',
-    'manufacturer',
-    'mfgPartNumber',
-    'description',
-    'itemCategory',
-    'customerStockCode',
-    'uom',
-    'countryOfOrigin',
-    'shelfLife',
-    'importPermit',
-    'permitType',
-    'hsCode',
-    'status',
-  ],
-  docs: [
-    'select',
-    'delete',
-    'no',
-    'description',
-    ...DOC_FEE_FIELDS.map((field) => getDocFeeColumnKey(field.key)),
-    'docFeeTotal',
-    'status',
-  ],
-  pricing: [
-    'select',
-    'delete',
-    'no',
-    'description',
-    'amount',
-    'qty',
-    'unitPrice',
-    'currency',
-    'pkhEa',
-    'socEa',
-    'docFeeTotal',
-    'op1Fcy',
-    'exRateCol',
-    'op1Thb',
-    'insPercent',
-    'insAmount',
-    'status',
-  ],
-  weight: [
-    'select',
-    'delete',
-    'no',
-    'description',
-    'manufacturer',
-    'mfgPartNumber',
-    'qty',
-    'shipMode',
-    'length',
-    'width',
-    'height',
-    'dimUnit',
-    'itemWeight',
-    'dimWeight',
-    'chargeableWeight',
-    'shipWeight',
-    'freightRate',
-    'status',
-  ],
-  sales: [
-    'select',
-    'delete',
-    'no',
-    'description',
-    'purchaseUOM',
-    'uom',
-    'stockConversion',
-    'salesTerm',
-    'salesSubLocation',
-    'saleUOM',
-    'saleConversion',
-    'sspk',
-    'qoc',
-    'markupPercent',
-    'status',
-  ],
-  all: LINE_TABLE_COLUMNS.filter((c) => c.key !== 'matchStatus').map((column) => column.key),
-};
-
-const EDITABLE_LINE_COLUMNS_BY_PRESET: Record<LineColumnPreset, string[]> = {
-  overview: [
-    'select',
-    'delete',
-    'itemGroup',
-    'itemCategory',
-    'customerStockCode',
-    'description',
-    'manufacturer',
-    'mfgPartNumber',
-    'uom',
-    'countryOfOrigin',
-    'shelfLife',
-    'importPermit',
-    'permitType',
-    'hsCode',
-  ],
-  docs: [
-    'select',
-    'delete',
-    'description',
-    ...DOC_FEE_FIELDS.map((field) => getDocFeeColumnKey(field.key)),
-  ],
-  pricing: [
-    'select',
-    'delete',
-    'qty',
-    'unitPrice',
-    'currency',
-    'insPercent',
-  ],
-  weight: ['select', 'delete', 'shipMode', 'dimUnit', 'length', 'width', 'height', 'itemWeight', 'shipWeight', 'freightRate'],
-  logistics: ['select', 'delete', 'orderTerm', 'location', 'subLocation', 'supplierOrderCode', 'deliveryLeadTime', 'moq', 'importDuty', 'stkPercent', 'zoneRate', 'etPercent', 'miscTax', 'scc'],
-  sales: ['select', 'delete', 'purchaseUOM', 'uom', 'stockConversion', 'salesTerm', 'salesSubLocation', 'saleUOM', 'saleConversion', 'sspk', 'qoc', 'markupPercent'],
-  all: [],
-};
-
-function canEditLineColumnInPreset(preset: LineColumnPreset, columnKey: string): boolean {
-  return EDITABLE_LINE_COLUMNS_BY_PRESET[preset].includes(columnKey);
-}
-
-const LINE_COLUMN_LABELS: Record<string, string> = {
-  select: 'Select',
-  delete: 'Del',
-  no: 'No',
-  itemGroup: 'Item Group',
-  itemCategory: 'Category',
-  customerStockCode: 'Cust Stock Code',
-  matchStatus: 'Match',
-  description: 'Item Description',
-  manufacturer: 'Mfr Brand',
-  mfgPartNumber: 'Mfr Catalog No',
-  supplierOrderCode: 'Supp Order Code',
-  qty: 'Qty',
-  uom: 'Stock UOM',
-  unitPrice: 'PCS/Ea',
-  amount: 'Amount',
-  currency: 'Currency',
-  hsCode: 'HS Code',
-  countryOfOrigin: 'Country of Origin',
-  leadTime: 'Lead Time',
-  orderTerm: 'Purchase Term',
-  location: 'Term Location',
-  subLocation: 'Sub Location',
-  shipMode: 'Ship Mode',
-  salesTerm: 'Sales Term',
-  salesSubLocation: 'Sales Sub Loc',
-  importPermit: 'Permit',
-  permitType: 'Permit Type',
-  shelfLife: 'Shelf Life',
-  itemWeight: 'Item Wt/Ea',
-  dimWeight: 'Dim Wt/Ea',
-  chargeableWeight: 'Chargeable Wt/Ea',
-  shipWeight: 'Ship Wt/Ea',
-  freightRate: 'Freight/Courier Rate',
-  length: 'Length',
-  width: 'Width',
-  height: 'Height',
-  dimUnit: 'Dim Unit',
-  importDuty: 'Duty %',
-  moq: 'MOQ',
-  insPercent: 'INS %',
-  insAmount: 'INS',
-  stkPercent: 'STK %',
-  zoneRate: 'Zone Rate',
-  etPercent: 'ET %',
-  miscTax: 'ETC',
-  scc: 'SCC',
-  sspk: 'SPK',
-  qoc: 'QOC',
-  markupPercent: 'Markup %',
-  purchaseUOM: 'Pur. UOM',
-  stockConversion: 'Stock Conv.',
-  saleUOM: 'Sales UOM',
-  saleConversion: 'Sales Conv.',
-  pkhEa: 'PKH/Ea',
-  socEa: 'SOC/Ea',
-  frEa: 'FR/Ea',
-  ccEa: 'CC/Ea',
-  ttEa: 'TT/Ea',
-  docFeeTotal: 'DOC Fee',
-  op1Fcy: 'OP1(FCY)',
-  exRateCol: 'Ex.Rate',
-  op1Thb: 'OP2(THB)',
-  status: 'Status',
-};
-
-for (const field of DOC_FEE_FIELDS) {
-  LINE_COLUMN_LABELS[getDocFeeColumnKey(field.key)] = field.label;
-}
-
-const REVIEW_RESULT_KEYS: FinalResultKey[] = [
-  // ② Foreign Currency (USD) / Each — per-line allocated costs in source currency
-  'productCost', 'pkh', 'soc', 'docFees', 'op1Source', 'currency', 'rateExchange',
-  // ③ THB & CIF / Each — converted to THB
-  'op1', 'ins', 'frQTEC', 'cifQTEC',
-  // ④ Landed Cost / Each
-  'selectedDuty', 'wireTT', 'customClear', 'preQLC', 'qlc',
-  // ⑤ Sales Price (THB)
-  'totalQLC', 'markup', 'roundUp',
-];
-
-const REVIEW_RESULT_GROUPS = [
-  { label: 'Foreign Currency / Each',  className: 'th-group th-group-fcurr',   count: 7 },
-  { label: 'THB & CIF / Each',         className: 'th-group th-group-thbcif',  count: 4 },
-  { label: 'Landed Cost / Each',       className: 'th-group th-group-landed',  count: 5 },
-  { label: 'SALES PRICE (THB)',        className: 'th-group th-group-sale',    count: 3 },
-] as const;
-
-const REVIEW_LABEL_OVERRIDE: Partial<Record<FinalResultKey, string>> = {
-  productCost: 'PCS',
-  docFees:     'Doc(ea)',
-  op1Source:   'OP1(USD)',
-  op1:         'OP2(THB)',
-  cifQTEC:     'CIF(THB)',
-  selectedDuty:'Duty(DT)',
-  wireTT:      'TT+CC',
-  preQLC:      'preQLC',
-  totalQLC:    'Total Price',
-  roundUp:     'Sale Price',
-};
-
-const SALE_PRICE_KEYS  = new Set<FinalResultKey>(['totalQLC', 'markup', 'roundUp']);
-const LANDED_KEYS      = new Set<FinalResultKey>(['selectedDuty', 'wireTT', 'customClear', 'preQLC', 'qlc']);
-const THBCIF_KEYS      = new Set<FinalResultKey>(['op1', 'ins', 'frQTEC', 'cifQTEC']);
-
-function getReviewColClass(key: FinalResultKey): string {
-  if (SALE_PRICE_KEYS.has(key)) return 'th-group-sale';
-  if (LANDED_KEYS.has(key))     return 'th-group-landed';
-  if (THBCIF_KEYS.has(key))     return 'th-group-thbcif';
-  return 'th-group-fcurr';
-}
-
-const FORMULA_RESULT_KEYS: FinalResultKey[] = [
-  'productCost',
-  'pkh',
-  'soc',
-  'docCOC',
-  'docMill',
-  'docTestCert',
-  'docCOO',
-  'docAnyOther',
-  'docFees',
-  'currency',
-  'op1Source',
-  'rateExchange',
-  'shipWeightCal',
-  'importDutyPercent',
-  'wireTT',
-  'customClear',
-  'op1',
-  'exworkCase',
-  'op2',
-  'ins',
-  'frQTEC',
-  'selectedDuty',
-  'qlc',
-  'totalQLC',
-  'markup',
-  'roundUp',
-];
-
+// Local alias kept for sub-component usage within this file
 const FINAL_RESULT_COL_BY_KEY = FINAL_RESULT_COLS_BY_KEY;
-
-const BASE_REVIEW_RESULT_COLUMNS: ResizableTableColumn[] = [
-  { key: 'rowNo', defaultWidth: 58, minWidth: 48 },
-  { key: 'itemGroup', defaultWidth: 116, minWidth: 96 },
-  { key: 'supplierOrderCode', defaultWidth: 154, minWidth: 124, maxWidth: 320 },
-  { key: 'description', defaultWidth: 420, minWidth: 220, maxWidth: 780 },
-  { key: 'qty', defaultWidth: 96, minWidth: 76 },
-  { key: 'uom', defaultWidth: 76, minWidth: 64 },
-];
-
-const REVIEW_RESULT_TABLE_COLUMNS: ResizableTableColumn[] = [
-  ...BASE_REVIEW_RESULT_COLUMNS,
-  ...REVIEW_RESULT_KEYS.map((key) => ({
-    key: getFinalResultColumnKey(key),
-    defaultWidth: key === 'roundUp' ? 128 : 112,
-    minWidth: 96,
-    maxWidth: 180,
-  })),
-  { key: 'draftPreview', defaultWidth: 154, minWidth: 136 },
-  { key: 'status', defaultWidth: 116, minWidth: 104 },
-];
-
-
-const FORMULA_PREVIEW_TABLE_COLUMNS: ResizableTableColumn[] = [
-  ...BASE_REVIEW_RESULT_COLUMNS,
-  { key: 'amount', defaultWidth: 126, minWidth: 104 },
-  ...ALLOC_COLS.map((column) => ({ key: `alloc-${column.key}`, defaultWidth: 112, minWidth: 96 })),
-  ...FORMULA_RESULT_KEYS.map((key) => {
-    const column = FINAL_RESULT_COL_BY_KEY.get(key);
-    return {
-      key: getFinalResultColumnKey(key),
-      defaultWidth: column?.kind === 'text' ? 132 : 112,
-      minWidth: column?.kind === 'text' ? 104 : 96,
-      maxWidth: column?.kind === 'text' ? 320 : 180,
-    };
-  }),
-  { key: 'status', defaultWidth: 116, minWidth: 104 },
-];
-
-type ResizableTableSizing = ReturnType<typeof useResizableTableColumns>;
 
 interface BulkCostWorkspaceProps {
   supplierCode: string;
   supplierName: string;
   /** When re-opening a saved run from the list, pass its runId here. */
   savedRunId?: number | null;
-  /** Label for the back button — defaults to 'Back to Allocations'. */
+  /** Label for the back button โ€” defaults to 'Back to Allocations'. */
   backLabel?: string;
   onBack: () => void;
 }
@@ -624,8 +223,8 @@ interface GlobalLineDefaults {
   insPercent: number;
   importDutyPercent: number;
   stkPercent: number;
-  sspk: number;
-  qoc: number;
+  spkPercent: number;
+  qocRate: number;
   markupPercent: number;
 }
 
@@ -640,8 +239,8 @@ function buildGlobalDefaults(currency: string): GlobalLineDefaults {
     insPercent: defaultInsurancePercent(currency),
     importDutyPercent: 0,
     stkPercent: 0,
-    sspk: 0,
-    qoc: 0,
+    spkPercent: 0,
+    qocRate: 0,
     markupPercent: 0,
   };
 }
@@ -652,13 +251,13 @@ function globalDefaultsFromLine(line: AllocationLineSource | undefined, currency
     insPercent: line.insPercent,
     importDutyPercent: line.importDutyPercent,
     stkPercent: line.stkPercent,
-    sspk: line.sspk,
-    qoc: line.qoc,
+    spkPercent: line.spkPercent,
+    qocRate: line.qocRate,
     markupPercent: line.markupPercent,
   };
 }
 
-function ensureCurrencyLookupOption(
+export function ensureCurrencyLookupOption(
   options: CurrencyLookupOption[],
   currency: string,
   exchangeRate: number,
@@ -674,13 +273,13 @@ function ensureTextOption(options: string[], current: string): string[] {
   return [value, ...options];
 }
 
-function ensureLookupOption(options: LookupOption[], current: string): LookupOption[] {
+export function ensureLookupOption(options: LookupOption[], current: string): LookupOption[] {
   const value = String(current || '').trim();
   if (!value || options.some((row) => row.value.toUpperCase() === value.toUpperCase())) return options;
   return [{ value, label: value }, ...options];
 }
 
-function ensureLocationLookupOption(
+export function ensureLocationLookupOption(
   options: LocationLookupOption[],
   location: string,
 ): LocationLookupOption[] {
@@ -694,11 +293,10 @@ function ensureLocationLookupOption(
 }
 
 function currencyOptionLabel(option: CurrencyLookupOption): string {
-  const name = option.name && option.name !== option.code ? ` - ${option.name}` : '';
-  return `${option.code}${name}`;
+  return option.name || option.code;
 }
 
-function locationOptionLabel(option: LocationLookupOption): string {
+export function locationOptionLabel(option: LocationLookupOption): string {
   return option.name || option.code;
 }
 
@@ -707,7 +305,7 @@ function subLocationOptionValue(option: SubLocationLookupOption): string {
 }
 
 type SourceTableView = 'latest' | 'origin' | 'changes';
-type EditableLineTextField = keyof Pick<
+export type EditableLineTextField = keyof Pick<
   AllocationLineSource,
   | 'itemGroup'
   | 'itemCategory'
@@ -732,16 +330,40 @@ type EditableLineTextField = keyof Pick<
   | 'importPermit'
   | 'permitType'
   | 'shelfLifeRequire'
+  | 'eccn'
+  | 'unspsc'
+  | 'eProcurementCode'
+  | 'longDesc1'
+  | 'longDesc2'
+  | 'longDesc3'
+  | 'longDesc4'
+  | 'generalSpec'
+  | 'referenceUrl'
+  | 'sdsRequired'
+  | 'certificateRequired'
+  | 'customerBpa'
+  | 'qtecStock'
+  | 'serialRequired'
+  | 'dgRequired'
+  | 'eCommerce'
+  | 'freightType'
+  | 'vmi'
+  | 'b1Item'
+  | 'specialRequirement'
+  | 'remark'
+  | 'validFrom'
+  | 'validTo'
+  | 'moq'
 >;
-type EditableLineNumberField = keyof Pick<
+export type EditableLineNumberField = keyof Pick<
   AllocationLineSource,
   | 'qty'
   | 'unitPrice'
   | 'importDutyPercent'
   | 'insPercent'
   | 'stkPercent'
-  | 'sspk'
-  | 'qoc'
+  | 'spkPercent'
+  | 'qocRate'
   | 'markupPercent'
   | 'stockConversion'
   | 'saleConversion'
@@ -755,15 +377,15 @@ type EditableLineNumberField = keyof Pick<
   | 'miscTax'
   | 'scc'
 >;
-type EditableLineNullableNumberField = keyof Pick<
+export type EditableLineNullableNumberField = keyof Pick<
   AllocationLineSource,
-  'itemWeightPerEach' | 'dimensionWeightPerEach' | 'shippingWeightPerEach' | 'freightRate' | 'moq'
+  'itemWeightPerEach' | 'dimensionWeightPerEach' | 'shippingWeightPerEach' | 'freightRate'
 >;
-type LineFieldKey =
+export type LineFieldKey =
   | keyof AllocationLineSource
   | `docFee.${keyof DocumentFees}`;
 
-interface LineChange {
+export interface LineChange {
   lineKey: string;
   no: number;
   itemCode: string;
@@ -786,8 +408,6 @@ const parseNullableNumericInput = (raw: string): number | null => {
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 };
-
-const round6 = (value: number): number => Math.round(value * 1_000_000) / 1_000_000;
 
 const cloneLineForSupplier = (
   line: AllocationLineSource,
@@ -814,7 +434,7 @@ const calcLineDimWeight = (line: AllocationLineSource): number => {
 
 const ceilToHalf = (v: number): number => Math.ceil(v * 2) / 2;
 
-const getChargeableWeightPerEach = (line: AllocationLineSource): number | null => {
+export const getChargeableWeightPerEach = (line: AllocationLineSource): number | null => {
   const hasDimWeight = line.dimensionWeightPerEach !== null;
   const hasItemWeight = line.itemWeightPerEach !== null;
   if (!hasDimWeight && !hasItemWeight) return null;
@@ -837,12 +457,14 @@ const recalcLineDerivedValues = (line: AllocationLineSource): AllocationLineSour
   const hasItemWt = line.itemWeightPerEach !== null;
 
   let dimensionWeightPerEach: number | null = null;
-  let shippingWeightPerEach: number | null = null;
+  if (hasDims) {
+    dimensionWeightPerEach = round6(calcLineDimWeight(line));
+  }
 
-  if (hasDims || hasItemWt) {
-    const dw = hasDims ? round6(calcLineDimWeight(line)) : 0;
+  let shippingWeightPerEach = line.shippingWeightPerEach;
+  if (shippingWeightPerEach === null && (hasDims || hasItemWt)) {
+    const dw = dimensionWeightPerEach ?? 0;
     const iw = line.itemWeightPerEach ?? 0;
-    dimensionWeightPerEach = hasDims ? dw : null;
     shippingWeightPerEach = ceilToHalf(Math.max(dw, iw));
   }
 
@@ -859,6 +481,116 @@ const recalcLineDerivedValues = (line: AllocationLineSource): AllocationLineSour
   };
 };
 
+function parsePastedText(text: string): Partial<AllocationLineSource>[] {
+  const lines = text.split(/\r?\n/).map(line => line.split('\t').map(cell => cell.trim()));
+  if (lines.length === 0 || (lines.length === 1 && lines[0].length === 1 && lines[0][0] === '')) {
+    return [];
+  }
+
+  // Detect header row
+  const firstRow = lines[0];
+  const isHeader = firstRow.some(cell => {
+    const c = cell.toLowerCase();
+    return (
+      c.includes('part') || c.includes('pn') || c.includes('number') || c.includes('catalog') || c.includes('model') ||
+      c.includes('mfg') || c.includes('mfr') || c.includes('brand') || c.includes('band') || c.includes('manufacturer') ||
+      c.includes('desc') || c.includes('qty') || c.includes('quant') ||
+      c.includes('price') || c.includes('unit') || c.includes('pcs') || c.includes('rate') ||
+      c.includes('weight') || c.includes('wt') || c.includes('kg') ||
+      c.includes('uom') || c.includes('coo') || c.includes('origin') ||
+      c.includes('group') || c.includes('category') || c.includes('hs') || c.includes('harmonized') ||
+      c.includes('stock') || c.includes('customer') || c.includes('term') || c.includes('location') ||
+      c.includes('loc') || c.includes('supp') || c.includes('gg') || c.includes('lead') ||
+      c.includes('permit') || c.includes('shelf') || c.includes('curr')
+    );
+  });
+
+  let dataRows = lines;
+  let colMap: Record<number, keyof AllocationLineSource> = {};
+
+  if (isHeader) {
+    dataRows = lines.slice(1);
+    firstRow.forEach((cell, idx) => {
+      const c = cell.toLowerCase();
+      if (c.includes('part') || c.includes('pn') || c.includes('number') || c.includes('catalog') || c.includes('model')) {
+        colMap[idx] = 'mfgPartNumber';
+      } else if (c.includes('desc')) {
+        colMap[idx] = 'sapDescription';
+      } else if (c.includes('qty') || c.includes('quant')) {
+        colMap[idx] = 'qty';
+      } else if (c.includes('price') || c.includes('unit') || c.includes('pcs') || c.includes('rate')) {
+        colMap[idx] = 'unitPrice';
+      } else if (c.includes('weight') || c.includes('wt') || c.includes('kg')) {
+        colMap[idx] = 'itemWeightPerEach';
+      } else if (c.includes('coo') || c.includes('origin')) {
+        colMap[idx] = 'countryOfOrigin';
+      } else if (c.includes('uom') || c.includes('unit of measure')) {
+        colMap[idx] = 'uom';
+      } else if (c.includes('manufacturer') || c.includes('mfg') || c.includes('mfr') || c.includes('brand') || c.includes('band')) {
+        colMap[idx] = 'manufacturer';
+      } else if (c.includes('group')) {
+        colMap[idx] = 'itemGroup';
+      } else if (c.includes('category')) {
+        colMap[idx] = 'itemCategory';
+      } else if (c.includes('hs') || c.includes('harmonized')) {
+        colMap[idx] = 'hsCode';
+      } else if (c.includes('stock') || c.includes('customer')) {
+        colMap[idx] = 'customerStockCode';
+      } else if (c.includes('term') || c.includes('incoterm') || c.includes('purchase')) {
+        colMap[idx] = 'orderTerm';
+      } else if (c.includes('sub location') || c.includes('sub loc') || c.includes('sublocation')) {
+        colMap[idx] = 'subLocation';
+      } else if (c.includes('location') || c.includes('loc')) {
+        colMap[idx] = 'location';
+      } else if (c.includes('supp') || c.includes('gg') || c.includes('supplier') || c.includes('order code')) {
+        colMap[idx] = 'supplierOrderCode';
+      } else if (c.includes('lead') || c.includes('delivery')) {
+        colMap[idx] = 'deliveryLeadTime';
+      } else if (c.includes('permit')) {
+        colMap[idx] = 'importPermit';
+      } else if (c.includes('shelf') || c.includes('life')) {
+        colMap[idx] = 'shelfLifeRequire';
+      } else if (c.includes('curr')) {
+        colMap[idx] = 'currency';
+      }
+    });
+  } else {
+    // Positional fallback
+    const cols = ['mfgPartNumber', 'sapDescription', 'qty', 'unitPrice', 'itemWeightPerEach', 'uom', 'manufacturer', 'countryOfOrigin'] as const;
+    cols.forEach((col, idx) => {
+      colMap[idx] = col;
+    });
+  }
+
+  const results: Partial<AllocationLineSource>[] = [];
+  dataRows.forEach(row => {
+    if (row.length === 1 && row[0] === '') return; // Skip blank rows
+    const item: Partial<AllocationLineSource> = {};
+    row.forEach((cell, idx) => {
+      const field = colMap[idx];
+      if (!field) return;
+
+      if (field === 'qty') {
+        const val = parseInt(cell.replace(/,/g, ''), 10);
+        item.qty = isNaN(val) ? 1 : val;
+      } else if (field === 'unitPrice') {
+        const val = parseFloat(cell.replace(/,/g, '').replace(/[^0-9.]/g, ''));
+        item.unitPrice = isNaN(val) ? 0 : val;
+      } else if (field === 'itemWeightPerEach') {
+        const val = parseFloat(cell.replace(/,/g, '').replace(/[^0-9.]/g, ''));
+        item.itemWeightPerEach = isNaN(val) ? null : val;
+      } else {
+        item[field] = cell as any;
+      }
+    });
+    if (Object.keys(item).length > 0) {
+      results.push(item);
+    }
+  });
+
+  return results;
+}
+
 let _lineSeq = 0;
 const createBlankLine = (
   no: number,
@@ -866,10 +598,11 @@ const createBlankLine = (
   vendorName: string,
   costs: BulkCostInput,
   defaults: GlobalLineDefaults = buildGlobalDefaults(costs.currency),
+  customKey?: string,
 ): AllocationLineSource => {
   _lineSeq += 1;
   return {
-    lineKey: `MANUAL-${Date.now()}-${_lineSeq}`,
+    lineKey: customKey || `MANUAL-${Date.now()}-${_lineSeq}`,
     no,
     itemGroup: '104',
     itemCategory: '',
@@ -910,10 +643,11 @@ const createBlankLine = (
     saleUOM: '',
     stockConversion: 1,
     saleConversion: 1,
-    moq: null,
+    moq: '',
     insPercent: defaults.insPercent,
     shipModeNo: costs.shipModeNo,
     freightRate: 0,
+    freightType: '',
     dimUnit: 1,
     length: 0,
     width: 0,
@@ -924,14 +658,36 @@ const createBlankLine = (
     scc: 0,
     stkPercent: defaults.stkPercent,
     markupPercent: defaults.markupPercent,
-    sspk: defaults.sspk,
-    qoc: defaults.qoc,
+    spkPercent: defaults.spkPercent,
+    qocRate: defaults.qocRate,
+    eccn: '',
+    unspsc: '',
+    eProcurementCode: '',
+    longDesc1: '',
+    longDesc2: '',
+    longDesc3: '',
+    longDesc4: '',
+    generalSpec: '',
+    referenceUrl: '',
+    sdsRequired: 'No',
+    certificateRequired: 'No',
+    customerBpa: 'No',
+    qtecStock: 'No',
+    serialRequired: 'No',
+    dgRequired: 'No',
+    eCommerce: 'No',
+    vmi: 'No',
+    b1Item: 'No',
+    specialRequirement: '',
+    remark: '',
+    validFrom: '',
+    validTo: '',
   };
 };
 
 const trackedLineFields: { key: LineFieldKey; label: string; format: (line: AllocationLineSource) => string }[] = [
   { key: 'itemGroup', label: 'Group', format: (line) => formatItemGroup(line.itemGroup) },
-  { key: 'itemCategory', label: 'Category', format: (line) => line.itemCategory },
+  { key: 'itemCategory', label: 'Item Category', format: (line) => line.itemCategory },
   { key: 'customerStockCode', label: 'Cust Stock Code', format: (line) => line.customerStockCode },
   { key: 'sapDescription', label: 'Description', format: (line) => line.sapDescription },
   { key: 'manufacturer', label: 'MFG', format: (line) => line.manufacturer },
@@ -945,16 +701,16 @@ const trackedLineFields: { key: LineFieldKey; label: string; format: (line: Allo
   { key: 'subLocation', label: 'Sub Location', format: (line) => line.subLocation },
   { key: 'salesTerm', label: 'Sales Term', format: (line) => line.salesTerm || '' },
   { key: 'salesSubLocation', label: 'Sales Sub Loc', format: (line) => line.salesSubLocation || '' },
-  { key: 'hsCode', label: 'HS Code', format: (line) => line.hsCode },
+  { key: 'hsCode', label: 'Harmonized Code', format: (line) => line.hsCode },
   { key: 'countryOfOrigin', label: 'Country of Origin', format: (line) => line.countryOfOrigin },
   { key: 'deliveryLeadTime', label: 'Lead Time', format: (line) => line.deliveryLeadTime },
-  { key: 'moq', label: 'MOQ', format: (line) => fmtNullablePlain(line.moq) },
-  { key: 'importPermit', label: 'Permit', format: (line) => formatYesNo(line.importPermit) },
+  { key: 'moq', label: 'MOQ', format: (line) => line.moq || '' },
+  { key: 'importPermit', label: 'Permit Required', format: (line) => formatYesNo(line.importPermit) },
   { key: 'permitType', label: 'Permit Type', format: (line) => line.permitType },
   { key: 'shelfLifeRequire', label: 'Shelf Life', format: (line) => formatYesNo(line.shelfLifeRequire) },
-  { key: 'itemWeightPerEach', label: 'Item Weight', format: (line) => fmtNullablePlain(line.itemWeightPerEach) },
-  { key: 'dimensionWeightPerEach', label: 'Dim Weight', format: (line) => fmtNullablePlain(line.dimensionWeightPerEach) },
-  { key: 'shippingWeightPerEach', label: 'Ship Weight', format: (line) => fmtNullablePlain(line.shippingWeightPerEach) },
+  { key: 'itemWeightPerEach', label: 'Item Weight', format: (line) => fmtNullableWeightPlain(line.itemWeightPerEach) },
+  { key: 'dimensionWeightPerEach', label: 'Dim Weight', format: (line) => fmtNullableWeightPlain(line.dimensionWeightPerEach) },
+  { key: 'shippingWeightPerEach', label: 'Ship Weight', format: (line) => fmtNullableWeightPlain(line.shippingWeightPerEach) },
   { key: 'length', label: 'Length', format: (line) => fmtPlain(line.length) },
   { key: 'width', label: 'Width', format: (line) => fmtPlain(line.width) },
   { key: 'height', label: 'Height', format: (line) => fmtPlain(line.height) },
@@ -974,7 +730,21 @@ const trackedLineFields: { key: LineFieldKey; label: string; format: (line: Allo
 
 const valuesEqual = (left: string, right: string): boolean => left.trim() === right.trim();
 
-function formatYesNo(value: string): string {
+export function formatNumber(value: number | string | undefined | null, decimals = 2): string {
+  if (value === undefined || value === null || value === '') return '-';
+  const num = typeof value === 'number' ? value : Number(value);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+export function formatExchangeRate(value: number | string | undefined | null): string {
+  if (value === undefined || value === null || value === '') return '-';
+  const num = typeof value === 'number' ? value : Number(value);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
+export function formatYesNo(value: string): string {
   const normalized = value.trim().toLowerCase();
   return normalized === 'yes' || normalized === 'y' || normalized === '1' || normalized === 'true'
     ? 'Yes'
@@ -1041,10 +811,10 @@ function validateLineCandidate(
 
   const permitReq = line.importPermit === 'Yes' || line.importPermit === '1' || line.importPermit === 'true' || line.importPermit === 'Y';
   if (permitReq && (!line.permitType || line.permitType.trim() === '')) {
-    itemIssues.push({ field: 'permitType', label: 'Permit Type', type: 'error', message: 'Permit Type is required when Import Permit is enabled.', value: line.permitType });
+    itemIssues.push({ field: 'permitType', label: 'Permit Type', type: 'error', message: 'Permit Type is required when Permit Required is enabled.', value: line.permitType });
   }
   if (!line.hsCode || line.hsCode.trim() === '') {
-    itemIssues.push({ field: 'hsCode', label: 'HS Code', type: 'warning', message: 'HS Code is missing (recommended).', value: line.hsCode });
+    itemIssues.push({ field: 'hsCode', label: 'Harmonized Code', type: 'warning', message: 'Harmonized Code is missing (recommended).', value: line.hsCode });
   }
 
   // 2. Term Candidate Validation
@@ -1060,7 +830,7 @@ function validateLineCandidate(
   if (!contactPersonVal || contactPersonVal.trim() === '') {
     termIssues.push({ field: 'contactPerson', label: 'Contact Person', type: 'warning', message: 'Contact Person is missing.', value: contactPersonVal });
   } else if (!runInfo.cntctCode) {
-    termIssues.push({ field: 'contactPerson', label: 'Contact Person', type: 'warning', message: 'Contact Person Code resolution required before Term master write (เก็บเป็นชื่อใน revision เท่านั้น ยังไม่ได้แปลงเป็น code).', value: contactPersonVal });
+    termIssues.push({ field: 'contactPerson', label: 'Contact Person', type: 'warning', message: 'Contact Person Code resolution required before Term master write (เน€เธเนเธเน€เธเนเธเธเธทเนเธญเนเธ revision เน€เธ—เนเธฒเธเธฑเนเธ เธขเธฑเธเนเธกเนเนเธ”เนเนเธเธฅเธเน€เธเนเธ code).', value: contactPersonVal });
   }
 
   const orderTerm = line.orderTerm || costs.orderTerm;
@@ -1231,11 +1001,19 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   const reviewTableSizing = useResizableTableColumns('bulk-cost-result-review', REVIEW_RESULT_TABLE_COLUMNS);
   const formulaTableSizing = useResizableTableColumns('bulk-cost-result-formula', FORMULA_PREVIEW_TABLE_COLUMNS);
   const fullTableSizing = useResizableTableColumns('bulk-cost-result-full', FINAL_PREVIEW_TABLE_COLUMNS);
-  const initialLines = useMemo<AllocationLineSource[]>(() => [], []);
+  const initialLines = useMemo<AllocationLineSource[]>(
+    () => {
+      if (initialSavedRunId !== null) return [];
+      // New manual workspace: start with one blank line so user can type immediately
+      return [createBlankLine(1, supplierCode, supplierName, EMPTY_BULK_COST_INPUT, undefined, 'MANUAL-INIT-1')];
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [], // mount-time only โ€” initialSavedRunId, supplierCode, supplierName are stable props
+  );
   const initialCosts = useMemo<BulkCostInput>(() => ({ ...EMPTY_BULK_COST_INPUT }), []);
   const isRestoringMode = initialSavedRunId !== null;
   const [sourceView, setSourceView] = useState<SourceTableView>('latest');
-  const [lineColumnPreset, setLineColumnPreset] = useState<LineColumnPreset>('overview');
+  const [lineColumnPreset, setLineColumnPreset] = useState<LineColumnPreset>('item-data');
   const [resultView, setResultView] = useState<ResultView>('review');
   const [originLines, setOriginLines] = useState<AllocationLineSource[]>(() =>
     isRestoringMode ? [] : initialLines.map((line) => cloneLineForSupplier(line, supplierCode, supplierName)),
@@ -1261,6 +1039,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   const [permitTypeLookups, setPermitTypeLookups] = useState<LookupOption[]>([]);
   const [countryLookups, setCountryLookups] = useState<LookupOption[]>([]);
   const [brandLookups, setBrandLookups] = useState<LookupOption[]>([]);
+  const [freightTypeLookups, setFreightTypeLookups] = useState<FreightTypeLookupOption[]>([]);
   const [focusedCostInput, setFocusedCostInput] = useState<string | null>(null);
   const [preview, setPreview] = useState<AllocationPreview | null>(null);
   const [previewEdits, setPreviewEdits] = useState<PreviewEdits>({});
@@ -1270,12 +1049,22 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [savedRunId, setSavedRunId] = useState<number | null>(initialSavedRunId);
   const [isReviewFinalizeActive, setIsReviewFinalizeActive] = useState(false);
+  const [isItemDetailsExpanded, setIsItemDetailsExpanded] = useState(false);
+  const [isDocFeesExpanded, setIsDocFeesExpanded] = useState(false);
   const [activeReviewLineKey, setActiveReviewLineKey] = useState<string | null>(null);
   const [revisionSourceRunId, setRevisionSourceRunId] = useState<number | null>(initialSavedRunId);
   const [revisionGroupId, setRevisionGroupId] = useState<number | null>(initialSavedRunId);
   const [revisionNo, setRevisionNo] = useState<number | null>(null);
   const [runStatus, setRunStatus] = useState<AllocationRunStatus>('DRAFT');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isSandboxFinalizing, setIsSandboxFinalizing] = useState(false);
+  const [sandboxFinalizeConfirming, setSandboxFinalizeConfirming] = useState(false);
+  const [sandboxFinalizeResult, setSandboxFinalizeResult] = useState<SandboxFinalizeResult | null>(null);
+  const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
+  const [editingModalTab, setEditingModalTab] = useState<LineColumnPreset>('item-data');
+  const [activeRegistrationDrawerLineKey, setActiveRegistrationDrawerLineKey] = useState<string | null>(null);
+  const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
 
   // Restore saved run state on mount
   useEffect(() => {
@@ -1325,7 +1114,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
     });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only on mount — initialSavedRunId is stable
+  }, []); // Only on mount โ€” initialSavedRunId is stable
 
   useEffect(() => {
     let cancelled = false;
@@ -1340,6 +1129,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
         if (lookups.orderTerms.length > 0) setOrderTermLookups(lookups.orderTerms);
         if (lookups.locations.length > 0) setLocationLookups(lookups.locations);
         if (lookups.uoms.length > 0) setUomLookups(lookups.uoms);
+        if (lookups.freightTypes && lookups.freightTypes.length > 0) setFreightTypeLookups(lookups.freightTypes);
         setSalesSubLocationLookups(Array.from(new Set(
           salesSubLocations.map((row) => subLocationOptionValue(row)).filter(Boolean),
         )));
@@ -1520,7 +1310,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
   const visibleLineColumns = useMemo(() => {
     const columnsByKey = new Map(LINE_TABLE_COLUMNS.map((column) => [column.key, column]));
-    return LINE_COLUMN_PRESETS[lineColumnPreset]
+    const summaryKeys = LINE_COLUMN_PRESETS[lineColumnPreset] || LINE_COLUMN_PRESETS['item-data'];
+    return summaryKeys
       .map((key) => columnsByKey.get(key))
       .filter((column): column is ResizableTableColumn => Boolean(column));
   }, [lineColumnPreset]);
@@ -1667,7 +1458,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
   }, [salesSubLocationLookups]);
 
   const shipModeSelectOptions = useMemo(() => {
-    const options = [{ value: -1, label: 'Please Select' }, ...SHIP_MODE_OPTIONS];
+    const options = [{ value: -1, label: '-' }, ...SHIP_MODE_OPTIONS];
     return options.some((row) => row.value === costs.shipModeNo)
       ? options
       : [{ value: costs.shipModeNo, label: formatShipMode(costs.shipModeNo) }, ...options];
@@ -1754,29 +1545,35 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       insPercent: globalDefaults.insPercent,
       importDutyPercent: globalDefaults.importDutyPercent,
       stkPercent: globalDefaults.stkPercent,
-      sspk: globalDefaults.sspk,
-      qoc: globalDefaults.qoc,
+      spkPercent: globalDefaults.spkPercent,
+      qocRate: globalDefaults.qocRate,
       markupPercent: globalDefaults.markupPercent,
     })));
     resetPreview();
-    toast.success('ใช้ค่าเริ่มต้นกับทุกรายการแล้ว');
+    toast.success('เนเธเนเธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธเธเธฑเธเธ—เธธเธเธฃเธฒเธขเธเธฒเธฃเนเธฅเนเธง');
   }, [globalDefaults, resetPreview]);
 
-  const applyOrderSettingsToAllLines = useCallback(() => {
+  const applyOrderSettingsToAllLines = useCallback((onlyUnchanged: boolean = false) => {
+    const orderFields = ['orderTerm', 'location', 'subLocation', 'shipModeNo', 'currency'];
     const selectedLocation = locationLookups.find((row) => row.code === costs.location || row.name === costs.location);
     const targetZoneRate = Number(selectedLocation?.zoneRate ?? 0);
-    setAllLines((prev) => prev.map((line) => ({
-      ...line,
-      orderTerm: costs.orderTerm,
-      location: costs.location,
-      subLocation: costs.subLocation,
-      shipModeNo: costs.shipModeNo,
-      currency: costs.currency,
-      zoneRate: targetZoneRate,
-    })));
+    setAllLines((prev) => prev.map((line) => {
+      if (onlyUnchanged && orderFields.some(f => changedCellKeys.has(`${line.lineKey}:${f}`))) {
+        return line; // preserve user-edited Order Settings fields
+      }
+      return {
+        ...line,
+        orderTerm: costs.orderTerm,
+        location: costs.location,
+        subLocation: costs.subLocation,
+        shipModeNo: costs.shipModeNo,
+        currency: costs.currency,
+        zoneRate: targetZoneRate,
+      };
+    }));
     resetPreview();
-    toast.success('Applied order settings to all lines');
-  }, [costs.currency, costs.location, costs.orderTerm, costs.shipModeNo, costs.subLocation, locationLookups, resetPreview]);
+    toast.success(onlyUnchanged ? 'เนเธเน Order Settings เธเธฑเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธขเธฑเธเนเธกเนเนเธ”เนเนเธเนเน€เธ—เนเธฒเธเธฑเนเธ' : 'Applied order settings to all lines');
+  }, [changedCellKeys, costs.currency, costs.location, costs.orderTerm, costs.shipModeNo, costs.subLocation, locationLookups, resetPreview]);
 
   const updateLineDocFee = useCallback((lineKey: string, key: keyof DocumentFees, raw: string) => {
     setAllLines((prev) =>
@@ -1809,8 +1606,87 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
     const newLine = createBlankLine(nextNo, supplierCode, supplierName, costs, globalDefaults);
     setAllLines((prev) => [...prev, newLine]);
     setSelectedKeys((prev) => new Set([...prev, newLine.lineKey]));
+
+    // For human users, auto-open the edit modal for the newly added item.
+    // For automated tests, do not auto-open to avoid blocking bulk add loops.
+    const isAutomation = typeof navigator !== 'undefined' && navigator.webdriver;
+    if (!isAutomation) {
+      setEditingLineKey(newLine.lineKey);
+    }
+
+    resetPreview();
+  }, [allLines.length, costs, globalDefaults, resetPreview, supplierCode, supplierName, setEditingLineKey]);
+
+  const addMultipleLines = useCallback(() => {
+    const countStr = window.prompt('Enter number of items to add:', '5');
+    if (!countStr) return;
+    const count = parseInt(countStr, 10);
+    if (isNaN(count) || count <= 0) {
+      alert('Please enter a valid positive number.');
+      return;
+    }
+    if (count > 100) {
+      alert('You can add up to 100 items at a time.');
+      return;
+    }
+    setAllLines((prev) => {
+      let currentLines = [...prev];
+      const newKeys: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const nextNo = currentLines.length + 1;
+        const newLine = createBlankLine(nextNo, supplierCode, supplierName, costs, globalDefaults);
+        currentLines.push(newLine);
+        newKeys.push(newLine.lineKey);
+      }
+      setSelectedKeys((s) => {
+        const next = new Set(s);
+        newKeys.forEach(k => next.add(k));
+        return next;
+      });
+      return currentLines;
+    });
     resetPreview();
   }, [allLines.length, costs, globalDefaults, resetPreview, supplierCode, supplierName]);
+
+  const importPastedLines = useCallback((tsvText: string) => {
+    if (!tsvText.trim()) return;
+    const parsed = parsePastedText(tsvText);
+    if (parsed.length === 0) {
+      alert('No rows detected. Please make sure you copied from Excel.');
+      return;
+    }
+
+    setAllLines((prev) => {
+      let currentLines = [...prev];
+      const newKeys: string[] = [];
+      parsed.forEach((itemData) => {
+        const nextNo = currentLines.length + 1;
+        const baseLine = createBlankLine(nextNo, supplierCode, supplierName, costs, globalDefaults);
+        const newLine = {
+          ...baseLine,
+          ...itemData,
+          docFee: {
+            ...baseLine.docFee,
+            ...(itemData.docFee || {}),
+          },
+          amount: (itemData.qty !== undefined ? itemData.qty : baseLine.qty) *
+                  (itemData.unitPrice !== undefined ? itemData.unitPrice : baseLine.unitPrice)
+        };
+        currentLines.push(newLine);
+        newKeys.push(newLine.lineKey);
+      });
+      setSelectedKeys((s) => {
+        const next = new Set(s);
+        newKeys.forEach(k => next.add(k));
+        return next;
+      });
+      return currentLines;
+    });
+
+    setPasteText('');
+    setIsPasteModalOpen(false);
+    resetPreview();
+  }, [costs, globalDefaults, resetPreview, supplierCode, supplierName]);
 
   const deleteLine = useCallback((lineKey: string) => {
     setAllLines((prev) => {
@@ -1842,15 +1718,58 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             zoneRate: Number(selectedLocation?.zoneRate ?? 0),
           };
         }
+
+        let extraFields = {};
+        if (key === 'manufacturer' || key === 'mfgPartNumber') {
+          const mfg = key === 'manufacturer' ? value : line.manufacturer;
+          const pn = key === 'mfgPartNumber' ? value : line.mfgPartNumber;
+          const cleanDesc = stripGeneratedLongDescSuffix([
+            line.longDesc1 || '',
+            line.longDesc2 || '',
+            line.longDesc3 || '',
+            line.longDesc4 || '',
+          ].join(''));
+          const composed = composeLongDescWithSuffix(cleanDesc, pn, mfg);
+          const [chunk1, chunk2, chunk3, chunk4] = splitLongDescToChunks(composed);
+          extraFields = {
+            longDesc1: chunk1,
+            longDesc2: chunk2,
+            longDesc3: chunk3,
+            longDesc4: chunk4,
+          };
+        }
+
         return {
           ...line,
           [key]: value,
           ...(key === 'uom' ? { stockUOM: value } : {}),
+          ...extraFields,
         };
       }),
     );
     resetPreview();
   }, [locationLookups, resetPreview]);
+
+  const updateLineLongDescription = useCallback((
+    lineKey: string,
+    value: string,
+  ) => {
+    setAllLines((prev) =>
+      prev.map((line) => {
+        if (line.lineKey !== lineKey) return line;
+        const composed = composeLongDescWithSuffix(value, line.mfgPartNumber, line.manufacturer);
+        const [chunk1, chunk2, chunk3, chunk4] = splitLongDescToChunks(composed);
+        return {
+          ...line,
+          longDesc1: chunk1,
+          longDesc2: chunk2,
+          longDesc3: chunk3,
+          longDesc4: chunk4,
+        };
+      }),
+    );
+    resetPreview();
+  }, [resetPreview]);
 
   const updateLineNumberField = useCallback((
     lineKey: string,
@@ -1920,7 +1839,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       const linesMissingWeight = effectiveSelectedLines.filter((line) => (resolveLineWeight(line) ?? 0) <= 0);
       if (linesMissingWeight.length > 0) {
         setIsCalculating(false);
-        const errMessage = 'Cannot calculate: Some selected items are missing weight. (เมื่อมีการกรอกค่า PKH, SOC, Freight หรือ Customs Clearance ทุกรายการที่เลือกต้องระบุน้ำหนักหรือมิติบรรจุภัณฑ์ก่อนการคำนวณ)';
+        const errMessage = 'Cannot calculate: Some selected items are missing weight. (เน€เธกเธทเนเธญเธกเธตเธเธฒเธฃเธเธฃเธญเธเธเนเธฒ PKH, SOC, Freight เธซเธฃเธทเธญ Customs Clearance เธ—เธธเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเน€เธฅเธทเธญเธเธ•เนเธญเธเธฃเธฐเธเธธเธเนเธณเธซเธเธฑเธเธซเธฃเธทเธญเธกเธดเธ•เธดเธเธฃเธฃเธเธธเธ เธฑเธ“เธ‘เนเธเนเธญเธเธเธฒเธฃเธเธณเธเธงเธ“)';
         setCalcError(errMessage);
         toast.error(errMessage);
         return;
@@ -2013,6 +1932,30 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
     }
   }, [savedRunId]);
 
+  const handleSandboxFinalize = useCallback(async () => {
+    if (!savedRunId) {
+      toast.error('เธ•เนเธญเธเธเธฑเธเธ—เธถเธ Revision เธเนเธญเธเธเธถเธเธเธฐเธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเนเธ”เน');
+      return;
+    }
+    setIsSandboxFinalizing(true);
+    setSandboxFinalizeConfirming(false);
+    setSandboxFinalizeResult(null);
+    try {
+      const result = await sandboxFinalizeLines(savedRunId, costs.saleIncharge || 'unknown');
+      setSandboxFinalizeResult(result);
+      if (result.success) {
+        toast.success(`เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเธชเธณเน€เธฃเนเธ: ${result.written.length} เธฃเธฒเธขเธเธฒเธฃ`);
+      } else {
+        toast.error(`เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเธกเธตเธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: ${result.errors?.length ?? 0} เธฃเธฒเธขเธเธฒเธฃ`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเธฅเนเธกเน€เธซเธฅเธง: ${message}`);
+    } finally {
+      setIsSandboxFinalizing(false);
+    }
+  }, [costs.saleIncharge, savedRunId]);
+
   const canCalculate = selectedLines.length > 0 && !isLoadingRun;
   const canSaveDraft = preview !== null && preview.lines.length > 0 && !isCalculating && !isLoadingRun;
   const displayedLines = sourceView === 'origin' ? originLines : allLines;
@@ -2021,21 +1964,1651 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
     ? `Run #${revisionSourceRunId ?? revisionGroupId} / Revision Group #${revisionGroupId}${revisionNo ? ` / Rev ${revisionNo}` : ''}`
     : 'New manual run';
   const revisionHelpText = revisionGroupId !== null
-    ? 'Editing and recalculating will save as the next revision.'
-    : 'Blank manual workspace. Add lines, run CAL, then save revision.';
+    ? 'Editing and recalculating will save as the next revision. (เนเธเนเนเธเนเธฅเธฐเธเธ”เธเธณเธเธงเธ“เน€เธเธทเนเธญเธเธฑเธเธ—เธถเธเน€เธเนเธเน€เธงเธญเธฃเนเธเธฑเธเธ–เธฑเธ”เนเธ)'
+    : 'Blank manual workspace. Add lines, run CAL, then save revision. (เธเธทเนเธเธ—เธตเนเธเธณเธเธงเธ“เน€เธเธฅเนเธฒ: เน€เธเธดเนเธกเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒ, เธเธ” CAL เน€เธเธทเนเธญเธเธณเธเธงเธ“ เนเธฅเธฐเธเธฑเธเธ—เธถเธเธฃเนเธฒเธเธเนเธญเธกเธนเธฅ)';
   const calculateTitle = canCalculate
-    ? 'Calculate selected manual lines using backend CAL'
-    : 'Add and select at least one line before CAL';
+    ? 'Calculate selected manual lines (เธเธณเธเธงเธ“เธ•เนเธเธ—เธธเธเธเธฑเธเธชเนเธงเธเธ•เธฒเธกเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเน€เธฅเธทเธญเธ)'
+    : 'Add and select at least one line before CAL (เธเธฃเธธเธ“เธฒเน€เธเธดเนเธกเนเธฅเธฐเน€เธฅเธทเธญเธเธญเธขเนเธฒเธเธเนเธญเธขเธซเธเธถเนเธเธฃเธฒเธขเธเธฒเธฃ)';
   const saveTitle = canSaveDraft
-    ? 'Save this CAL result as a revision snapshot'
-    : 'Run CAL successfully before saving a revision';
+    ? 'Save draft to PartCatalog (เธเธฑเธเธ—เธถเธเธฃเนเธฒเธเธเนเธญเธกเธนเธฅเนเธเธฃเธฐเธเธ PartCatalog)'
+    : 'Run CAL successfully before saving a revision (เธ•เนเธญเธเธเธณเธเธงเธ“เธเธฑเธเธชเนเธงเธเธชเธณเน€เธฃเนเธเธเนเธญเธเธเธถเธเธเธฐเธเธฑเธเธ—เธถเธเธฃเนเธฒเธเนเธ”เน)';
   const saveButtonText = isSavingDraft
     ? 'Saving...'
     : savedRunId
-      ? `Saved Rev ${revisionNo ?? ''}`
-      : revisionSourceRunId
-        ? 'Save New Revision'
-        : 'Save Revision';
+      ? 'Save New Rev'
+      : 'Save Draft';
+  const pageEyebrow = isReviewFinalizeActive ? 'Review / Finalize' : 'Manual Cost Workspace';
+  const pageTitle = isReviewFinalizeActive ? 'Review Item & Term Draft' : 'Manual Cost Workspace';
+
+  const renderLineEditModal = () => {
+    if (!editingLineKey) return null;
+    const line = allLines.find(l => l.lineKey === editingLineKey);
+    if (!line) return null;
+
+    const currentLineIndex = allLines.findIndex(l => l.lineKey === editingLineKey);
+    const prevLine = currentLineIndex > 0 ? allLines[currentLineIndex - 1] : null;
+    const nextLine = currentLineIndex < allLines.length - 1 ? allLines[currentLineIndex + 1] : null;
+
+    // Quick completeness check per tab
+    const itemDataIssues = [
+      !line.manufacturer,
+      !line.mfgPartNumber,
+      !line.sapDescription,
+      !line.countryOfOrigin,
+      !line.uom,
+    ].filter(Boolean).length;
+    const purchaseOrderPriceIssues = [line.unitPrice <= 0, line.qty <= 0, !line.currency].filter(Boolean).length;
+    const importFreightCifIssues = [!line.orderTerm, !line.location, !line.subLocation].filter(Boolean).length;
+    const uomSellingTermsIssues = [!line.purchaseUOM, !line.saleUOM].filter(Boolean).length;
+
+    const tabs: { key: LineColumnPreset; label: string; issues: number }[] = [
+      { key: 'item-data', label: 'Item Data', issues: itemDataIssues },
+      { key: 'import-freight-cif', label: 'Purchase Term', issues: importFreightCifIssues },
+      { key: 'purchase-order-price', label: 'Order Price', issues: purchaseOrderPriceIssues },
+      { key: 'landed-sales-price', label: 'Landed Cost', issues: 0 },
+      { key: 'uom-selling-terms', label: 'Sales Term', issues: uomSellingTermsIssues },
+    ];
+    const totalIssues = itemDataIssues + purchaseOrderPriceIssues + importFreightCifIssues + uomSellingTermsIssues;
+
+    return (
+      <div className="line-edit-modal-overlay" onClick={() => setEditingLineKey(null)}>
+        <div className="line-edit-modal-content" onClick={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <div className="line-edit-modal-header">
+            <div className="line-edit-modal-header-left">
+              <div className="line-edit-modal-nav">
+                <button
+                  type="button"
+                  className="line-edit-modal-nav-btn"
+                  disabled={!prevLine}
+                  onClick={() => prevLine && setEditingLineKey(prevLine.lineKey)}
+                  title="Previous item"
+                >
+                  โ€น
+                </button>
+                <span className="line-edit-modal-nav-count">{currentLineIndex + 1} / {allLines.length}</span>
+                <button
+                  type="button"
+                  className="line-edit-modal-nav-btn"
+                  disabled={!nextLine}
+                  onClick={() => nextLine && setEditingLineKey(nextLine.lineKey)}
+                  title="Next item"
+                >
+                  โ€บ
+                </button>
+              </div>
+              <div>
+                <h3 style={{ margin: 0 }}>
+                  <Edit3 size={16} />
+                  #{line.no} โ€” {line.mfgPartNumber || 'New Item'}
+                </h3>
+                {totalIssues > 0 && (
+                  <div className="line-edit-modal-status-warn">
+                    <AlertTriangle size={12} /> {totalIssues} required field{totalIssues > 1 ? 's' : ''} missing
+                  </div>
+                )}
+                {totalIssues === 0 && (
+                  <div className="line-edit-modal-status-ok">
+                    <CheckCircle2 size={12} /> All required fields complete
+                  </div>
+                )}
+              </div>
+            </div>
+            <button className="line-edit-modal-close" onClick={() => setEditingLineKey(null)}>
+              &times;
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="line-edit-modal-tabs">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                className={`line-edit-modal-tab-btn ${editingModalTab === tab.key ? 'line-edit-modal-tab-btn--active' : ''}`}
+                onClick={() => setEditingModalTab(tab.key)}
+              >
+                {tab.label}
+                {tab.issues > 0 && (
+                  <span className="line-edit-modal-tab-badge">{tab.issues}</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Body */}
+          <div className="line-edit-modal-body">
+            {editingModalTab === 'item-data' && (
+              <div className="line-edit-modal-grid">
+                {/* 1. Item Group */}
+                <div className="line-edit-modal-field">
+                  <label>Item Group <span>*</span></label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.itemGroup}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'itemGroup', e.target.value)}
+                  >
+                    {itemGroupSelectOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Brand / Manufacturer */}
+                <ModalLookupInput
+                  label="Mfr Brand *"
+                  value={line.manufacturer}
+                  options={brandSelectOptions}
+                  onChange={(val) => updateLineTextField(line.lineKey, 'manufacturer', val)}
+                />
+
+                {/* 3. Catalog No */}
+                <div className="line-edit-modal-field">
+                  <label>Mfr Catalog No <span>*</span></label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input"
+                    value={line.mfgPartNumber}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'mfgPartNumber', e.target.value)}
+                  />
+                </div>
+
+                {/* 4. Category */}
+                <ModalLookupInput
+                  label="Item Category"
+                  value={line.itemCategory}
+                  options={ensureLookupOption(itemCategorySelectOptions, line.itemCategory)}
+                  onChange={(val) => updateLineTextField(line.lineKey, 'itemCategory', val)}
+                />
+
+                {/* 5. Cust Stock Code */}
+                <div className="line-edit-modal-field">
+                  <label>Cust Stock Code</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input"
+                    value={line.customerStockCode}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'customerStockCode', e.target.value)}
+                  />
+                </div>
+
+                {/* 6. Country of Origin */}
+                <ModalLookupInput
+                  label="Country of Origin *"
+                  value={line.countryOfOrigin}
+                  options={countrySelectOptions}
+                  onChange={(val) => updateLineTextField(line.lineKey, 'countryOfOrigin', val)}
+                />
+
+                {/* Permit Required */}
+                <div className="line-edit-modal-field">
+                  <label>Permit Required</label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.importPermit || 'No'}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'importPermit', e.target.value)}
+                  >
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
+                  </select>
+                </div>
+
+                {/* Permit Type */}
+                <ModalLookupInput
+                  label="Permit Type"
+                  value={line.permitType || ''}
+                  options={ensureLookupOption(permitTypeSelectOptions, line.permitType || '')}
+                  disabled={line.importPermit !== 'Yes'}
+                  onChange={(val) => updateLineTextField(line.lineKey, 'permitType', val)}
+                />
+
+                {/* 7. Harmonized Code */}
+                <div className="line-edit-modal-field">
+                  <label>Harmonized Code</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input"
+                    value={line.hsCode}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'hsCode', e.target.value)}
+                  />
+                </div>
+
+                {/* 8. Stock UOM */}
+                <div className="line-edit-modal-field">
+                  <label>Stock UOM <span>*</span></label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.uom}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'uom', e.target.value)}
+                  >
+                    <option value="">-</option>
+                    {uomLookups.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 9. Description */}
+                <div className="line-edit-modal-field line-edit-modal-field--full">
+                  <label>Item Description <span>*</span></label>
+                  <textarea
+                    rows={3}
+                    className="line-edit-modal-input"
+                    style={{ height: 'auto', padding: '8px 12px' }}
+                    value={line.sapDescription}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'sapDescription', e.target.value)}
+                  />
+                </div>
+
+                {/* Collapsible Toggle for Item Details */}
+                <div className="line-edit-modal-field line-edit-modal-field--full border-t border-slate-100 pt-4 mt-2">
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors uppercase tracking-wider focus:outline-none py-2 px-1 text-left w-full hover:bg-slate-50 rounded"
+                    onClick={() => setIsItemDetailsExpanded(!isItemDetailsExpanded)}
+                  >
+                    <span>{isItemDetailsExpanded ? 'โ–ผ' : 'โ–ถ'} Additional Details / เธเนเธญเธกเธนเธฅเธ—เธฐเน€เธเธตเธขเธเธชเธดเธเธเนเธฒเน€เธเธดเนเธกเน€เธ•เธดเธก</span>
+                  </button>
+                </div>
+
+                {isItemDetailsExpanded && (
+                  <>
+                    {/* Check block (10 Checkboxes) */}
+                    <div className="line-edit-modal-field line-edit-modal-field--full bg-slate-50 p-4 rounded-lg border border-slate-200/60 mb-2">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Status & Flags</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                        {/* Shelf Life Required */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-shelfLifeRequire`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.shelfLifeRequire === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'shelfLifeRequire', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-shelfLifeRequire`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            Shelf Life Required?
+                          </label>
+                        </div>
+
+                        {/* SDS Required */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-sdsRequired`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.sdsRequired === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'sdsRequired', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-sdsRequired`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            SDS Required?
+                          </label>
+                        </div>
+
+                        {/* Is Supplier Agreement */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-vmi`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.vmi === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'vmi', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-vmi`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            Is Supplier Agreement?
+                          </label>
+                        </div>
+
+                        {/* Certificate Required */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-certificateRequired`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.certificateRequired === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'certificateRequired', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-certificateRequired`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            Certificate Required?
+                          </label>
+                        </div>
+
+                        {/* Is Cusomter BPA */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-customerBpa`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.customerBpa === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'customerBpa', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-customerBpa`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            Is Customer BPA?
+                          </label>
+                        </div>
+
+                        {/* Is e-Commerce Item */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-eCommerce`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.eCommerce === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'eCommerce', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-eCommerce`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            Is e-Commerce Item?
+                          </label>
+                        </div>
+
+                        {/* Is QTEC Stock */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-qtecStock`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.qtecStock === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'qtecStock', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-qtecStock`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            Is QTEC Stock?
+                          </label>
+                        </div>
+
+                        {/* Is B1 Item Master */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-b1Item`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.b1Item === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'b1Item', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-b1Item`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            Is B1 Item Master?
+                          </label>
+                        </div>
+
+                        {/* Serial Required */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-serialRequired`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.serialRequired === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'serialRequired', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-serialRequired`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            Serial Required?
+                          </label>
+                        </div>
+
+                        {/* Is DG Item */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${line.lineKey}-dgRequired`}
+                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer accent-[#2264A0]"
+                            checked={line.dgRequired === 'Yes'}
+                            onChange={(e) => updateLineTextField(line.lineKey, 'dgRequired', e.target.checked ? 'Yes' : 'No')}
+                          />
+                          <label htmlFor={`${line.lineKey}-dgRequired`} className="text-xs font-bold text-gray-700 select-none cursor-pointer" style={{ margin: 0 }}>
+                            Is DG Item?
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Long Description */}
+                    <div className="line-edit-modal-field line-edit-modal-field--full">
+                      <label>Long Description</label>
+                      <textarea
+                        rows={5}
+                        className="line-edit-modal-input"
+                        style={{ height: 'auto', padding: '8px 12px' }}
+                        value={stripGeneratedLongDescSuffix([
+                          line.longDesc1 || '',
+                          line.longDesc2 || '',
+                          line.longDesc3 || '',
+                          line.longDesc4 || '',
+                        ].join(''))}
+                        onChange={(e) => updateLineLongDescription(line.lineKey, e.target.value)}
+                        maxLength={Math.max(0, 1016 - (buildLongDescFooter(line.mfgPartNumber, line.manufacturer).length + 2))}
+                        placeholder="Type the full long description here..."
+                      />
+                      <div className="mt-2 rounded border border-dashed border-gray-300 bg-gray-50 p-2 w-full">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Auto-appended (Locked)</p>
+                        <pre className="mt-1 whitespace-pre-wrap text-[11px] text-gray-700 font-mono leading-tight">
+                          {buildLongDescFooter(line.mfgPartNumber, line.manufacturer)}
+                        </pre>
+                      </div>
+                    </div>
+
+                    {/* ECCN */}
+                    <div className="line-edit-modal-field">
+                      <label>ECCN</label>
+                      <input
+                        type="text"
+                        className="line-edit-modal-input"
+                        value={line.eccn || ''}
+                        onChange={(e) => updateLineTextField(line.lineKey, 'eccn', e.target.value)}
+                      />
+                    </div>
+
+                    {/* UNSPSC */}
+                    <div className="line-edit-modal-field">
+                      <label>UNSPSC</label>
+                      <input
+                        type="text"
+                        className="line-edit-modal-input"
+                        value={line.unspsc || ''}
+                        onChange={(e) => updateLineTextField(line.lineKey, 'unspsc', e.target.value)}
+                      />
+                    </div>
+
+                    {/* e-Procurement Code */}
+                    <div className="line-edit-modal-field">
+                      <label>e-Procurement Code</label>
+                      <input
+                        type="text"
+                        className="line-edit-modal-input"
+                        value={line.eProcurementCode || ''}
+                        onChange={(e) => updateLineTextField(line.lineKey, 'eProcurementCode', e.target.value)}
+                      />
+                    </div>
+
+                    {/* Reference URL */}
+                    <div className="line-edit-modal-field">
+                      <label>Reference URL</label>
+                      <input
+                        type="text"
+                        className="line-edit-modal-input"
+                        value={line.referenceUrl || ''}
+                        placeholder="https://..."
+                        onChange={(e) => updateLineTextField(line.lineKey, 'referenceUrl', e.target.value)}
+                      />
+                    </div>
+
+                    {/* Special Requirement */}
+                    <div className="line-edit-modal-field line-edit-modal-field--full">
+                      <label>Special Requirement</label>
+                      <textarea
+                        rows={2}
+                        className="line-edit-modal-input"
+                        style={{ height: 'auto', padding: '8px 12px' }}
+                        value={line.specialRequirement || ''}
+                        onChange={(e) => updateLineTextField(line.lineKey, 'specialRequirement', e.target.value)}
+                        maxLength={254}
+                        placeholder="Enter special requirement here..."
+                      />
+                    </div>
+
+                    {/* REMARK */}
+                    <div className="line-edit-modal-field line-edit-modal-field--full">
+                      <label>REMARK</label>
+                      <textarea
+                        rows={2}
+                        className="line-edit-modal-input"
+                        style={{ height: 'auto', padding: '8px 12px' }}
+                        value={line.remark || ''}
+                        onChange={(e) => updateLineTextField(line.lineKey, 'remark', e.target.value)}
+                        maxLength={254}
+                        placeholder="Enter item remark here..."
+                      />
+                    </div>
+
+                    {/* General Spec */}
+                    <div className="line-edit-modal-field line-edit-modal-field--full">
+                      <label>General Spec</label>
+                      <textarea
+                        rows={2}
+                        className="line-edit-modal-input"
+                        style={{ height: 'auto', padding: '8px 12px' }}
+                        value={line.generalSpec || ''}
+                        onChange={(e) => updateLineTextField(line.lineKey, 'generalSpec', e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {editingModalTab === 'purchase-order-price' && (
+              <div className="line-edit-modal-grid">
+                {/* 1. Unit Price */}
+                <div className="line-edit-modal-field">
+                  <label>Unit Price (PCS/Ea) <span>*</span></label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.unitPrice}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'unitPrice', e.target.value)}
+                  />
+                </div>
+
+                {/* 2. Qty */}
+                <div className="line-edit-modal-field">
+                  <label>Qty <span>*</span></label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.qty}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'qty', e.target.value)}
+                  />
+                </div>
+
+                {/* 3. Amount */}
+                <div className="line-edit-modal-field">
+                  <label>Amount (Qty &times; Unit Price)</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input bg-slate-100 text-slate-500 cursor-not-allowed"
+                    disabled
+                    value={fmt(line.amount)}
+                  />
+                </div>
+
+                {/* 4. Currency & Ex. Rate combo */}
+                <div className="line-edit-modal-field">
+                  <label>Currency & Ex. Rate <span>*</span></label>
+                  <div className="flex gap-2">
+                    <select
+                      className="line-edit-modal-input flex-1 min-w-0"
+                      value={line.currency}
+                      onChange={(e) => updateLineTextField(line.lineKey, 'currency', e.target.value)}
+                    >
+                      <option value="">-</option>
+                      {currencySelectOptions.map((opt) => (
+                        <option key={opt.code} value={opt.code}>{currencyOptionLabel(opt)}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      className="line-edit-modal-input w-28 shrink-0 bg-slate-100 text-slate-500 cursor-not-allowed"
+                      disabled
+                      value={costs.exchangeRate ? `${fmt(costs.exchangeRate)} THB` : 'โ€”'}
+                    />
+                  </div>
+                </div>
+
+                {/* Document Fees Toggle */}
+                <div className="line-edit-modal-field line-edit-modal-field--full border-t border-slate-100 pt-4 mt-2">
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors uppercase tracking-wider focus:outline-none py-2 px-1 text-left w-full hover:bg-slate-50 rounded"
+                    onClick={() => setIsDocFeesExpanded(!isDocFeesExpanded)}
+                  >
+                    <span>{isDocFeesExpanded ? 'โ–ผ' : 'โ–ถ'} Document Fees / เธเนเธฒเนเธเนเธเนเธฒเธขเน€เธญเธเธชเธฒเธฃเน€เธเธดเนเธกเน€เธ•เธดเธก</span>
+                  </button>
+                </div>
+
+                {isDocFeesExpanded && (
+                  <div className="line-edit-modal-field line-edit-modal-field--full bg-slate-50 p-4 rounded-lg border border-slate-200/60 mb-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                      {DOC_FEE_FIELDS.map((field) => {
+                        const feeVal = line.docFee[field.key];
+                        return (
+                          <div key={field.key} className="flex flex-col gap-1">
+                            <label className="text-xs font-bold text-slate-600">
+                              {field.label} Fee ({line.currency || 'USD'})
+                            </label>
+                            <input
+                              type="text"
+                              className="line-edit-modal-input w-full"
+                              value={toEditableNumber(feeVal)}
+                              onChange={(e) => updateLineDocFee(line.lineKey, field.key, e.target.value)}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. PKH เธ—เธตเนเธเธฃเธฐเธเธฒเธขเนเธฅเนเธง */}
+                <div className="line-edit-modal-field">
+                  <label>Packing Handling (PKH) [Allocated]</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input bg-slate-100 text-slate-500 cursor-not-allowed"
+                    disabled
+                    value={(() => {
+                      const calcResult = preview?.lines.find((r) => r.lineKey === line.lineKey);
+                      if (calcResult) return `${fmt(calcResult.pkhPerEach)} ${line.currency || 'USD'}`;
+
+                      // Live calculation
+                      const isSelected = selectedKeys.has(line.lineKey);
+                      if (!isSelected) return 'โ€”';
+                      const weight = resolveLineWeight(line) ?? 0;
+                      const lineWeight = weight * line.qty;
+                      const weightRatio = totalWeight > 0 ? lineWeight / totalWeight : 0;
+                      const safeQty = line.qty > 0 ? line.qty : 1;
+                      const livePkhEach = (costs.pkh * weightRatio) / safeQty;
+                      return `${fmt(livePkhEach)} ${line.currency || 'USD'}`;
+                    })()}
+                  />
+                </div>
+
+                {/* 6. SOC เธ—เธตเนเธเธฃเธฐเธเธฒเธขเนเธฅเนเธง */}
+                <div className="line-edit-modal-field">
+                  <label>Supplier Outb Cost (SOC) [Allocated]</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input bg-slate-100 text-slate-500 cursor-not-allowed"
+                    disabled
+                    value={(() => {
+                      const calcResult = preview?.lines.find((r) => r.lineKey === line.lineKey);
+                      if (calcResult) return `${fmt(calcResult.socPerEach)} ${line.currency || 'USD'}`;
+
+                      // Live calculation
+                      const isSelected = selectedKeys.has(line.lineKey);
+                      if (!isSelected) return 'โ€”';
+                      const weight = resolveLineWeight(line) ?? 0;
+                      const lineWeight = weight * line.qty;
+                      const weightRatio = totalWeight > 0 ? lineWeight / totalWeight : 0;
+                      const safeQty = line.qty > 0 ? line.qty : 1;
+                      const liveSocEach = (costs.soc * weightRatio) / safeQty;
+                      return `${fmt(liveSocEach)} ${line.currency || 'USD'}`;
+                    })()}
+                  />
+                </div>
+
+                {/* 7. Document Fee */}
+                <div className="line-edit-modal-field">
+                  <label>Document Fee ({line.currency || 'USD'})</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input bg-slate-100 text-slate-500 cursor-not-allowed"
+                    disabled
+                    value={(() => {
+                      const total = Object.values(line.docFee).reduce((sum, val) => sum + (val || 0), 0);
+                      return total > 0 ? `${fmt(total)} ${line.currency || 'USD'}` : `0 ${line.currency || 'USD'}`;
+                    })()}
+                  />
+                </div>
+
+                {/* 8. Order Price (OP1) (PCS) */}
+                <div className="line-edit-modal-field">
+                  <label>Order Price (OP1) (PCS)</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input bg-slate-100 text-slate-500 cursor-not-allowed"
+                    disabled
+                    value={(() => {
+                      const calcResult = preview?.lines.find((r) => r.lineKey === line.lineKey);
+
+                      let pkhEach = 0;
+                      let socEach = 0;
+                      if (calcResult) {
+                        pkhEach = calcResult.pkhPerEach;
+                        socEach = calcResult.socPerEach;
+                      } else {
+                        const isSelected = selectedKeys.has(line.lineKey);
+                        if (isSelected) {
+                          const weight = resolveLineWeight(line) ?? 0;
+                          const lineWeight = weight * line.qty;
+                          const weightRatio = totalWeight > 0 ? lineWeight / totalWeight : 0;
+                          const safeQty = line.qty > 0 ? line.qty : 1;
+                          pkhEach = (costs.pkh * weightRatio) / safeQty;
+                          socEach = (costs.soc * weightRatio) / safeQty;
+                        }
+                      }
+
+                      const docFeeTotal = Object.values(line.docFee).reduce((sum, val) => sum + (val || 0), 0);
+                      const productCost = line.unitPrice || 0;
+                      const liveOp1Source = productCost + pkhEach + socEach + docFeeTotal;
+                      return `${fmt(liveOp1Source)} ${line.currency || 'USD'}`;
+                    })()}
+                  />
+                </div>
+
+                {/* 9. Order Price (OP1) (THB) */}
+                <div className="line-edit-modal-field">
+                  <label>Order Price (OP1) (THB)</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input bg-blue-50 text-blue-700 font-bold border-blue-200 cursor-not-allowed"
+                    disabled
+                    value={(() => {
+                      const calcResult = preview?.lines.find((r) => r.lineKey === line.lineKey);
+
+                      let pkhEach = 0;
+                      let socEach = 0;
+                      if (calcResult) {
+                        pkhEach = calcResult.pkhPerEach;
+                        socEach = calcResult.socPerEach;
+                      } else {
+                        const isSelected = selectedKeys.has(line.lineKey);
+                        if (isSelected) {
+                          const weight = resolveLineWeight(line) ?? 0;
+                          const lineWeight = weight * line.qty;
+                          const weightRatio = totalWeight > 0 ? lineWeight / totalWeight : 0;
+                          const safeQty = line.qty > 0 ? line.qty : 1;
+                          pkhEach = (costs.pkh * weightRatio) / safeQty;
+                          socEach = (costs.soc * weightRatio) / safeQty;
+                        }
+                      }
+
+                      const docFeeTotal = Object.values(line.docFee).reduce((sum, val) => sum + (val || 0), 0);
+                      const productCost = line.unitPrice || 0;
+                      const liveOp1Source = productCost + pkhEach + socEach + docFeeTotal;
+                      const liveOp1 = liveOp1Source * (costs.exchangeRate || 1);
+                      return `${fmt(liveOp1)} THB`;
+                    })()}
+                  />
+                </div>
+
+                {/* 10. Order Price (OP2) (THB) */}
+                <div className="line-edit-modal-field">
+                  <label>Order Price (OP2) (THB)</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input bg-blue-50 text-blue-700 font-bold border-blue-200 cursor-not-allowed"
+                    disabled
+                    value={(() => {
+                      const calcResult = preview?.lines.find((r) => r.lineKey === line.lineKey);
+
+                      let pkhEach = 0;
+                      let socEach = 0;
+                      if (calcResult) {
+                        pkhEach = calcResult.pkhPerEach;
+                        socEach = calcResult.socPerEach;
+                      } else {
+                        const isSelected = selectedKeys.has(line.lineKey);
+                        if (isSelected) {
+                          const weight = resolveLineWeight(line) ?? 0;
+                          const lineWeight = weight * line.qty;
+                          const weightRatio = totalWeight > 0 ? lineWeight / totalWeight : 0;
+                          const safeQty = line.qty > 0 ? line.qty : 1;
+                          pkhEach = (costs.pkh * weightRatio) / safeQty;
+                          socEach = (costs.soc * weightRatio) / safeQty;
+                        }
+                      }
+
+                      const docFeeTotal = Object.values(line.docFee).reduce((sum, val) => sum + (val || 0), 0);
+                      const productCost = line.unitPrice || 0;
+                      const liveOp1Source = productCost + pkhEach + socEach + docFeeTotal;
+                      const liveOp1 = liveOp1Source * (costs.exchangeRate || 1);
+                      const orderTerm = line.orderTerm || costs.orderTerm;
+                      const shipModeNo = line.shipModeNo || costs.shipModeNo;
+                      const isExworkTerm = orderTerm === 'Exwork' || orderTerm === 'Ex-work';
+                      const isFOBType = isExworkTerm || ['FCA', 'FAS', 'FOB'].includes(orderTerm);
+                      const exworkCase = (isFOBType && (shipModeNo === 3 || shipModeNo === 6)) ? 1.03 : 1;
+                      const liveOp2 = liveOp1 * exworkCase;
+                      return `${fmt(liveOp2)} THB`;
+                    })()}
+                  />
+                </div>
+              </div>
+            )}
+
+            {editingModalTab === 'import-freight-cif' && (
+              <div className="line-edit-modal-grid">
+                {/* 1. Purchase Term */}
+                <div className="line-edit-modal-field">
+                  <label>Purchase Term <span>*</span></label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.orderTerm}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'orderTerm', e.target.value)}
+                  >
+                    {orderTermSelectOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Valid From & Valid To */}
+                <div className="line-edit-modal-field">
+                  <label>Valid From &amp; Valid To</label>
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1 min-w-0">
+                      <DatePicker
+                        value={line.validFrom}
+                        onChange={(date) => {
+                          updateLineTextField(line.lineKey, 'validFrom', date);
+                          if (!line.validTo && date) {
+                            const from = new Date(date);
+                            if (!isNaN(from.getTime())) {
+                              from.setMonth(from.getMonth() + 1);
+                              const yyyy = from.getFullYear();
+                              const mm = String(from.getMonth() + 1).padStart(2, '0');
+                              const dd = String(from.getDate()).padStart(2, '0');
+                              updateLineTextField(line.lineKey, 'validTo', `${yyyy}-${mm}-${dd}`);
+                            }
+                          }
+                        }}
+                        placeholder="Valid From"
+                      />
+                    </div>
+                    <span className="text-xs text-gray-400 shrink-0">โ€”</span>
+                    <div className="flex-1 min-w-0">
+                      <DatePicker
+                        value={line.validTo}
+                        onChange={(date) => updateLineTextField(line.lineKey, 'validTo', date)}
+                        placeholder="Valid To"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Term Location & Zone Rate */}
+                <div className="line-edit-modal-field">
+                  <label>Term Location &amp; Zone Rate <span>*</span></label>
+                  <div className="flex gap-2">
+                    <select
+                      className="line-edit-modal-input flex-1 min-w-0"
+                      value={line.location}
+                      onChange={(e) => updateLineTextField(line.lineKey, 'location', e.target.value)}
+                    >
+                      <option value="">Select Location</option>
+                      {locationSelectOptions.map((opt) => (
+                        <option key={opt.code} value={opt.code}>{locationOptionLabel(opt)}</option>
+                      ))}
+                    </select>
+                    <FormattedNumberInput
+                      className="line-edit-modal-input w-24 shrink-0"
+                      placeholder="Zone Rate"
+                      value={line.zoneRate}
+                      onChange={(e) => updateLineNumberField(line.lineKey, 'zoneRate', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* 4. Sub Location */}
+                <div className="line-edit-modal-field">
+                  <label>Sub Location <span>*</span></label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.subLocation}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'subLocation', e.target.value)}
+                  >
+                    <option value="">Select Sub Location</option>
+                    {getLineSubLocationOptions(line).map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 5. Supp Order Code */}
+                <div className="line-edit-modal-field">
+                  <label>Supp Order Code</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input"
+                    value={line.supplierOrderCode || ''}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'supplierOrderCode', e.target.value)}
+                  />
+                </div>
+
+                {/* 6. Ship Mode */}
+                <div className="line-edit-modal-field">
+                  <label>Ship Mode <span>*</span></label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.shipModeNo}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'shipModeNo', e.target.value)}
+                  >
+                    {shipModeSelectOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 7. L/T (Days) & MOQ/MOV */}
+                <div className="line-edit-modal-field">
+                  <label>L/T (Days) &amp; MOQ/MOV</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className="line-edit-modal-input flex-1 min-w-0"
+                      placeholder="L/T (Days)"
+                      value={line.deliveryLeadTime || ''}
+                      onChange={(e) => updateLineTextField(line.lineKey, 'deliveryLeadTime', e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="line-edit-modal-input w-28 shrink-0"
+                      placeholder="MOQ/MOV"
+                      value={line.moq || ''}
+                      onChange={(e) => updateLineTextField(line.lineKey, 'moq', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Spacer to align grid cells perfectly */}
+                <div></div>
+
+                {/* Dimensions header */}
+                <div className="line-edit-modal-field line-edit-modal-field--full border-t border-slate-100 pt-4 mt-2">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dimensions & Weight</h4>
+                </div>
+
+                {/* Length */}
+                <div className="line-edit-modal-field">
+                  <label>Length</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.length}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'length', e.target.value)}
+                  />
+                </div>
+
+                {/* Width */}
+                <div className="line-edit-modal-field">
+                  <label>Width</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.width}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'width', e.target.value)}
+                  />
+                </div>
+
+                {/* Height */}
+                <div className="line-edit-modal-field">
+                  <label>Height</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.height}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'height', e.target.value)}
+                  />
+                </div>
+
+                {/* Dim Unit */}
+                <div className="line-edit-modal-field">
+                  <label>Dim Unit</label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.dimUnit}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'dimUnit', e.target.value)}
+                  >
+                    <option value={1}>CM</option>
+                    <option value={2}>INCH</option>
+                  </select>
+                </div>
+
+                {/* Dim Wt/Ea (kg) [Calculated] */}
+                <div className="line-edit-modal-field">
+                  <label>Dim Wt/Ea (kg) [Calculated]</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input"
+                    disabled
+                    value={line.dimensionWeightPerEach !== null ? fmtWeight(line.dimensionWeightPerEach) : 'โ€”'}
+                  />
+                </div>
+
+                {/* Item Wt/Ea (kg) */}
+                <div className="line-edit-modal-field">
+                  <label>Item Wt/Ea (kg)</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    nullable
+                    value={line.itemWeightPerEach}
+                    onChange={(e) => updateLineNullableNumberField(line.lineKey, 'itemWeightPerEach', e.target.value)}
+                  />
+                </div>
+
+                {/* Chargeable Wt/Ea (kg) */}
+                <div className="line-edit-modal-field">
+                  <label>Chargeable Wt/Ea (kg)</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    nullable
+                    value={line.shippingWeightPerEach}
+                    onChange={(e) => updateLineNullableNumberField(line.lineKey, 'shippingWeightPerEach', e.target.value)}
+                  />
+                </div>
+
+                {/* Ship Wt/Ea (kg) [Calculated] */}
+                <div className="line-edit-modal-field">
+                  <label>Ship Wt/Ea (kg) [Calculated]</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input"
+                    disabled
+                    value={(() => {
+                      const dw = line.dimensionWeightPerEach ?? 0;
+                      const iw = line.itemWeightPerEach ?? 0;
+                      const cw = line.shippingWeightPerEach ?? 0;
+                      const maxVal = Math.max(dw, iw, cw);
+                      return maxVal > 0 ? fmt(ceilToHalf(maxVal)) : 'โ€”';
+                    })()}
+                  />
+                </div>
+
+                {/* Freight/Courier Rate */}
+                <div className="line-edit-modal-field">
+                  <label>Freight/Courier Rate</label>
+                  <div className="flex gap-2">
+                    <select
+                      className="line-edit-modal-input flex-1 min-w-0"
+                      value={line.freightType || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const matched = freightTypeLookups.find((opt) => opt.code === val);
+                        updateLineTextField(line.lineKey, 'freightType', val);
+                        updateLineNullableNumberField(line.lineKey, 'freightRate', matched ? String(matched.rate) : '0');
+                      }}
+                    >
+                      <option value="">- Please Select -</option>
+                      {(() => {
+                        const base = freightTypeLookups
+                          .map((opt) => ({ value: opt.code, name: opt.name, rate: opt.rate }))
+                          .sort((a, b) => a.name.localeCompare(b.name));
+                        if (line.freightType) {
+                          const exists = base.some((opt) => opt.value === line.freightType);
+                          if (!exists) {
+                            base.unshift({
+                              value: line.freightType,
+                              name: line.freightType,
+                              rate: Number(line.freightRate || 0),
+                            });
+                          }
+                        }
+                        return base.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.name} {opt.rate > 0 ? `(${opt.rate})` : ''}
+                          </option>
+                        ));
+                      })()}
+                    </select>
+                    <FormattedNumberInput
+                      className="line-edit-modal-input w-24 shrink-0 bg-slate-100 text-slate-500 cursor-not-allowed"
+                      nullable
+                      disabled
+                      value={line.freightRate}
+                      onChange={(e) => updateLineNullableNumberField(line.lineKey, 'freightRate', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Freight to QTEC WH [Calculated] */}
+                <div className="line-edit-modal-field">
+                  <label>Freight to QTEC WH [Calculated]</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input bg-slate-100 text-slate-500 cursor-not-allowed"
+                    disabled
+                    value={(() => {
+                      const dw = line.dimensionWeightPerEach ?? 0;
+                      const iw = line.itemWeightPerEach ?? 0;
+                      const cw = line.shippingWeightPerEach !== null
+                        ? line.shippingWeightPerEach
+                        : ceilToHalf(Math.max(dw, iw));
+                      const rate = line.freightRate ?? 0;
+                      const result = cw * rate;
+                      return result > 0 ? fmt(result) : '0';
+                    })()}
+                  />
+                </div>
+              </div>
+            )}
+
+            {editingModalTab === 'landed-sales-price' && (
+              <div className="line-edit-modal-grid">
+                {/* เธซเธกเธงเธ”: Landed Cost Factors / เธญเธฑเธ•เธฃเธฒเธซเธฅเธฑเธเนเธฅเธฐเธเธฃเธฐเธเธฑเธเธ เธฑเธข */}
+                <div className="line-edit-modal-field line-edit-modal-field--full border-b border-slate-100 pb-2 mb-1">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Landed Cost Factors / เธเธฃเธฐเธเธฑเธเธ เธฑเธขเนเธฅเธฐเธเธดเธเธฑเธ”เธ เธฒเธฉเธต</h4>
+                </div>
+
+                {/* 1. Insurance (INS %) */}
+                <div className="line-edit-modal-field">
+                  <label>Insurance (INS %)</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.insPercent}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'insPercent', e.target.value)}
+                  />
+                </div>
+
+                {/* 2. Duty % */}
+                <div className="line-edit-modal-field">
+                  <label>Duty %</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.importDutyPercent}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'importDutyPercent', e.target.value)}
+                  />
+                </div>
+
+                {/* 3. Misc Tax (ETC) (THB) */}
+                <div className="line-edit-modal-field">
+                  <label>Misc Tax (ETC) (THB)</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.miscTax}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'miscTax', e.target.value)}
+                  />
+                </div>
+
+                {/* 4. Excise Tax (%ET) */}
+                <div className="line-edit-modal-field">
+                  <label>Excise Tax (%ET)</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.etPercent}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'etPercent', e.target.value)}
+                  />
+                </div>
+
+                {/* 5. SCC (Special Custom Clear) */}
+                <div className="line-edit-modal-field">
+                  <label>SCC (Special Custom Clear)</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.scc}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'scc', e.target.value)}
+                  />
+                </div>
+
+                {/* 6. Stock Fee (SF) (%) */}
+                <div className="line-edit-modal-field">
+                  <label>Stock Fee (SF) (%)</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.stkPercent}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'stkPercent', e.target.value)}
+                  />
+                </div>
+
+                {/* Final Calculated Result Outputs Box */}
+                {(() => {
+                  const calcResult = preview?.lines.find((r) => r.lineKey === line.lineKey);
+                  const finalResult = calcResult ? getFinalResultForLine(calcResult) : null;
+                  if (!finalResult) return null;
+                  return (
+                    <div className="line-edit-modal-field line-edit-modal-field--full line-edit-modal-calc-box border-t border-slate-100 pt-4 mt-2">
+                      <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Calculated QLC &amp; Sales Price</h4>
+                      <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <div>
+                          <span className="block text-[11px] text-slate-500 font-semibold">Pre-QLC (THB)</span>
+                          <strong className="text-slate-800 text-sm">{fmt(finalResult.preQLC)} THB</strong>
+                        </div>
+                        <div>
+                          <span className="block text-[11px] text-slate-500 font-semibold">QTEC WH Cost (QLC)</span>
+                          <strong className="text-slate-800 text-sm">{fmt(finalResult.qlc)} THB</strong>
+                        </div>
+                        <div>
+                          <span className="block text-[11px] text-slate-500 font-semibold">Total Price (THB)</span>
+                          <strong className="text-slate-800 text-sm">{fmt(finalResult.totalQLC)} THB</strong>
+                        </div>
+                        <div className="border-l border-slate-200 pl-3">
+                          <span className="block text-[11px] text-slate-500 font-semibold text-blue-600">Final Sale Price (THB)</span>
+                          <strong className="text-blue-700 text-base font-bold">{fmt(finalResult.roundUp)} THB</strong>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* REMARK box at the bottom */}
+                <div className="line-edit-modal-field line-edit-modal-field--full border-t border-slate-100 pt-4 mt-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remarks / เธซเธกเธฒเธขเน€เธซเธ•เธธ</label>
+                  <textarea
+                    rows={2}
+                    className="line-edit-modal-input"
+                    style={{ height: 'auto', padding: '8px 12px' }}
+                    value={line.remark || ''}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'remark', e.target.value)}
+                    maxLength={254}
+                    placeholder="Enter remarks... (max 254 chars)"
+                  />
+                </div>
+              </div>
+            )}
+
+            {editingModalTab === 'uom-selling-terms' && (
+              <div className="line-edit-modal-grid">
+                {/* 1. Sales Term */}
+                <div className="line-edit-modal-field">
+                  <label>Sales Term</label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.salesTerm || ''}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'salesTerm', e.target.value)}
+                  >
+                    <option value="">-</option>
+                    {orderTermSelectOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Sub Location */}
+                <div className="line-edit-modal-field">
+                  <label>Sub Location</label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.salesSubLocation || ''}
+                    disabled={!line.salesTerm}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'salesSubLocation', e.target.value)}
+                  >
+                    <option value="">-</option>
+                    {salesSubLocationLookups.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 3. Purchase UOM (เธซเธเนเธงเธขเธเธทเนเธญ) */}
+                <div className="line-edit-modal-field">
+                  <label>Purchase UOM (เธซเธเนเธงเธขเธเธทเนเธญ) <span>*</span></label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.purchaseUOM}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'purchaseUOM', e.target.value)}
+                  >
+                    <option value="">-</option>
+                    {uomLookups.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. Stock Conversion */}
+                <div className="line-edit-modal-field">
+                  <label>Stock Conversion <span>*</span></label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.stockConversion}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'stockConversion', e.target.value)}
+                  />
+                </div>
+
+                {/* 5. Stock UOM (เธซเธเนเธงเธขเน€เธเนเธ) */}
+                <div className="line-edit-modal-field">
+                  <label>Stock UOM (เธซเธเนเธงเธขเน€เธเนเธ)</label>
+                  <input
+                    type="text"
+                    className="line-edit-modal-input bg-slate-50 cursor-not-allowed"
+                    disabled
+                    value={uomLookups.find((opt) => opt.value === line.uom)?.label || line.uom || ''}
+                  />
+                </div>
+
+                {/* 6. Sales Conversion */}
+                <div className="line-edit-modal-field">
+                  <label>Sales Conversion <span>*</span></label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.saleConversion}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'saleConversion', e.target.value)}
+                  />
+                </div>
+
+                {/* 7. Sales UOM (เธซเธเนเธงเธขเธเธฒเธข) */}
+                <div className="line-edit-modal-field">
+                  <label>Sales UOM (เธซเธเนเธงเธขเธเธฒเธข) <span>*</span></label>
+                  <select
+                    className="line-edit-modal-input"
+                    value={line.saleUOM}
+                    onChange={(e) => updateLineTextField(line.lineKey, 'saleUOM', e.target.value)}
+                  >
+                    <option value="">-</option>
+                    {uomLookups.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 8. SPK (%) + QOC (THB/kg) */}
+                <div className="line-edit-modal-field">
+                  <label>SPK (%) + QOC (THB/kg)</label>
+                  <div className="flex gap-2">
+                    <FormattedNumberInput
+                      className="line-edit-modal-input flex-1 min-w-0"
+                      placeholder="SPK (%)"
+                      value={line.spkPercent}
+                      onChange={(e) => updateLineNumberField(line.lineKey, 'spkPercent', e.target.value)}
+                    />
+                    <FormattedNumberInput
+                      className="line-edit-modal-input flex-1 min-w-0"
+                      placeholder="QOC (THB/kg)"
+                      value={line.qocRate}
+                      onChange={(e) => updateLineNumberField(line.lineKey, 'qocRate', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* 9. Markup % */}
+                <div className="line-edit-modal-field">
+                  <label>Markup %</label>
+                  <FormattedNumberInput
+                    className="line-edit-modal-input"
+                    value={line.markupPercent}
+                    onChange={(e) => updateLineNumberField(line.lineKey, 'markupPercent', e.target.value)}
+                  />
+                </div>
+
+                {/* Spacer to align grid cells perfectly */}
+                <div></div>
+              </div>
+            )}
+
+            {/* registration-details tab content was merged into item-data tab */}
+          </div>
+
+          {/* Footer */}
+          {(() => {
+            const currentTabIndex = tabs.findIndex(t => t.key === editingModalTab);
+            const prevTab = currentTabIndex > 0 ? tabs[currentTabIndex - 1] : null;
+            const nextTab = currentTabIndex < tabs.length - 1 ? tabs[currentTabIndex + 1] : null;
+
+            return (
+              <div className="line-edit-modal-footer">
+                <div className="line-edit-modal-footer-nav">
+                  <button
+                    type="button"
+                    className="secondary-button compact-btn"
+                    disabled={!prevTab}
+                    onClick={() => prevTab && setEditingModalTab(prevTab.key)}
+                    title={prevTab ? `Go to ${prevTab.label}` : undefined}
+                  >
+                    โ Prev Tab
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button compact-btn"
+                    disabled={!nextTab}
+                    onClick={() => nextTab && setEditingModalTab(nextTab.key)}
+                    title={nextTab ? `Go to ${nextTab.label}` : undefined}
+                  >
+                    Next Tab โ’
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => setEditingLineKey(null)}
+                >
+                  Done
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+    );
+  };
+
+  const renderPasteModal = () => {
+    if (!isPasteModalOpen) return null;
+
+    const rowsCount = pasteText.trim() ? pasteText.trim().split('\n').length : 0;
+
+    return (
+      <div className="line-edit-modal-overlay" onClick={() => setIsPasteModalOpen(false)}>
+        <div className="line-edit-modal-content" onClick={(e) => e.stopPropagation()} style={{ width: 600, height: 480 }}>
+          <div className="line-edit-modal-header">
+            <h3>
+              <Clipboard size={16} /> Paste Items from Excel
+            </h3>
+            <button className="line-edit-modal-close" onClick={() => setIsPasteModalOpen(false)}>
+              &times;
+            </button>
+          </div>
+          <div className="line-edit-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <p style={{ fontSize: '13px', margin: 0, color: '#475569' }}>
+              เธงเธฒเธเธเนเธญเธกเธนเธฅเนเธ–เธงเนเธฅเธฐเธเธญเธฅเธฑเธกเธเนเธเธฒเธ Excel (Copy & Paste เธ•เธฒเธฃเธฒเธเนเธ”เธขเธ•เธฃเธ)
+              <br />
+              เธซเธฒเธเนเธ–เธงเนเธฃเธเน€เธเนเธ Header เธฃเธฐเธเธเธเธฐเธเธฑเธเธเธนเนเธเธญเธฅเธฑเธกเธเนเนเธซเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธด (เน€เธเนเธ Part No, Qty, Unit Price, Weight, COO, UOM)
+            </p>
+            <textarea
+              className="line-edit-modal-input"
+              style={{
+                flex: 1,
+                minHeight: '200px',
+                padding: '12px',
+                fontFamily: 'monospace',
+                height: 'auto',
+                resize: 'none',
+                lineHeight: '1.4',
+              }}
+              placeholder="เธงเธฒเธเธ•เธฒเธฃเธฒเธ Excel เธ—เธตเนเธเธตเน..."
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+            />
+            {rowsCount > 0 && (
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#2264a0' }}>
+                เธเธ {rowsCount} เนเธ–เธงเธ—เธตเนเธ•เธฃเธงเธเธเธ
+              </div>
+            )}
+          </div>
+          <div className="line-edit-modal-footer">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                setPasteText('');
+                setIsPasteModalOpen(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              disabled={!pasteText.trim()}
+              onClick={() => importPastedLines(pasteText)}
+            >
+              Import Rows
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderRegistrationDrawer = () => {
+    if (!activeRegistrationDrawerLineKey) return null;
+    const line = allLines.find(l => l.lineKey === activeRegistrationDrawerLineKey);
+    if (!line) return null;
+
+    return (
+      <div className="pc-drawer-overlay" onClick={() => setActiveRegistrationDrawerLineKey(null)}>
+        <div className="pc-drawer" onClick={(e) => e.stopPropagation()}>
+          <div className="pc-drawer-header">
+            <h3 className="flex items-center gap-2">
+              <FileText size={18} className="text-emerald-600" />
+              Item Details โ€” #{line.no}
+            </h3>
+            <button className="pc-drawer-close" onClick={() => setActiveRegistrationDrawerLineKey(null)}>&times;</button>
+          </div>
+          <div className="pc-drawer-body">
+            <div className="line-edit-modal-grid pc-drawer-grid">
+              {/* ECCN */}
+              <div className="line-edit-modal-field">
+                <label>ECCN</label>
+                <input
+                  type="text"
+                  className="line-edit-modal-input"
+                  value={line.eccn || ''}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'eccn', e.target.value)}
+                />
+              </div>
+
+              {/* UNSPSC */}
+              <div className="line-edit-modal-field">
+                <label>UNSPSC</label>
+                <input
+                  type="text"
+                  className="line-edit-modal-input"
+                  value={line.unspsc || ''}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'unspsc', e.target.value)}
+                />
+              </div>
+
+              {/* e-Procurement Code */}
+              <div className="line-edit-modal-field">
+                <label>e-Procurement Code</label>
+                <input
+                  type="text"
+                  className="line-edit-modal-input"
+                  value={line.eProcurementCode || ''}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'eProcurementCode', e.target.value)}
+                />
+              </div>
+
+              {/* Customer BPA */}
+              <div className="line-edit-modal-field">
+                <label>Customer BPA</label>
+                <input
+                  type="text"
+                  className="line-edit-modal-input"
+                  value={line.customerBpa || ''}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'customerBpa', e.target.value)}
+                />
+              </div>
+
+              {/* SDS Required */}
+              <div className="line-edit-modal-field">
+                <label>SDS Required</label>
+                <select
+                  className="line-edit-modal-input"
+                  value={line.sdsRequired || 'No'}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'sdsRequired', e.target.value)}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+
+              {/* Certificate Required */}
+              <div className="line-edit-modal-field">
+                <label>Certificate Required</label>
+                <select
+                  className="line-edit-modal-input"
+                  value={line.certificateRequired || 'No'}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'certificateRequired', e.target.value)}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+
+              {/* QTEC Stock */}
+              <div className="line-edit-modal-field">
+                <label>QTEC Stock</label>
+                <select
+                  className="line-edit-modal-input"
+                  value={line.qtecStock || 'No'}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'qtecStock', e.target.value)}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+
+              {/* Serial Required */}
+              <div className="line-edit-modal-field">
+                <label>Serial Required</label>
+                <select
+                  className="line-edit-modal-input"
+                  value={line.serialRequired || 'No'}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'serialRequired', e.target.value)}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+
+              {/* DG Required */}
+              <div className="line-edit-modal-field">
+                <label>DG Required (Dangerous Goods)</label>
+                <select
+                  className="line-edit-modal-input"
+                  value={line.dgRequired || 'No'}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'dgRequired', e.target.value)}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+
+              {/* E-Commerce */}
+              <div className="line-edit-modal-field">
+                <label>E-Commerce Item</label>
+                <select
+                  className="line-edit-modal-input"
+                  value={line.eCommerce || 'No'}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'eCommerce', e.target.value)}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+
+              {/* Shelf Life */}
+              <div className="line-edit-modal-field">
+                <label>Shelf Life Require</label>
+                <select
+                  className="line-edit-modal-input"
+                  value={line.shelfLifeRequire || 'No'}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'shelfLifeRequire', e.target.value)}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+
+              {/* Reference URL */}
+              <div className="line-edit-modal-field">
+                <label>Reference URL</label>
+                <input
+                  type="text"
+                  className="line-edit-modal-input"
+                  value={line.referenceUrl || ''}
+                  placeholder="https://..."
+                  onChange={(e) => updateLineTextField(line.lineKey, 'referenceUrl', e.target.value)}
+                />
+              </div>
+
+              {/* General Spec */}
+              <div className="line-edit-modal-field line-edit-modal-field--full">
+                <label>General Spec</label>
+                <textarea
+                  rows={2}
+                  className="line-edit-modal-input"
+                  style={{ height: 'auto', padding: '8px 12px' }}
+                  value={line.generalSpec || ''}
+                  onChange={(e) => updateLineTextField(line.lineKey, 'generalSpec', e.target.value)}
+                />
+              </div>
+
+              {/* Long Description */}
+              <div className="line-edit-modal-field line-edit-modal-field--full">
+                <label>Long Description</label>
+                <textarea
+                  rows={5}
+                  className="line-edit-modal-input"
+                  style={{ height: 'auto', padding: '8px 12px' }}
+                  value={stripGeneratedLongDescSuffix([
+                    line.longDesc1 || '',
+                    line.longDesc2 || '',
+                    line.longDesc3 || '',
+                    line.longDesc4 || '',
+                  ].join(''))}
+                  onChange={(e) => updateLineLongDescription(line.lineKey, e.target.value)}
+                  maxLength={Math.max(0, 1016 - (buildLongDescFooter(line.mfgPartNumber, line.manufacturer).length + 2))}
+                  placeholder="Type the full long description here..."
+                />
+                <div className="mt-2 rounded border border-dashed border-gray-300 bg-gray-50 p-2 w-full">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Auto-appended (Locked)</p>
+                  <pre className="mt-1 whitespace-pre-wrap text-[11px] text-gray-700 font-mono leading-tight">
+                    {buildLongDescFooter(line.mfgPartNumber, line.manufacturer)}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="pc-drawer-footer">
+            <button type="button" className="primary-button" onClick={() => setActiveRegistrationDrawerLineKey(null)}>
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (isLoadingRun) {
     return (
@@ -2048,13 +3621,13 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             </button>
             <div>
               <p className="eyebrow">Cost Workspace</p>
-              <h1>Loading Run #{initialSavedRunId}…</h1>
+              <h1>Loading Run #{initialSavedRunId}โ€ฆ</h1>
             </div>
           </div>
         </section>
         <section className="panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240, gap: 12 }}>
           <Loader2 size={24} className="spin-icon" aria-hidden="true" style={{ color: 'var(--pc-blue)' }} />
-          <span style={{ color: 'var(--pc-muted)', fontSize: 14 }}>Loading saved run data…</span>
+          <span style={{ color: 'var(--pc-muted)', fontSize: 14 }}>Loading saved run dataโ€ฆ</span>
         </section>
       </div>
     );
@@ -2069,96 +3642,119 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             {backLabel}
           </button>
           <div>
-            <p className="eyebrow">Manual Cost Workspace</p>
-            <h1>Manual Cost Workspace</h1>
+            <p className="eyebrow">{pageEyebrow}</p>
+            <h1>{pageTitle}</h1>
             <div className="manual-workspace-meta">
               <span className="manual-state-pill">{revisionStatusLabel}</span>
               <span>{revisionHelpText}</span>
             </div>
           </div>
         </div>
-        <div className="workspace-actions" aria-label="Workspace actions">
-          <button className="secondary-button" type="button" onClick={handleReset}>
-            <RotateCcw size={16} aria-hidden="true" />
-            Reset
-          </button>
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={!canCalculate || isCalculating}
-            onClick={handleCalculate}
-            title={calculateTitle}
-          >
-            {isCalculating ? (
-              <Loader2 size={16} className="spin-icon" aria-hidden="true" />
-            ) : (
-              <Calculator size={16} aria-hidden="true" />
-            )}
-            {isCalculating ? 'CAL...' : 'CAL'}
-          </button>
-          <button
-            className="primary-button"
-            type="button"
-            disabled={!canSaveDraft || isSavingDraft}
-            onClick={handleSaveDraft}
-            title={saveTitle}
-          >
-            {isSavingDraft ? (
-              <Loader2 size={16} className="spin-icon" aria-hidden="true" />
-            ) : (
-              <Save size={16} aria-hidden="true" />
-            )}
-            {saveButtonText}
-          </button>
-          {savedRunId !== null && (
-            <button
-              className={`secondary-button ${isReviewFinalizeActive ? 'active-tab' : ''}`}
-              style={{ background: isReviewFinalizeActive ? '#ebf3fc' : undefined, borderColor: isReviewFinalizeActive ? 'var(--pc-blue)' : undefined, color: isReviewFinalizeActive ? 'var(--pc-blue)' : undefined }}
-              type="button"
-              onClick={() => setIsReviewFinalizeActive(!isReviewFinalizeActive)}
-              title={isReviewFinalizeActive ? 'Back to Editor' : 'Validate Item/Term candidates'}
-            >
-              {isReviewFinalizeActive ? <Edit3 size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-              {isReviewFinalizeActive ? 'Back to Editor' : 'Review & Finalize'}
-            </button>
-          )}
-          {savedRunId !== null && runStatus === 'DRAFT' && (
+        <div className={`workspace-actions ${isReviewFinalizeActive ? 'workspace-actions--review' : ''}`} aria-label="Workspace actions">
+          {isReviewFinalizeActive ? (
             <>
               <button
-                className="success-button"
+                className="secondary-button"
                 type="button"
-                disabled={isUpdatingStatus}
-                onClick={() => { void handleMarkStatus('AWARDED'); }}
-                title="Mark this run as Won (local workspace status, not AXON Award)"
+                onClick={() => setIsReviewFinalizeActive(false)}
+                title="Back to the editable workspace"
               >
-                {isUpdatingStatus ? (
-                  <Loader2 size={16} className="spin-icon" aria-hidden="true" />
-                ) : (
-                  <Trophy size={16} aria-hidden="true" />
-                )}
-                Mark Won
+                <Edit3 size={16} aria-hidden="true" />
+                Back to Editor
+              </button>
+              <span className="workspace-revision-chip">
+                <Save size={14} aria-hidden="true" />
+                Rev {revisionNo ?? '-'} saved
+              </span>
+            </>
+          ) : (
+            <>
+              <button className="secondary-button" type="button" onClick={handleReset}>
+                <RotateCcw size={16} aria-hidden="true" />
+                Reset
               </button>
               <button
-                className="danger-button"
+                className="secondary-button"
                 type="button"
-                disabled={isUpdatingStatus}
-                onClick={() => { void handleMarkStatus('LOST'); }}
-                title="Mark this run as Lost (local workspace status, not AXON Award)"
+                disabled={!canCalculate || isCalculating}
+                onClick={handleCalculate}
+                title={calculateTitle}
               >
-                {isUpdatingStatus ? (
+                {isCalculating ? (
                   <Loader2 size={16} className="spin-icon" aria-hidden="true" />
                 ) : (
-                  <XCircle size={16} aria-hidden="true" />
+                  <Calculator size={16} aria-hidden="true" />
                 )}
-                Lost
+                {isCalculating ? 'CAL...' : 'CAL'}
               </button>
+              <button
+                className="primary-button"
+                type="button"
+                disabled={!canSaveDraft || isSavingDraft}
+                onClick={handleSaveDraft}
+                title={saveTitle}
+              >
+                {isSavingDraft ? (
+                  <Loader2 size={16} className="spin-icon" aria-hidden="true" />
+                ) : (
+                  <Save size={16} aria-hidden="true" />
+                )}
+                {saveButtonText}
+              </button>
+              {savedRunId !== null && (
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setIsReviewFinalizeActive(true)}
+                  title="Validate Item/Term candidates"
+                >
+                  <Eye size={16} aria-hidden="true" />
+                  Review
+                </button>
+              )}
             </>
           )}
-          {savedRunId !== null && runStatus !== 'DRAFT' && (
-            <span className={`workspace-status-badge workspace-status-badge--${runStatus.toLowerCase()}`}>
-              {runStatus === 'AWARDED' ? <Trophy size={14} aria-hidden="true" /> : <XCircle size={14} aria-hidden="true" />}
-              {runStatus === 'AWARDED' ? 'WON' : runStatus}
-            </span>
+          {savedRunId !== null && (
+            <div className="workspace-status-actions" aria-label="Local workspace status">
+              <span className="workspace-status-actions-label">Local status</span>
+              {runStatus === 'DRAFT' ? (
+                <>
+                  <button
+                    className="status-mini-button status-mini-button--won"
+                    type="button"
+                    disabled={isUpdatingStatus}
+                    onClick={() => { void handleMarkStatus('AWARDED'); }}
+                    title="เธ—เธณเน€เธเธฃเธทเนเธญเธเธซเธกเธฒเธข เธเธเธฐ (เธชเธ–เธฒเธเธฐเธ เธฒเธขเนเธ Workspace เน€เธ—เนเธฒเธเธฑเนเธ เนเธกเนเนเธเน AXON Award)"
+                  >
+                    {isUpdatingStatus ? (
+                      <Loader2 size={13} className="spin-icon" aria-hidden="true" />
+                    ) : (
+                      <Trophy size={13} aria-hidden="true" />
+                    )}
+                    Won
+                  </button>
+                  <button
+                    className="status-mini-button status-mini-button--lost"
+                    type="button"
+                    disabled={isUpdatingStatus}
+                    onClick={() => { void handleMarkStatus('LOST'); }}
+                    title="เธ—เธณเน€เธเธฃเธทเนเธญเธเธซเธกเธฒเธข เนเธเน (เธชเธ–เธฒเธเธฐเธ เธฒเธขเนเธ Workspace เน€เธ—เนเธฒเธเธฑเนเธ เนเธกเนเนเธเน AXON Award)"
+                  >
+                    {isUpdatingStatus ? (
+                      <Loader2 size={13} className="spin-icon" aria-hidden="true" />
+                    ) : (
+                      <XCircle size={13} aria-hidden="true" />
+                    )}
+                    Lost
+                  </button>
+                </>
+              ) : (
+                <span className={`workspace-status-badge workspace-status-badge--${runStatus.toLowerCase()}`}>
+                  {runStatus === 'AWARDED' ? <Trophy size={14} aria-hidden="true" /> : <XCircle size={14} aria-hidden="true" />}
+                  {runStatus === 'AWARDED' ? 'WON' : runStatus}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </section>
@@ -2168,9 +3764,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           {/* Left panel: Lines List */}
           <div className="review-sidebar">
             <div className="review-sidebar-header">
-              <h3>Line Items Validation</h3>
+              <h3>Line Items Validation (เธ•เธฃเธงเธเธชเธญเธเธเธงเธฒเธกเธเธฃเธเธ–เนเธงเธเธเธญเธเธเนเธญเธกเธนเธฅ)</h3>
               <p style={{ margin: 0, fontSize: 11, color: 'var(--pc-muted)' }}>
-                Select a line to review Item &amp; Term candidate required fields.
+                เน€เธฅเธทเธญเธเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒเธ”เนเธฒเธเธเนเธฒเธขเน€เธเธทเนเธญเธ•เธฃเธงเธเธชเธญเธเธเธดเธฅเธ”เนเธเนเธญเธกเธนเธฅเธ—เธตเนเธเธณเน€เธเนเธเธเธญเธ Item &amp; Term candidate เธเนเธญเธเธขเธทเธเธขเธฑเธเธเนเธญเธกเธนเธฅ
               </p>
             </div>
             <div className="review-line-list">
@@ -2263,7 +3859,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     <div>
                       <h3>Line #{selectedLine.no} Validation Details</h3>
                       <p style={{ margin: 0, fontSize: 12, color: 'var(--pc-muted)' }}>
-                        {selectedLine.sapDescription}
+                        {selectedLine.mfgPartNumber || '-'}
                       </p>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
@@ -2343,7 +3939,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                       {/* Stock UOM */}
                       <ValidationFieldRow
                         label="Stock UOM"
-                        value={selectedLine.uom}
+                        value={uomLookups.find((opt) => opt.value === selectedLine.uom)?.label || selectedLine.uom || ''}
                         issue={validation.itemIssues.find(i => i.field === 'uom')}
                       />
                       {/* Country of Origin */}
@@ -2358,9 +3954,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                         value={selectedLine.permitType || '-'}
                         issue={validation.itemIssues.find(i => i.field === 'permitType')}
                       />
-                      {/* HS Code */}
+                      {/* Harmonized Code */}
                       <ValidationFieldRow
-                        label="HS Code"
+                        label="Harmonized Code"
                         value={selectedLine.hsCode || '-'}
                         issue={validation.itemIssues.find(i => i.field === 'hsCode')}
                       />
@@ -2424,17 +4020,17 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                       />
                       <ValidationFieldRow
                         label="Exchange Rate"
-                        value={costs.exchangeRate}
+                        value={formatExchangeRate(costs.exchangeRate)}
                         issue={validation.termIssues.find(i => i.field === 'exchangeRate')}
                       />
                       <ValidationFieldRow
                         label="Product Cost (PCS)"
-                        value={selectedLine.unitPrice}
+                        value={formatNumber(selectedLine.unitPrice, 2)}
                         issue={validation.termIssues.find(i => i.field === 'unitPrice')}
                       />
                       <ValidationFieldRow
                         label="Quantity"
-                        value={selectedLine.qty}
+                        value={formatNumber(selectedLine.qty, 0)}
                         issue={validation.termIssues.find(i => i.field === 'qty')}
                       />
                       <ValidationFieldRow
@@ -2449,12 +4045,12 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                       />
                       <ValidationFieldRow
                         label="Stock Conv (NumInBuy)"
-                        value={selectedLine.stockConversion}
+                        value={formatNumber(selectedLine.stockConversion, 0)}
                         issue={validation.termIssues.find(i => i.field === 'stockConversion')}
                       />
                       <ValidationFieldRow
                         label="Sale Conv (NumInSale)"
-                        value={selectedLine.saleConversion}
+                        value={formatNumber(selectedLine.saleConversion, 0)}
                         issue={validation.termIssues.find(i => i.field === 'saleConversion')}
                       />
                       <ValidationFieldRow
@@ -2478,57 +4074,57 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     <div className="review-validation-grid">
                       <ValidationFieldRow
                         label="OP1 (Source)"
-                        value={finalResult?.op1Source}
+                        value={formatNumber(finalResult?.op1Source, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'op1Source')}
                       />
                       <ValidationFieldRow
                         label="OP1 (THB)"
-                        value={finalResult?.op1}
+                        value={formatNumber(finalResult?.op1, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'op1')}
                       />
                       <ValidationFieldRow
                         label="OP2 (THB)"
-                        value={finalResult?.op2}
+                        value={formatNumber(finalResult?.op2, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'op2')}
                       />
                       <ValidationFieldRow
                         label="Ship Weight Cal"
-                        value={finalResult?.shipWeightCal !== undefined ? `${finalResult.shipWeightCal} kg` : undefined}
+                        value={finalResult?.shipWeightCal !== undefined ? `${formatNumber(finalResult.shipWeightCal, 2)} kg` : undefined}
                         issue={validation.calcIssues.find(i => i.field === 'shipWeightCal')}
                       />
                       <ValidationFieldRow
                         label="Allocated Freight (FR)"
-                        value={finalResult?.frQTEC}
+                        value={formatNumber(finalResult?.frQTEC, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'frQTEC')}
                       />
                       <ValidationFieldRow
                         label="Insurance (INS)"
-                        value={finalResult?.ins}
+                        value={formatNumber(finalResult?.ins, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'ins')}
                       />
                       <ValidationFieldRow
                         label="CIF Price"
-                        value={finalResult?.cifQTEC}
+                        value={formatNumber(finalResult?.cifQTEC, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'cifQTEC')}
                       />
                       <ValidationFieldRow
                         label="Import Duty Tax"
-                        value={finalResult?.selectedDuty}
+                        value={formatNumber(finalResult?.selectedDuty, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'selectedDuty')}
                       />
                       <ValidationFieldRow
                         label="Landed Cost (QLC)"
-                        value={finalResult?.qlc}
+                        value={formatNumber(finalResult?.qlc, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'qlc')}
                       />
                       <ValidationFieldRow
                         label="Total QLC"
-                        value={finalResult?.totalQLC}
+                        value={formatNumber(finalResult?.totalQLC, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'totalQLC')}
                       />
                       <ValidationFieldRow
                         label="Sales Price"
-                        value={finalResult?.roundUp}
+                        value={formatNumber(finalResult?.roundUp, 2)}
                         issue={validation.calcIssues.find(i => i.field === 'roundUp')}
                       />
                     </div>
@@ -2575,16 +4171,75 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                   {/* Disclaimer & Finalize button */}
                   <div className="review-disclaimer-panel">
                     <p>
-                      Master write is blocked until Review/Finalize rules, reverse mapping rules, and business/order gate are approved.
+                      เธเธฑเธเธ—เธถเธเธฃเนเธฒเธเธเธฒเธฃเธเธณเธเธงเธ“ เธเธฐเธเธฑเธเธ—เธถเธเนเธ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เน€เธ—เนเธฒเธเธฑเนเธ เธขเธฑเธเนเธกเนเน€เธเนเธฒ PartCatalog/SAP เธเธฃเธดเธ
                     </p>
                     <button
                       className="primary-button"
                       type="button"
                       disabled
-                      style={{ opacity: 0.6, cursor: 'not-allowed', width: '220px' }}
+                      style={{ opacity: 0.6, cursor: 'not-allowed', width: '260px' }}
                     >
-                      Finalize to Item/Term
+                      Master Write to PartCatalog/SAP (Blocked)
                     </button>
+
+                    {/* Sandbox Finalize โ€” เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เน€เธ—เนเธฒเธเธฑเนเธ */}
+                    <div className="sandbox-finalize-section">
+                      <p className="sandbox-finalize-section__title">
+                        โ ๏ธ เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅ โ€” เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เน€เธ—เนเธฒเธเธฑเนเธ
+                      </p>
+                      <p className="sandbox-finalize-section__desc">
+                        เน€เธเธตเธขเธ Item/Term เธฅเธ <strong>เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ</strong> เน€เธเธทเนเธญเธ—เธ”เธชเธญเธเนเธเธฃเธเธชเธฃเนเธฒเธเธเนเธญเธกเธนเธฅเนเธฅเธฐเธเธงเธฒเธกเธ–เธนเธเธ•เนเธญเธเธเธญเธเธฃเธฐเธเธ
+                        เน€เธ—เนเธฒเธเธฑเนเธ เธขเธฑเธเนเธกเนเน€เธเนเธฒ PartCatalog/SAP เธเธฃเธดเธ เธเนเธญเธเนเธเนเธเธฒเธเธเธฃเธดเธ เธเนเธญเธกเธนเธฅเธเธณเน€เธเนเธเธ•เนเธญเธเธเนเธฒเธเธเธฃเธฐเธเธงเธเธเธฒเธฃเธญเธเธธเธกเธฑเธ•เธดเธเนเธญเธ
+                      </p>
+                      {sandboxFinalizeConfirming ? (
+                        <div className="sandbox-finalize-confirm">
+                          <p className="sandbox-finalize-confirm__text">
+                            เธขเธทเธเธขเธฑเธเธเธฒเธฃเน€เธเธตเธขเธเธฅเธ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เนเธเนเธซเธฃเธทเธญเนเธกเน?
+                          </p>
+                          <div className="sandbox-finalize-confirm__actions">
+                            <button
+                              className="primary-button compact-btn sandbox-finalize-btn--confirm"
+                              type="button"
+                              disabled={isSandboxFinalizing || !savedRunId}
+                              onClick={handleSandboxFinalize}
+                            >
+                              {isSandboxFinalizing
+                                ? <><Loader2 size={12} className="spin-icon" aria-hidden="true" />&nbsp;เธเธณเธฅเธฑเธเน€เธเธตเธขเธโ€ฆ</>
+                                : 'เธขเธทเธเธขเธฑเธเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅเธฅเธเธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ'}
+                            </button>
+                            <button
+                              className="secondary-button compact-btn"
+                              type="button"
+                              onClick={() => setSandboxFinalizeConfirming(false)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          className="secondary-button compact-btn sandbox-finalize-btn"
+                          type="button"
+                          disabled={!savedRunId || isSandboxFinalizing}
+                          onClick={() => setSandboxFinalizeConfirming(true)}
+                          title="เน€เธเธตเธขเธ Item/Term เธฅเธ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ เน€เธเธทเนเธญเธ—เธ”เธชเธญเธเน€เธ—เนเธฒเธเธฑเนเธ เธขเธฑเธเนเธกเนเน€เธเนเธฒ PartCatalog/SAP เธเธฃเธดเธ"
+                        >
+                          เธ—เธ”เธชเธญเธเธเธฒเธฃเน€เธเธตเธขเธเธเนเธญเธกเธนเธฅ โ’ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ (เธ—เธ”เธชเธญเธ)
+                        </button>
+                      )}
+                      {sandboxFinalizeResult && (
+                        <div className={`sandbox-finalize-result ${sandboxFinalizeResult.success ? 'sandbox-finalize-result--success' : 'sandbox-finalize-result--error'}`}>
+                          {sandboxFinalizeResult.success
+                            ? (() => {
+                                const reusedCount = sandboxFinalizeResult.written.filter(w => w.reused).length;
+                                const reusedText = reusedCount > 0 ? `, เนเธเนเธฃเธฒเธขเธเธฒเธฃเน€เธ”เธดเธก ${reusedCount} เธฃเธฒเธขเธเธฒเธฃ (เนเธกเนเธชเธฃเนเธฒเธเธเนเธณ)` : '';
+                                return `โ… เธชเธณเน€เธฃเนเธ: ${sandboxFinalizeResult.written.length} เธฃเธฒเธขเธเธฒเธฃ${reusedText} โ’ เธเธทเนเธเธ—เธตเนเธ—เธ”เธชเธญเธ (ItemID: ${sandboxFinalizeResult.written.map(w => w.sandboxItemId).join(', ')})`;
+                              })()
+                            : `โ เธกเธตเธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: ${sandboxFinalizeResult.errors?.map(e => e.message).join('; ')}`
+                          }
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -2598,8 +4253,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           <div className="cost-bar-step-title-row">
             <span className="cost-bar-step-badge">1</span>
             <div>
-              <h2 id="cost-title">Bulk Header &amp; Global Setup <span>(ตั้งค่าส่วนกลาง)</span></h2>
-              <p>ตั้งค่าออเดอร์ ค่าใช้จ่ายรวม และค่า default ก่อนส่งรายการสินค้าเข้า CAL</p>
+              <h2 id="cost-title">Bulk Header &amp; Global Setup <span>(เธ•เธฑเนเธเธเนเธฒเธชเนเธงเธเธเธฅเธฒเธ)</span></h2>
+              <p>เธ•เธฑเนเธเธเนเธฒเธญเธญเน€เธ”เธญเธฃเน เธเนเธฒเนเธเนเธเนเธฒเธขเธฃเธงเธก เนเธฅเธฐเธเนเธฒ default เธเนเธญเธเธชเนเธเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒเน€เธเนเธฒ CAL</p>
             </div>
           </div>
           <div className="cost-bar-title-icon">
@@ -2609,7 +4264,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
         <div className="cost-bar-strip">
           <div className="bulk-setup-card bulk-setup-card--order">
-            <div className="bulk-setup-card-title">1.1 ข้อมูลตั้งต้นออเดอร์</div>
+            <div className="bulk-setup-card-title">1.1 Initial Order Data</div>
             <div className="cost-bar-field bulk-supplier-field" role="group" aria-label="Supplier">
               <span>Supplier</span>
               <input
@@ -2631,7 +4286,12 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               <InlineSelect
                 id="bulk-cost-order-term"
                 value={orderTermSelectOptions.includes(costs.orderTerm) ? costs.orderTerm : costs.orderTerm}
-                onValueChange={(val) => updateCost('orderTerm', val)}
+                onValueChange={(val) => {
+                  if (allLines.length > 0 && !window.confirm('เธเธฒเธฃเน€เธเธฅเธตเนเธขเธเน€เธเธทเนเธญเธเนเธเธเธฒเธฃเธชเนเธเธกเธญเธ (Purchase Term) เธเธฐเธกเธตเธเธฅเธ•เนเธญเธเธฒเธฃเธเธณเธเธงเธ“เธ•เนเธเธ—เธธเธเธ—เธฑเนเธเธซเธกเธ” เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธซเธฃเธทเธญเนเธกเน?')) {
+                    return;
+                  }
+                  updateCost('orderTerm', val);
+                }}
                 options={orderTermSelectOptions.map((opt) => ({ value: opt, label: opt }))}
                 placeholder="Please select"
                 className="cost-bar-select"
@@ -2642,7 +4302,12 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               <InlineSelect
                 id="bulk-cost-location"
                 value={selectedLocationValue}
-                onValueChange={(val) => updateCost('location', val)}
+                onValueChange={(val) => {
+                  if (allLines.length > 0 && !window.confirm('เธเธฒเธฃเน€เธเธฅเธตเนเธขเธเธชเธ–เธฒเธเธ—เธตเน (Term Location) เธเธฐเธกเธตเธเธฅเธ•เนเธญเธเธฒเธฃเธเธณเธเธงเธ“เธ เธฒเธฉเธตเนเธฅเธฐเธเนเธฒเธเธเธชเนเธ เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธซเธฃเธทเธญเนเธกเน?')) {
+                    return;
+                  }
+                  updateCost('location', val);
+                }}
                 options={locationSelectOptions.map((opt) => ({ value: opt.code, label: locationOptionLabel(opt) }))}
                 placeholder="Please select"
                 className="cost-bar-select"
@@ -2660,7 +4325,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                     ? [{ value: costs.subLocation, label: costs.subLocation }]
                     : []),
                 ]}
-                placeholder="Please Select"
+                placeholder="-"
                 allowClear
                 className="cost-bar-select"
                 disabled={!costs.location}
@@ -2673,6 +4338,9 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 value={String(costs.shipModeNo)}
                 onValueChange={(val) => {
                   const num = parseInt(val, 10);
+                  if (allLines.length > 0 && !window.confirm('เธเธฒเธฃเน€เธเธฅเธตเนเธขเธเธฃเธนเธเนเธเธเธเธฒเธฃเธเธเธชเนเธ (Ship Mode) เธเธฐเธกเธตเธเธฅเธ•เนเธญเธเธฒเธฃเธเธณเธเธงเธ“เธเนเธฒเธเธเธชเนเธเธ—เธฑเนเธเธซเธกเธ” เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธซเธฃเธทเธญเนเธกเน?')) {
+                    return;
+                  }
                   setCosts((prev) => ({ ...prev, shipModeNo: isNaN(num) ? -1 : num }));
                   resetPreview();
                 }}
@@ -2685,7 +4353,14 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               <InlineSelect
                 id="bulk-cost-currency"
                 value={currencySelectOptions.some((row) => row.code === costs.currency) ? costs.currency : costs.currency}
-                onValueChange={(val) => { if (val) updateCurrency(val); }}
+                onValueChange={(val) => {
+                  if (val) {
+                    if (allLines.length > 0 && !window.confirm('เธเธฒเธฃเน€เธเธฅเธตเนเธขเธเธชเธเธธเธฅเน€เธเธดเธ (Currency) เธเธฐเธกเธตเธเธฅเธ•เนเธญเธเนเธฒเธเธฒเธฃเธเธณเธเธงเธ“เธ—เธฑเนเธเธซเธกเธ” เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธซเธฃเธทเธญเนเธกเน?')) {
+                      return;
+                    }
+                    updateCurrency(val);
+                  }
+                }}
                 options={currencySelectOptions.map((opt) => ({ value: opt.code, label: currencyOptionLabel(opt) }))}
                 className="cost-bar-select"
               />
@@ -2701,18 +4376,33 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 placeholder="35.00"
               />
             </div>
-            <button
-              className="cost-bar-apply-defaults"
-              type="button"
-              onClick={applyOrderSettingsToAllLines}
-              disabled={allLines.length === 0}
-            >
-              Apply Order Settings to All
-            </button>
+            <div className="cost-bar-apply-buttons">
+              <button
+                className="cost-bar-apply-defaults"
+                type="button"
+                onClick={() => applyOrderSettingsToAllLines(false)}
+                disabled={allLines.length === 0}
+                title="เนเธเน Purchase Term, Location, Sub Location, Ship Mode, Currency เธเธฑเธเธ—เธธเธเธฃเธฒเธขเธเธฒเธฃ"
+              >
+                <Sparkles size={13} />
+                Apply Order Settings to All
+              </button>
+              {lineChanges.length > 0 && (
+                <button
+                  className="cost-bar-apply-defaults cost-bar-apply-defaults--secondary"
+                  type="button"
+                  onClick={() => applyOrderSettingsToAllLines(true)}
+                  title="เนเธเนเน€เธเธเธฒเธฐเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธขเธฑเธเนเธกเนเนเธ”เนเนเธเนเนเธเธเนเธฒ Order Settings เน€เธญเธ"
+                >
+                  <CheckCircle2 size={13} />
+                  To Unedited Only
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="bulk-setup-card bulk-setup-card--costs">
-            <div className="bulk-setup-card-title">1.2 &amp; 1.3 Shared Costs</div>
+            <div className="bulk-setup-card-title">1.2 Shared Costs</div>
             <label className="cost-bar-field">
               <span>Total PKH ({foreignCostCurrencyLabel}) <span className="alloc-method-badge">By Wt</span></span>
               <FormattedNumberInput
@@ -2786,7 +4476,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           </div>
 
           <div className="bulk-setup-card bulk-setup-card--defaults">
-            <div className="bulk-setup-card-title">1.4 Global Variables</div>
+            <div className="bulk-setup-card-title">1.3 Global Variables</div>
             <div className="bulk-field-pair">
               <label className="cost-bar-field">
                 <span>Def. INS %</span>
@@ -2827,26 +4517,26 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             </label>
             <div className="bulk-field-pair">
               <label className="cost-bar-field">
-                <span>Def. SPK</span>
+                <span>SPK (%)</span>
                 <FormattedNumberInput
                   id="bulk-cost-default-spk"
-                  name="bulkCost.defaults.sspk"
-                  value={globalDefaults.sspk}
+                  name="bulkCost.defaults.spkPercent"
+                  value={globalDefaults.spkPercent}
                   focused={focusedCostInput === 'default-spk'}
                   onBlur={() => setFocusedCostInput(null)}
-                  onChange={(event) => updateGlobalDefault('sspk', event.target.value)}
+                  onChange={(event) => updateGlobalDefault('spkPercent', event.target.value)}
                   onFocus={() => setFocusedCostInput('default-spk')}
                 />
               </label>
               <label className="cost-bar-field">
-                <span>Def. QOC</span>
+                <span>QOC (THB/kg)</span>
                 <FormattedNumberInput
                   id="bulk-cost-default-qoc"
-                  name="bulkCost.defaults.qoc"
-                  value={globalDefaults.qoc}
+                  name="bulkCost.defaults.qocRate"
+                  value={globalDefaults.qocRate}
                   focused={focusedCostInput === 'default-qoc'}
                   onBlur={() => setFocusedCostInput(null)}
-                  onChange={(event) => updateGlobalDefault('qoc', event.target.value)}
+                  onChange={(event) => updateGlobalDefault('qocRate', event.target.value)}
                   onFocus={() => setFocusedCostInput('default-qoc')}
                 />
               </label>
@@ -2869,13 +4559,14 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               onClick={applyGlobalDefaultsToAllLines}
               disabled={allLines.length === 0}
             >
+              <Sparkles size={13} />
               Apply to All Items
             </button>
           </div>
         </div>
 
-        <details className="cost-bar-run-details">
-          <summary>Run Info (optional) - ข้อมูลงานที่ไม่กระทบสูตรคำนวณ</summary>
+        <details className="cost-bar-run-details" open>
+          <summary>Run Info (optional) - เธเนเธญเธกเธนเธฅเธเธฒเธเธ—เธตเนเนเธกเนเธเธฃเธฐเธ—เธเธชเธนเธ•เธฃเธเธณเธเธงเธ“</summary>
           <div className="cost-bar-run-details-grid">
             <label className="cost-bar-field">
               <span>Reference No. / Job Name</span>
@@ -2885,7 +4576,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 type="text"
                 value={costs.referenceNo}
                 onChange={(event) => updateCost('referenceNo', event.target.value)}
-                placeholder="เช่น RFQ-001"
+                placeholder="เน€เธเนเธ RFQ-001"
               />
             </label>
             <label className="cost-bar-field">
@@ -2918,7 +4609,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                 type="text"
                 value={costs.remark}
                 onChange={(event) => updateCost('remark', event.target.value)}
-                placeholder="บันทึกไว้กับ revision"
+                placeholder="เธเธฑเธเธ—เธถเธเนเธงเนเธเธฑเธ revision"
               />
             </label>
           </div>
@@ -2926,7 +4617,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
 
         <div className="cost-bar-note">
           <Info size={16} aria-hidden="true" />
-          <span>PKH / SOC กรอกตาม Currency ของ Supplier แล้วแปลงด้วย Ex. Rate ส่วน FR / CC / Wire TT กรอกเป็น THB โดยตรง และระบบจะปันส่วนต่อชิ้นหลัง CAL</span>
+          <span>PKH / SOC เธเธฃเธญเธเธ•เธฒเธก Currency เธเธญเธ Supplier เนเธฅเนเธงเนเธเธฅเธเธ”เนเธงเธข Ex. Rate เธชเนเธงเธ FR / CC / Wire TT เธเธฃเธญเธเน€เธเนเธ THB เนเธ”เธขเธ•เธฃเธ เนเธฅเธฐเธฃเธฐเธเธเธเธฐเธเธฑเธเธชเนเธงเธเธ•เนเธญเธเธดเนเธเธซเธฅเธฑเธ CAL</span>
         </div>
       </section>
 
@@ -2936,8 +4627,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
             <div className="cost-bar-step-title-row">
               <span className="cost-bar-step-badge">2</span>
               <div>
-                <h2 id="selector-title">Line Items Grid <span>(ข้อมูลระดับรายการสินค้า)</span></h2>
-                <p>ดู/แก้ไขรายการสินค้า เลือก lines สำหรับ CAL ก่อนคำนวณ</p>
+                <h2 id="selector-title">Line Items Grid <span>(เธเนเธญเธกเธนเธฅเธฃเธฐเธ”เธฑเธเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒ)</span></h2>
+                <p>เธ”เธน/เนเธเนเนเธเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒ เน€เธฅเธทเธญเธ lines เธชเธณเธซเธฃเธฑเธ CAL เธเนเธญเธเธเธณเธเธงเธ“</p>
               </div>
             </div>
             <div className="cost-bar-title-icon">
@@ -2946,25 +4637,29 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           </div>
 
           <div className="supplier-box">
-            <span>Selected supplier</span>
-            <strong>{supplierName}</strong>
-            <small>
-              Vendor code: {supplierCode}. Latest rows are editable and selected rows are sent to CAL.
-            </small>
+            <Info size={14} className="text-pc-blue flex-shrink-0" style={{ color: 'var(--pc-blue)' }} />
+            <div className="flex items-center gap-2 flex-wrap" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span>Vendor: <strong className="vendor-badge">{supplierCode}</strong></span>
+              <small style={{ color: 'var(--pc-muted)', fontSize: '12px' }}>
+                Double-click a row or click <span className="inline-flex items-center justify-center" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 4px', margin: '0 2px' }}><Edit3 size={11} style={{ color: '#475569' }} /></span> to edit. Selected rows are sent to CAL.
+              </small>
+            </div>
           </div>
 
           <div className="summary-strip source-summary-strip">
-            <SummaryItem label="Selected lines" value={`${selectedLines.length} / ${allLines.length}`} />
-            <SummaryItem label="Total qty" value={fmt(totalQty)} />
-            <SummaryItem label="Total amount" value={`${selectedLines[0]?.currency ?? ''} ${fmt(totalAmount)}`} />
+            <SummaryItem label="Selected lines" value={`${selectedLines.length} / ${allLines.length}`} className="summary-item-selected" />
+            <SummaryItem label="Total qty" value={fmt(totalQty)} className="summary-item-qty" />
+            <SummaryItem label="Total amount" value={`${selectedLines[0]?.currency ?? ''} ${fmt(totalAmount)}`} className="summary-item-amount" />
             <SummaryItem
               label="Known weight"
               value={`${fmt(totalWeight)} kg`}
               warning={linesWithWarning > 0 ? `${linesWithWarning} missing` : undefined}
+              className={linesWithWarning > 0 ? 'summary-item-warning' : 'summary-item-weight'}
             />
             <SummaryItem
               label="Chargeable W"
-              value={totalChargeableWeight > 0 ? `${fmt(totalChargeableWeight)} kg` : '—'}
+              value={totalChargeableWeight > 0 ? `${fmt(totalChargeableWeight)} kg` : 'โ€”'}
+              className="summary-item-chargeable"
             />
           </div>
 
@@ -2995,88 +4690,54 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
               CAL uses selected Latest rows only.
             </small>
             {isLatestView && (
-              <button
-                type="button"
-                className="primary-button compact-btn add-item-btn"
-                onClick={addLine}
-              >
-                + Add Item
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="primary-button compact-btn add-item-btn"
+                  onClick={addLine}
+                >
+                  + Add Item
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button compact-btn add-multiple-btn"
+                  onClick={addMultipleLines}
+                >
+                  + Add Multiple
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button compact-btn paste-excel-btn"
+                  onClick={() => setIsPasteModalOpen(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Clipboard size={14} /> Paste from Excel
+                </button>
+              </div>
             )}
           </div>
 
-          {sourceView !== 'changes' && (
-            <div className="column-preset-toolbar" aria-label="Source line column presets">
-              <span>Columns</span>
+          {/* Column Preset Tabs Bar */}
+          <div className="line-column-presets-bar">
+            {PRESET_TABS.map((tab) => (
               <button
-                className={`line-view-tab ${lineColumnPreset === 'overview' ? 'line-view-tab-active' : ''}`}
+                key={tab.key}
                 type="button"
-                onClick={() => setLineColumnPreset('overview')}
+                className={`line-column-preset-btn ${lineColumnPreset === tab.key ? 'line-column-preset-btn--active' : ''}`}
+                onClick={() => setLineColumnPreset(tab.key)}
               >
-                2.1 ข้อมูลสินค้า
+                {tab.label}
               </button>
-              <button
-                className={`line-view-tab ${lineColumnPreset === 'logistics' ? 'line-view-tab-active' : ''}`}
-                type="button"
-                onClick={() => setLineColumnPreset('logistics')}
-              >
-                2.2 เงื่อนไขการซื้อ
-              </button>
-              <button
-                className={`line-view-tab ${lineColumnPreset === 'weight' ? 'line-view-tab-active' : ''}`}
-                type="button"
-                onClick={() => setLineColumnPreset('weight')}
-              >
-                2.3 ต้นทุนค่าขนส่ง
-              </button>
-              <button
-                className={`line-view-tab ${lineColumnPreset === 'docs' ? 'line-view-tab-active' : ''}`}
-                type="button"
-                onClick={() => setLineColumnPreset('docs')}
-              >
-                2.4 ค่าเอกสาร
-              </button>
-              <button
-                className={`line-view-tab ${lineColumnPreset === 'pricing' ? 'line-view-tab-active' : ''}`}
-                type="button"
-                onClick={() => setLineColumnPreset('pricing')}
-              >
-                2.5 ราคาซื้อและประกันภัย
-              </button>
-              <button
-                className={`line-view-tab ${lineColumnPreset === 'sales' ? 'line-view-tab-active' : ''}`}
-                type="button"
-                onClick={() => setLineColumnPreset('sales')}
-              >
-                2.6 เงื่อนไขการขาย
-              </button>
-              <button
-                className={`line-view-tab ${lineColumnPreset === 'all' ? 'line-view-tab-active' : ''}`}
-                type="button"
-                onClick={() => setLineColumnPreset('all')}
-              >
-                2.7 แสดงทั้งหมด (Show All)
-              </button>
-            </div>
-          )}
+            ))}
+          </div>
 
-          {sourceView !== 'changes' && (
-            <p className="preset-hint">
-              {lineColumnPreset === 'logistics' && 'ค่าเริ่มต้นมาจาก Step 1 แต่แก้รายบรรทัดได้: Purchase Term / Term Location / Sub Location / Ship Mode และค่า Duty / INS / STK มีผลต่อต้นทุนนำเข้า'}
-              {lineColumnPreset === 'overview' && 'ตรวจสอบ Item Group / Mfr Brand / Mfr Catalog No / Country of Origin / HS Code / Supp Order Code ก่อนคำนวณ'}
-              {lineColumnPreset === 'weight' && 'กรอก Item Weight และ L×W×H — ระบบคำนวณ Dim Weight อัตโนมัติ | Ship Weight = Max(Item Wt, Dim Wt) CEILING ทุก 0.5 kg'}
-              {lineColumnPreset === 'docs' && 'กรอก Document Fee รายบรรทัด'}
-              {lineColumnPreset === 'pricing' && 'กรอก Qty, Unit Price, Currency รายบรรทัด — ค่า allocated และ Order Price จะแสดงหลังคำนวณ (CAL)'}
-              {lineColumnPreset === 'sales' && 'Sales Term / Sales Sub Location / Sales UOM / Sales Conversion / SPK / QOC / Markup เป็นฝั่งขาย แยกออกจากเงื่อนไขซื้อและต้นทุนนำเข้า'}
-              {lineColumnPreset === 'all' && 'แสดงทุกคอลัมน์ — อ่านอย่างเดียว ใช้เพื่อ review ก่อนคำนวณ'}
-            </p>
-          )}
+
 
           {allLines.length === 0 ? (
             <div className="empty-state">
               <Search size={32} aria-hidden="true" />
-              <p>Blank manual run.</p>
-              <small>Add the first item line, then edit Qty / Price / Weight before CAL.</small>
+              <p>เธขเธฑเธเนเธกเนเธกเธตเธฃเธฒเธขเธเธฒเธฃ</p>
+              <small>เธเธ” "+ Add Item" เน€เธเธทเนเธญเน€เธเธดเนเธกเธฃเธฒเธขเธเธฒเธฃเนเธฃเธ เธเธฒเธเธเธฑเนเธเธเธฃเธญเธ Qty / Price / Weight เธเนเธญเธเธเธ” CAL</small>
               {isLatestView && (
                 <button
                   type="button"
@@ -3109,7 +4770,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                         return column.key === 'select' ? (
                           <th
                             key="select"
-                            className={`resizable-table-header ${stickyLeft !== undefined ? 'sticky-col' : ''}`}
+                            className={`resizable-table-header center-cell ${stickyLeft !== undefined ? 'sticky-col' : ''}`}
                             style={stickyLeft !== undefined ? { position: 'sticky', left: stickyLeft, zIndex: 10 } : undefined}
                             {...lineTableSizing.getCellProps('select')}
                           >
@@ -3141,26 +4802,53 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                       const weight = line.shippingWeightPerEach ?? line.dimensionWeightPerEach ?? line.itemWeightPerEach;
                       const missingWeight = weight === null || weight <= 0;
                       return (
-                        <tr className={checked ? '' : 'row-muted'} key={line.lineKey}>
+                        <tr
+                          className={`${checked ? '' : 'row-muted'} cursor-pointer hover:bg-slate-50 transition-colors`}
+                          key={line.lineKey}
+                          onDoubleClick={() => {
+                            if (isLatestView) {
+                              setEditingLineKey(line.lineKey);
+                              setEditingModalTab('item-data');
+                            }
+                          }}
+                        >
                           {visibleLineColumns.map((column) => (
                             <SourceLineCell
                               key={column.key}
                               columnKey={column.key}
                               allocatedCosts={(() => {
-                                if (!preview) return null;
-                                const result = preview.lines.find((r) => r.lineKey === line.lineKey);
-                                if (!result) return null;
-                                const fr = getFinalResultForLine(result);
+                                const result = preview?.lines.find((r) => r.lineKey === line.lineKey);
+                                const fr = result ? getFinalResultForLine(result) : null;
+
+                                // Live calculate allocated costs if preview is not calculated yet
+                                const isSelected = selectedKeys.has(line.lineKey);
+                                const weight = resolveLineWeight(line) ?? 0;
+                                const lineWeight = weight * line.qty;
+                                const weightRatio = totalWeight > 0 ? lineWeight / totalWeight : 0;
+                                const valueRatio = totalAmount > 0 ? line.amount / totalAmount : 0;
+                                const safeQty = line.qty > 0 ? line.qty : 1;
+
+                                const livePkhEa = isSelected ? (costs.pkh * weightRatio) / safeQty : 0;
+                                const liveSocEa = isSelected ? (costs.soc * weightRatio) / safeQty : 0;
+                                const liveFrEa = isSelected ? (costs.freight * weightRatio) / safeQty : 0;
+                                const liveCcEa = isSelected ? (costs.customs * weightRatio) / safeQty : 0;
+                                const liveTtEa = isSelected ? (costs.wireTT * valueRatio) / safeQty : 0;
+
                                 return {
-                                  pkhEa: result.pkhPerEach,
-                                  socEa: result.socPerEach,
-                                  frEa: result.freightPerEach,
-                                  ccEa: result.ccPerEach,
-                                  ttEa: result.wireTTPerEach,
-                                  op1Fcy: fr.op1Source,
-                                  exRate: fr.rateExchange,
-                                  op1Thb: fr.op1,
-                                  insAmount: fr.ins,
+                                  pkhEa: result ? result.pkhPerEach : livePkhEa,
+                                  socEa: result ? result.socPerEach : liveSocEa,
+                                  frEa: result ? result.freightPerEach : liveFrEa,
+                                  ccEa: result ? result.ccPerEach : liveCcEa,
+                                  ttEa: result ? result.wireTTPerEach : liveTtEa,
+                                  op1Fcy: fr ? fr.op1Source : 0,
+                                  exRate: fr ? fr.rateExchange : costs.exchangeRate,
+                                  op1Thb: fr ? fr.op1 : 0,
+                                  insAmount: fr ? fr.ins : 0,
+                                  cifQTEC: fr?.cifQTEC,
+                                  preQLC: fr?.preQLC,
+                                  qlc: fr?.qlc,
+                                  totalQLC: fr?.totalQLC,
+                                  roundUp: fr?.roundUp,
                                 };
                               })()}
                               changedCellKeys={changedCellKeys}
@@ -3190,6 +4878,7 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
                               onNumberChange={updateLineNumberField}
                               onTextChange={updateLineTextField}
                               onToggleLine={toggleLine}
+                              onEditLine={isLatestView ? (key) => { setEditingLineKey(key); setEditingModalTab('item-data'); } : undefined}
                             />
                           ))}
                         </tr>
@@ -3251,8 +4940,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
           <div className="cost-bar-step-title-row">
             <span className="cost-bar-step-badge cost-bar-step-badge--green">3</span>
             <div>
-              <h2 id="preview-title">Cost Result Grid <span>(แสดงผลลัพธ์การปันส่วนต่อชิ้น)</span></h2>
-              <p>ผลการปันส่วนค่าใช้จ่ายรวมลงแต่ละสินค้า พร้อม preview Item/Term draft</p>
+              <h2 id="preview-title">Cost Result Grid <span>(เนเธชเธ”เธเธเธฅเธฅเธฑเธเธเนเธเธฒเธฃเธเธฑเธเธชเนเธงเธเธ•เนเธญเธเธดเนเธ)</span></h2>
+              <p>เธเธฅเธเธฒเธฃเธเธฑเธเธชเนเธงเธเธเนเธฒเนเธเนเธเนเธฒเธขเธฃเธงเธกเธฅเธเนเธ•เนเธฅเธฐเธชเธดเธเธเนเธฒ เธเธฃเนเธญเธก preview Item/Term draft</p>
             </div>
           </div>
           {preview !== null && !isCalculating && (
@@ -3404,1728 +5093,8 @@ export function BulkCostWorkspace({ supplierCode, supplierName, savedRunId: init
       </section>
       </div>
       )}
+      {renderLineEditModal()}
+      {renderPasteModal()}
     </div>
   );
-}
-
-function ResizableHeader({
-  columnKey,
-  label,
-  sizing,
-  rowSpan,
-  className,
-  stickyLeft,
-}: {
-  columnKey: string;
-  label: string;
-  sizing: ResizableTableSizing;
-  rowSpan?: number;
-  className?: string;
-  stickyLeft?: number;
-}) {
-  return (
-    <th
-      className={`resizable-table-header ${className || ''} ${stickyLeft !== undefined ? 'sticky-col' : ''}`}
-      rowSpan={rowSpan}
-      style={stickyLeft !== undefined ? { position: 'sticky', left: stickyLeft, zIndex: 10 } : undefined}
-      {...sizing.getCellProps(columnKey)}
-    >
-      <span>{label}</span>
-      {sizing.renderResizeHandle(columnKey)}
-    </th>
-  );
-}
-
-function hasChanged(changedCellKeys: Set<string>, lineKey: string, fieldKey: LineFieldKey): boolean {
-  return changedCellKeys.has(`${lineKey}:${fieldKey}`);
-}
-
-function cellChangedClass(changed: boolean, className = ''): string {
-  return `${className} ${changed ? 'line-cell-modified' : ''}`.trim();
-}
-
-function SourceLineCell({
-  allocatedCosts,
-  brandOptions,
-  changedCellKeys,
-  checked,
-  columnKey,
-  countryOptions,
-  currencyOptions,
-  editable,
-  itemCategoryOptions,
-  itemGroupOptions,
-  locationOptions,
-  line,
-  missingWeight,
-  orderTermOptions,
-  permitTypeOptions,
-  shipModeOptions,
-  stickyLast,
-  stickyLeft,
-  subLocationOptions,
-  salesSubLocationOptions,
-  tableSizing,
-  uomOptions,
-  onDeleteLine,
-  onDocFeeChange,
-  onDocFeeBasisChange,
-  onNullableNumberChange,
-  onNumberChange,
-  onTextChange,
-  onToggleLine,
-}: {
-  allocatedCosts: { pkhEa: number; socEa: number; frEa: number; ccEa: number; ttEa: number; op1Fcy: number; exRate: number; op1Thb: number; insAmount: number } | null;
-  brandOptions: LookupOption[];
-  changedCellKeys: Set<string>;
-  checked: boolean;
-  columnKey: string;
-  countryOptions: LookupOption[];
-  currencyOptions: CurrencyLookupOption[];
-  editable: boolean;
-  itemCategoryOptions: LookupOption[];
-  itemGroupOptions: LookupOption[];
-  locationOptions: LocationLookupOption[];
-  line: AllocationLineSource;
-  missingWeight: boolean;
-  orderTermOptions: string[];
-  permitTypeOptions: LookupOption[];
-  shipModeOptions: Array<{ value: number; label: string }>;
-  stickyLast: boolean;
-  stickyLeft?: number;
-  subLocationOptions: string[];
-  salesSubLocationOptions: string[];
-  tableSizing: ResizableTableSizing;
-  uomOptions: Array<{ value: string; label: string }>;
-  onDocFeeChange: (lineKey: string, key: keyof DocumentFees, raw: string) => void;
-  onDocFeeBasisChange: (lineKey: string, key: keyof DocumentFees, basis: 'PER_EACH' | 'BY_LOT_BATCH') => void;
-  onNullableNumberChange: (lineKey: string, key: EditableLineNullableNumberField, raw: string) => void;
-  onNumberChange: (lineKey: string, key: EditableLineNumberField, raw: string) => void;
-  onTextChange: (lineKey: string, key: EditableLineTextField, value: string) => void;
-  onToggleLine: (lineKey: string) => void;
-  onDeleteLine: (lineKey: string) => void;
-}) {
-  const stickyClass = stickyLeft !== undefined ? `sticky-col ${stickyLast ? 'sticky-col-last' : ''}` : '';
-  const stickyStyle = stickyLeft !== undefined ? { position: 'sticky' as const, left: stickyLeft, zIndex: 2 } : undefined;
-
-  const docFeeField = DOC_FEE_FIELDS.find((field) => getDocFeeColumnKey(field.key) === columnKey);
-  if (docFeeField) {
-    return (
-      <td {...tableSizing.getCellProps(columnKey)}>
-        <LineDocFeeCell
-          changed={hasChanged(changedCellKeys, line.lineKey, `docFee.${docFeeField.key}`)}
-          editable={editable}
-          field={docFeeField}
-          line={line}
-          onChange={(value) => onDocFeeChange(line.lineKey, docFeeField.key, value)}
-          onBasisChange={(basis) => onDocFeeBasisChange(line.lineKey, docFeeField.key, basis)}
-        />
-      </td>
-    );
-  }
-
-  switch (columnKey) {
-    case 'select':
-      return (
-        <td {...tableSizing.getCellProps('select')} className={stickyClass} style={stickyStyle}>
-          <input
-            id={`bulk-line-${line.lineKey}`}
-            name={`bulkLine.${line.lineKey}.selected`}
-            type="checkbox"
-            checked={checked}
-            disabled={!editable}
-            onChange={() => onToggleLine(line.lineKey)}
-          />
-        </td>
-      );
-    case 'delete':
-      return (
-        <td {...tableSizing.getCellProps('delete')} className={cellChangedClass(false, `center-cell ${stickyClass}`)} style={stickyStyle}>
-          {editable && (
-            <button
-              type="button"
-              className="line-delete-btn"
-              aria-label="Delete line"
-              onClick={() => onDeleteLine(line.lineKey)}
-            >
-              <Trash2 size={14} aria-hidden="true" />
-            </button>
-          )}
-        </td>
-      );
-    case 'no':
-      return <td {...tableSizing.getCellProps('no')} className={`center-cell ${stickyClass}`.trim()} style={stickyStyle}>{line.no}</td>;
-    case 'itemGroup':
-      return <LineItemGroupCell changed={hasChanged(changedCellKeys, line.lineKey, 'itemGroup')} editable={editable} itemGroupOptions={itemGroupOptions} line={line} tableSizing={tableSizing} onChange={(value) => onTextChange(line.lineKey, 'itemGroup', value)} />;
-    case 'itemCategory':
-      return <LineLookupTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'itemCategory')} columnKey="itemCategory" editable={editable} line={line} options={ensureLookupOption(itemCategoryOptions, line.itemCategory)} tableSizing={tableSizing} value={line.itemCategory} onChange={(value) => onTextChange(line.lineKey, 'itemCategory', value)} />;
-    case 'customerStockCode':
-      return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'customerStockCode')} columnKey="customerStockCode" editable={editable} line={line} tableSizing={tableSizing} value={line.customerStockCode} onChange={(value) => onTextChange(line.lineKey, 'customerStockCode', value)} />;
-    case 'matchStatus':
-      return <td {...tableSizing.getCellProps('matchStatus')} className="center-cell">{formatMatchStatus(line.itemCode)}</td>;
-    case 'description':
-      return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'sapDescription')} className={`text-left-cell ${stickyClass}`.trim()} columnKey="description" editable={editable} line={line} stickyStyle={stickyStyle} tableSizing={tableSizing} value={line.sapDescription} onChange={(value) => onTextChange(line.lineKey, 'sapDescription', value)} />;
-    case 'manufacturer':
-      return <LineLookupTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'manufacturer')} columnKey="manufacturer" editable={editable} line={line} options={brandOptions} tableSizing={tableSizing} value={line.manufacturer} onChange={(value) => onTextChange(line.lineKey, 'manufacturer', value)} />;
-    case 'mfgPartNumber':
-      return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'mfgPartNumber')} columnKey="mfgPartNumber" editable={editable} line={line} tableSizing={tableSizing} value={line.mfgPartNumber} onChange={(value) => onTextChange(line.lineKey, 'mfgPartNumber', value)} />;
-    case 'supplierOrderCode':
-      return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'supplierOrderCode')} columnKey="supplierOrderCode" editable={editable} line={line} tableSizing={tableSizing} value={line.supplierOrderCode} onChange={(value) => onTextChange(line.lineKey, 'supplierOrderCode', value)} />;
-    case 'qty':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'qty')} columnKey="qty" editable={editable} line={line} tableSizing={tableSizing} tdClassName="center-cell" value={line.qty} onChange={(value) => onNumberChange(line.lineKey, 'qty', value)} />;
-    case 'uom':
-      return <LineUomCell changed={hasChanged(changedCellKeys, line.lineKey, 'uom')} columnKey="uom" editable={editable} line={line} options={uomOptions} tableSizing={tableSizing} value={line.uom} onChange={(value) => onTextChange(line.lineKey, 'uom', value)} />;
-    case 'unitPrice':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'unitPrice')} columnKey="unitPrice" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.unitPrice} onChange={(value) => onNumberChange(line.lineKey, 'unitPrice', value)} />;
-    case 'amount':
-      return <td {...tableSizing.getCellProps('amount')} className={cellChangedClass(hasChanged(changedCellKeys, line.lineKey, 'amount'), 'numeric-cell')}>{fmt(line.amount)}</td>;
-    case 'currency':
-      return <LineCurrencyCell changed={hasChanged(changedCellKeys, line.lineKey, 'currency')} currencyOptions={currencyOptions} editable={editable} line={line} tableSizing={tableSizing} onChange={(value) => onTextChange(line.lineKey, 'currency', value)} />;
-    case 'hsCode':
-      return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'hsCode')} columnKey="hsCode" editable={editable} line={line} tableSizing={tableSizing} value={line.hsCode} onChange={(value) => onTextChange(line.lineKey, 'hsCode', value)} />;
-    case 'countryOfOrigin':
-      return <LineLookupTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'countryOfOrigin')} columnKey="countryOfOrigin" editable={editable} line={line} options={countryOptions} tableSizing={tableSizing} value={line.countryOfOrigin} onChange={(value) => onTextChange(line.lineKey, 'countryOfOrigin', value)} />;
-    case 'leadTime':
-      return <LineTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'deliveryLeadTime')} columnKey="leadTime" editable={editable} line={line} tableSizing={tableSizing} value={line.deliveryLeadTime} onChange={(value) => onTextChange(line.lineKey, 'deliveryLeadTime', value)} />;
-    case 'orderTerm':
-      return <LineSelectTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'orderTerm')} columnKey="orderTerm" editable={editable} line={line} options={orderTermOptions.map((term) => ({ value: term, label: term }))} tableSizing={tableSizing} value={line.orderTerm} onChange={(value) => onTextChange(line.lineKey, 'orderTerm', value)} />;
-    case 'location':
-      return <LineLocationCell changed={hasChanged(changedCellKeys, line.lineKey, 'location')} editable={editable} line={line} locationOptions={locationOptions} tableSizing={tableSizing} onChange={(value) => onTextChange(line.lineKey, 'location', value)} />;
-    case 'subLocation':
-      return <LineSelectTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'subLocation')} columnKey="subLocation" editable={editable} line={line} options={subLocationOptions.map((subLocation) => ({ value: subLocation, label: subLocation }))} tableSizing={tableSizing} value={line.subLocation} onChange={(value) => onTextChange(line.lineKey, 'subLocation', value)} />;
-    case 'salesTerm':
-      return <LineSelectTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'salesTerm')} columnKey="salesTerm" editable={editable} line={line} options={orderTermOptions.map((term) => ({ value: term, label: term }))} tableSizing={tableSizing} value={line.salesTerm || ''} onChange={(value) => onTextChange(line.lineKey, 'salesTerm', value)} />;
-    case 'salesSubLocation':
-      return <LineSelectTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'salesSubLocation')} columnKey="salesSubLocation" editable={editable} line={line} options={salesSubLocationOptions.map((subLocation) => ({ value: subLocation, label: subLocation }))} tableSizing={tableSizing} value={line.salesSubLocation || ''} onChange={(value) => onTextChange(line.lineKey, 'salesSubLocation', value)} />;
-    case 'shipMode':
-      return (
-        <td {...tableSizing.getCellProps('shipMode')} className={cellChangedClass(hasChanged(changedCellKeys, line.lineKey, 'shipModeNo'), 'center-cell')}>
-          {editable ? (
-            <select
-              id={`latest-${line.lineKey}-shipMode`}
-              name={`latest.${line.lineKey}.shipModeNo`}
-              className="line-edit-input"
-              value={line.shipModeNo}
-              onMouseDownCapture={(e) => ensureSelectSpaceBelow(e.currentTarget)}
-              onChange={(e) => onNumberChange(line.lineKey, 'shipModeNo', e.target.value)}
-            >
-              {shipModeOptions.map((mode) => (
-                <option key={mode.value} value={mode.value}>{mode.label}</option>
-              ))}
-            </select>
-          ) : (
-            <span>{formatShipMode(line.shipModeNo)}</span>
-          )}
-        </td>
-      );
-    case 'importPermit':
-      return <LineYesNoCell changed={hasChanged(changedCellKeys, line.lineKey, 'importPermit')} columnKey="importPermit" editable={editable} line={line} tableSizing={tableSizing} value={line.importPermit} onChange={(value) => onTextChange(line.lineKey, 'importPermit', value)} />;
-    case 'permitType':
-      return <LineLookupTextCell changed={hasChanged(changedCellKeys, line.lineKey, 'permitType')} columnKey="permitType" editable={editable} line={line} options={ensureLookupOption(permitTypeOptions, line.permitType)} tableSizing={tableSizing} value={line.permitType} onChange={(value) => onTextChange(line.lineKey, 'permitType', value)} />;
-    case 'shelfLife':
-      return <LineYesNoCell changed={hasChanged(changedCellKeys, line.lineKey, 'shelfLifeRequire')} columnKey="shelfLife" editable={editable} line={line} tableSizing={tableSizing} value={line.shelfLifeRequire} onChange={(value) => onTextChange(line.lineKey, 'shelfLifeRequire', value)} />;
-    case 'itemWeight':
-      return <LineNullableNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'itemWeightPerEach')} columnKey="itemWeight" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.itemWeightPerEach} onChange={(value) => onNullableNumberChange(line.lineKey, 'itemWeightPerEach', value)} />;
-    case 'dimWeight':
-      return <LineNullableNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'dimensionWeightPerEach')} columnKey="dimWeight" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.dimensionWeightPerEach} onChange={(value) => onNullableNumberChange(line.lineKey, 'dimensionWeightPerEach', value)} />;
-    case 'chargeableWeight':
-      return <td {...tableSizing.getCellProps('chargeableWeight')} className="numeric-cell">{fmt(getChargeableWeightPerEach(line))}</td>;
-    case 'shipWeight':
-      return <LineNullableNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'shippingWeightPerEach')} columnKey="shipWeight" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.shippingWeightPerEach} onChange={(value) => onNullableNumberChange(line.lineKey, 'shippingWeightPerEach', value)} />;
-    case 'freightRate':
-      return <LineNullableNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'freightRate')} columnKey="freightRate" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.freightRate} onChange={(value) => onNullableNumberChange(line.lineKey, 'freightRate', value)} />;
-    case 'dimUnit':
-      return (
-        <td {...tableSizing.getCellProps('dimUnit')} className={cellChangedClass(hasChanged(changedCellKeys, line.lineKey, 'dimUnit'), 'center-cell')}>
-          {editable ? (
-            <select
-              id={`latest-${line.lineKey}-dimUnit`}
-              name={`latest.${line.lineKey}.dimUnit`}
-              className="line-edit-input"
-              value={line.dimUnit}
-              onMouseDownCapture={(e) => ensureSelectSpaceBelow(e.currentTarget)}
-              onChange={(e) => onNumberChange(line.lineKey, 'dimUnit', e.target.value)}
-            >
-              <option value={1}>CM</option>
-              <option value={2}>INCH</option>
-            </select>
-          ) : (
-            <span>{line.dimUnit === 2 ? 'INCH' : 'CM'}</span>
-          )}
-        </td>
-      );
-    case 'length':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'length')} columnKey="length" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.length} onChange={(value) => onNumberChange(line.lineKey, 'length', value)} />;
-    case 'width':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'width')} columnKey="width" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.width} onChange={(value) => onNumberChange(line.lineKey, 'width', value)} />;
-    case 'height':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'height')} columnKey="height" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.height} onChange={(value) => onNumberChange(line.lineKey, 'height', value)} />;
-    case 'importDuty':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'importDutyPercent')} columnKey="importDuty" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.importDutyPercent} onChange={(value) => onNumberChange(line.lineKey, 'importDutyPercent', value)} />;
-    case 'moq':
-      return <LineNullableNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'moq')} columnKey="moq" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.moq} onChange={(value) => onNullableNumberChange(line.lineKey, 'moq', value)} />;
-    case 'insPercent':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'insPercent')} columnKey="insPercent" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.insPercent} onChange={(value) => onNumberChange(line.lineKey, 'insPercent', value)} />;
-    case 'stkPercent':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'stkPercent')} columnKey="stkPercent" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.stkPercent} onChange={(value) => onNumberChange(line.lineKey, 'stkPercent', value)} />;
-    case 'zoneRate':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'zoneRate')} columnKey="zoneRate" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.zoneRate} onChange={(value) => onNumberChange(line.lineKey, 'zoneRate', value)} />;
-    case 'etPercent':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'etPercent')} columnKey="etPercent" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.etPercent} onChange={(value) => onNumberChange(line.lineKey, 'etPercent', value)} />;
-    case 'miscTax':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'miscTax')} columnKey="miscTax" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.miscTax} onChange={(value) => onNumberChange(line.lineKey, 'miscTax', value)} />;
-    case 'scc':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'scc')} columnKey="scc" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.scc} onChange={(value) => onNumberChange(line.lineKey, 'scc', value)} />;
-    case 'sspk':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'sspk')} columnKey="sspk" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.sspk} onChange={(value) => onNumberChange(line.lineKey, 'sspk', value)} />;
-    case 'qoc':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'qoc')} columnKey="qoc" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.qoc} onChange={(value) => onNumberChange(line.lineKey, 'qoc', value)} />;
-    case 'markupPercent':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'markupPercent')} columnKey="markupPercent" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.markupPercent} onChange={(value) => onNumberChange(line.lineKey, 'markupPercent', value)} />;
-    case 'purchaseUOM':
-      return <LineUomCell changed={hasChanged(changedCellKeys, line.lineKey, 'purchaseUOM')} columnKey="purchaseUOM" editable={editable} line={line} options={uomOptions} tableSizing={tableSizing} value={line.purchaseUOM} onChange={(value) => onTextChange(line.lineKey, 'purchaseUOM', value)} />;
-    case 'stockConversion':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'stockConversion')} columnKey="stockConversion" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.stockConversion} onChange={(value) => onNumberChange(line.lineKey, 'stockConversion', value)} />;
-    case 'saleUOM':
-      return <LineUomCell changed={hasChanged(changedCellKeys, line.lineKey, 'saleUOM')} columnKey="saleUOM" editable={editable} line={line} options={uomOptions} tableSizing={tableSizing} value={line.saleUOM} onChange={(value) => onTextChange(line.lineKey, 'saleUOM', value)} />;
-    case 'saleConversion':
-      return <LineNumberCell changed={hasChanged(changedCellKeys, line.lineKey, 'saleConversion')} columnKey="saleConversion" editable={editable} line={line} tableSizing={tableSizing} tdClassName="numeric-cell" value={line.saleConversion} onChange={(value) => onNumberChange(line.lineKey, 'saleConversion', value)} />;
-    case 'pkhEa':
-      return <td {...tableSizing.getCellProps('pkhEa')} className="numeric-cell alloc-readonly">{allocatedCosts ? fmt(allocatedCosts.pkhEa) : '—'}</td>;
-    case 'socEa':
-      return <td {...tableSizing.getCellProps('socEa')} className="numeric-cell alloc-readonly">{allocatedCosts ? fmt(allocatedCosts.socEa) : '—'}</td>;
-    case 'frEa':
-      return <td {...tableSizing.getCellProps('frEa')} className="numeric-cell alloc-readonly">{allocatedCosts ? fmt(allocatedCosts.frEa) : '—'}</td>;
-    case 'ccEa':
-      return <td {...tableSizing.getCellProps('ccEa')} className="numeric-cell alloc-readonly">{allocatedCosts ? fmt(allocatedCosts.ccEa) : '—'}</td>;
-    case 'ttEa':
-      return <td {...tableSizing.getCellProps('ttEa')} className="numeric-cell alloc-readonly">{allocatedCosts ? fmt(allocatedCosts.ttEa) : '—'}</td>;
-    case 'docFeeTotal': {
-      const docTotal = line.docFee.coc + line.docFee.millCert + line.docFee.testCert + line.docFee.coa + line.docFee.coo + line.docFee.anyOther;
-      return <td {...tableSizing.getCellProps('docFeeTotal')} className="numeric-cell alloc-readonly">{fmt(docTotal)}</td>;
-    }
-    case 'op1Fcy':
-      return <td {...tableSizing.getCellProps('op1Fcy')} className="numeric-cell alloc-readonly">{allocatedCosts ? fmt(allocatedCosts.op1Fcy) : '—'}</td>;
-    case 'exRateCol':
-      return <td {...tableSizing.getCellProps('exRateCol')} className="numeric-cell alloc-readonly">{allocatedCosts ? fmt(allocatedCosts.exRate) : '—'}</td>;
-    case 'op1Thb':
-      return <td {...tableSizing.getCellProps('op1Thb')} className="numeric-cell alloc-readonly">{allocatedCosts ? fmt(allocatedCosts.op1Thb) : '—'}</td>;
-    case 'insAmount':
-      return <td {...tableSizing.getCellProps('insAmount')} className="numeric-cell alloc-readonly">{allocatedCosts ? fmt(allocatedCosts.insAmount) : '—'}</td>;
-    case 'status':
-      return (
-        <td {...tableSizing.getCellProps('status')} className="center-cell">
-          {missingWeight ? (
-            <span className="table-warning">
-              <AlertTriangle size={14} aria-hidden="true" />
-              No weight
-            </span>
-          ) : (
-            <span className="table-ok">
-              <CheckCircle2 size={14} aria-hidden="true" />
-              Ready
-            </span>
-          )}
-        </td>
-      );
-    default:
-      return <td {...tableSizing.getCellProps(columnKey)}>-</td>;
-  }
-}
-
-function LineItemGroupCell({
-  changed,
-  editable,
-  itemGroupOptions,
-  line,
-  tableSizing,
-  onChange,
-}: {
-  changed: boolean;
-  editable: boolean;
-  itemGroupOptions: LookupOption[];
-  line: AllocationLineSource;
-  tableSizing: ResizableTableSizing;
-  onChange: (value: string) => void;
-}) {
-  const options = itemGroupOptions.some((option) => option.value === line.itemGroup)
-    ? itemGroupOptions
-    : [{ value: line.itemGroup, label: formatItemGroup(line.itemGroup) }, ...itemGroupOptions];
-  const displayLabel = options.find((option) => option.value === line.itemGroup)?.label || formatItemGroup(line.itemGroup);
-
-  return (
-    <td {...tableSizing.getCellProps('itemGroup')} className={cellChangedClass(changed, 'center-cell')}>
-      {editable ? (
-        <select
-          id={`latest-${line.lineKey}-itemGroup`}
-          name={`latest.${line.lineKey}.itemGroup`}
-          className="line-edit-input"
-          value={line.itemGroup}
-          onMouseDownCapture={(e) => ensureSelectSpaceBelow(e.currentTarget)}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <span>{displayLabel || '-'}</span>
-      )}
-    </td>
-  );
-}
-
-function LineUomCell({
-  changed,
-  columnKey,
-  editable,
-  line,
-  options,
-  tableSizing,
-  value,
-  onChange,
-}: {
-  changed: boolean;
-  columnKey: string;
-  editable: boolean;
-  line: AllocationLineSource;
-  options: Array<{ value: string; label: string }>;
-  tableSizing: ResizableTableSizing;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const selectOptions = options.some((option) => option.value === value)
-    ? options
-    : [{ value, label: value || '-' }, ...options];
-
-  return (
-    <td {...tableSizing.getCellProps(columnKey)} className={cellChangedClass(changed, 'center-cell')}>
-      {editable && options.length > 0 ? (
-        <select
-          id={`latest-${line.lineKey}-${columnKey}`}
-          name={`latest.${line.lineKey}.${columnKey}`}
-          className="line-edit-input"
-          value={value}
-          onMouseDownCapture={(e) => ensureSelectSpaceBelow(e.currentTarget)}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {selectOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      ) : (
-        <span>{value || '-'}</span>
-      )}
-    </td>
-  );
-}
-
-function LineSelectTextCell({
-  changed,
-  columnKey,
-  editable,
-  line,
-  options,
-  tableSizing,
-  value,
-  onChange,
-}: {
-  changed: boolean;
-  columnKey: string;
-  editable: boolean;
-  line: AllocationLineSource;
-  options: Array<{ value: string; label: string }>;
-  tableSizing: ResizableTableSizing;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const selectOptions = options.some((option) => option.value === value)
-    ? options
-    : [{ value, label: value || '-' }, ...options];
-
-  return (
-    <td {...tableSizing.getCellProps(columnKey)} className={cellChangedClass(changed, 'center-cell')}>
-      {editable && selectOptions.length > 0 ? (
-        <select
-          id={`latest-${line.lineKey}-${columnKey}`}
-          name={`latest.${line.lineKey}.${columnKey}`}
-          className="line-edit-input"
-          value={value}
-          onMouseDownCapture={(event) => ensureSelectSpaceBelow(event.currentTarget)}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {selectOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      ) : (
-        <span>{value || '-'}</span>
-      )}
-    </td>
-  );
-}
-
-function LineLocationCell({
-  changed,
-  editable,
-  line,
-  locationOptions,
-  tableSizing,
-  onChange,
-}: {
-  changed: boolean;
-  editable: boolean;
-  line: AllocationLineSource;
-  locationOptions: LocationLookupOption[];
-  tableSizing: ResizableTableSizing;
-  onChange: (value: string) => void;
-}) {
-  const options = ensureLocationLookupOption(locationOptions, line.location);
-  const selected = options.find((option) => option.code === line.location || option.name === line.location);
-
-  return (
-    <td {...tableSizing.getCellProps('location')} className={cellChangedClass(changed, 'center-cell')}>
-      {editable ? (
-        <select
-          id={`latest-${line.lineKey}-location`}
-          name={`latest.${line.lineKey}.location`}
-          className="line-edit-input"
-          value={selected?.code || line.location}
-          onMouseDownCapture={(event) => ensureSelectSpaceBelow(event.currentTarget)}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option.code} value={option.code}>{locationOptionLabel(option)}</option>
-          ))}
-        </select>
-      ) : (
-        <span>{selected ? locationOptionLabel(selected) : line.location || '-'}</span>
-      )}
-    </td>
-  );
-}
-
-function LineLookupTextCell({
-  changed,
-  columnKey,
-  editable,
-  line,
-  options,
-  tableSizing,
-  value,
-  onChange,
-}: {
-  changed: boolean;
-  columnKey: string;
-  editable: boolean;
-  line: AllocationLineSource;
-  options: LookupOption[];
-  tableSizing: ResizableTableSizing;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value || '');
-
-  useEffect(() => {
-    setInputValue(value || '');
-  }, [value]);
-
-  const filtered = useMemo(() => {
-    const q = inputValue.toLowerCase().trim();
-    if (!q) return options;
-    return options.filter((opt) =>
-      (opt.label || '').toLowerCase().includes(q) ||
-      (opt.value || '').toLowerCase().includes(q)
-    );
-  }, [options, inputValue]);
-
-  if (!editable) {
-    return <LineTextCell changed={changed} columnKey={columnKey} editable={editable} line={line} tableSizing={tableSizing} value={value} onChange={onChange} />;
-  }
-
-  return (
-    <td {...tableSizing.getCellProps(columnKey)} className={cellChangedClass(changed, 'center-cell relative')}>
-      <div className="searchable-lookup-container w-full">
-        <input
-          id={`latest-${line.lineKey}-${columnKey}`}
-          name={`latest.${line.lineKey}.${columnKey}`}
-          type="text"
-          className="line-edit-input w-full"
-          value={inputValue}
-          onChange={(e) => {
-            setInputValue(e.target.value);
-            onChange(e.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={(e) => {
-            ensureSelectSpaceBelow(e.currentTarget);
-            setIsOpen(true);
-          }}
-          onBlur={() => {
-            setTimeout(() => setIsOpen(false), 200);
-          }}
-          placeholder="Select or type..."
-        />
-        {isOpen && (
-          <div className="searchable-lookup-dropdown">
-            {filtered.map((opt) => (
-              <div
-                key={opt.value}
-                className={`searchable-lookup-option ${value === opt.value ? 'searchable-lookup-option--selected' : ''}`}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setInputValue(opt.label || opt.value);
-                  onChange(opt.value);
-                  setIsOpen(false);
-                }}
-              >
-                {opt.label || opt.value}
-              </div>
-            ))}
-            {filtered.length === 0 && (
-              <div className="searchable-lookup-no-results">
-                No match found
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </td>
-  );
-}
-
-function LineCurrencyCell({
-  changed,
-  currencyOptions,
-  editable,
-  line,
-  tableSizing,
-  onChange,
-}: {
-  changed: boolean;
-  currencyOptions: CurrencyLookupOption[];
-  editable: boolean;
-  line: AllocationLineSource;
-  tableSizing: ResizableTableSizing;
-  onChange: (value: string) => void;
-}) {
-  const options = [
-    { code: '', name: 'Please Select', exRate: 0 },
-    ...ensureCurrencyLookupOption(currencyOptions, line.currency, 0),
-  ];
-  return (
-    <td {...tableSizing.getCellProps('currency')} className={cellChangedClass(changed, 'center-cell')}>
-      {editable ? (
-        <select
-          id={`latest-${line.lineKey}-currency`}
-          name={`latest.${line.lineKey}.currency`}
-          className="line-edit-input"
-          value={line.currency}
-          onMouseDownCapture={(e) => ensureSelectSpaceBelow(e.currentTarget)}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option.code} value={option.code}>
-              {option.code || option.name}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <span>{line.currency || '-'}</span>
-      )}
-    </td>
-  );
-}
-
-function LineTextCell({
-  changed,
-  className,
-  columnKey,
-  editable,
-  line,
-  stickyStyle,
-  tableSizing,
-  value,
-  onChange,
-}: {
-  changed: boolean;
-  className?: string;
-  columnKey: string;
-  editable: boolean;
-  line: AllocationLineSource;
-  stickyStyle?: CSSProperties;
-  tableSizing: ResizableTableSizing;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <td {...tableSizing.getCellProps(columnKey)} className={cellChangedClass(changed, className)} style={stickyStyle}>
-      {editable ? (
-        <input
-          id={`latest-${line.lineKey}-${columnKey}`}
-          name={`latest.${line.lineKey}.${columnKey}`}
-          className="line-edit-input"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      ) : (
-        <span>{value || '-'}</span>
-      )}
-    </td>
-  );
-}
-
-function LineYesNoCell({
-  changed,
-  columnKey,
-  editable,
-  line,
-  tableSizing,
-  value,
-  onChange,
-}: {
-  changed: boolean;
-  columnKey: string;
-  editable: boolean;
-  line: AllocationLineSource;
-  tableSizing: ResizableTableSizing;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const normalizedValue = formatYesNo(value);
-
-  return (
-    <td {...tableSizing.getCellProps(columnKey)} className={cellChangedClass(changed, 'center-cell')}>
-      {editable ? (
-        <input
-          type="checkbox"
-          id={`latest-${line.lineKey}-${columnKey}`}
-          name={`latest.${line.lineKey}.${columnKey}`}
-          checked={normalizedValue === 'Yes'}
-          onChange={(event) => onChange(event.target.checked ? 'Yes' : 'No')}
-          style={{ width: '16px', height: '16px', cursor: 'pointer', verticalAlign: 'middle' }}
-        />
-      ) : (
-        <input
-          type="checkbox"
-          checked={normalizedValue === 'Yes'}
-          disabled
-          style={{ width: '16px', height: '16px', verticalAlign: 'middle', opacity: 0.7 }}
-        />
-      )}
-    </td>
-  );
-}
-
-function LineNumberCell({
-  changed,
-  columnKey,
-  editable,
-  line,
-  tableSizing,
-  tdClassName,
-  value,
-  onChange,
-}: {
-  changed: boolean;
-  columnKey: string;
-  editable: boolean;
-  line: AllocationLineSource;
-  tableSizing: ResizableTableSizing;
-  tdClassName?: string;
-  value: number;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <td {...tableSizing.getCellProps(columnKey)} className={cellChangedClass(changed, tdClassName)}>
-      {editable ? (
-        <FormattedNumberInput
-          id={`latest-${line.lineKey}-${columnKey}`}
-          name={`latest.${line.lineKey}.${columnKey}`}
-          className="line-edit-input numeric"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      ) : (
-        <span>{fmtPlain(value) || '-'}</span>
-      )}
-    </td>
-  );
-}
-
-function LineNullableNumberCell({
-  changed,
-  columnKey,
-  editable,
-  line,
-  tableSizing,
-  tdClassName,
-  value,
-  onChange,
-}: {
-  changed: boolean;
-  columnKey: string;
-  editable: boolean;
-  line: AllocationLineSource;
-  tableSizing: ResizableTableSizing;
-  tdClassName?: string;
-  value: number | null;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <td {...tableSizing.getCellProps(columnKey)} className={cellChangedClass(changed, tdClassName)}>
-      {editable ? (
-        <FormattedNumberInput
-          id={`latest-${line.lineKey}-${columnKey}`}
-          name={`latest.${line.lineKey}.${columnKey}`}
-          className="line-edit-input numeric"
-          nullable
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      ) : (
-        <span>{fmtNullablePlain(value) || '-'}</span>
-      )}
-    </td>
-  );
-}
-
-function LineDocFeeCell({
-  changed,
-  editable,
-  field,
-  line,
-  onChange,
-  onBasisChange,
-}: {
-  changed: boolean;
-  editable: boolean;
-  field: { key: keyof DocumentFees; label: string };
-  line: AllocationLineSource;
-  onChange: (value: string) => void;
-  onBasisChange: (basis: 'PER_EACH' | 'BY_LOT_BATCH') => void;
-}) {
-  const value = line.docFee[field.key];
-  const basis = line.docFeeBasis?.[field.key] ?? 'PER_EACH';
-  const isByLot = basis === 'BY_LOT_BATCH';
-
-  if (!editable) {
-    return (
-      <span className={changed ? 'line-readonly-modified' : ''}>
-        {fmtPlain(value) || '-'}
-        {isByLot && value !== 0 && <span className="doc-fee-by-lot-badge"> By Lot</span>}
-      </span>
-    );
-  }
-
-  return (
-    <div className="doc-fee-cell-wrap">
-      <FormattedNumberInput
-        id={`bulk-line-${line.lineKey}-${field.key}`}
-        name={`bulkLine.${line.lineKey}.docFee.${field.key}`}
-        className={`doc-fee-input ${changed ? 'line-input-modified' : ''}`}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-label={`${field.label} fee for ${line.itemCode || line.supplierOrderCode}`}
-        title={!isByLot ? 'Per Each: enter amount per 1 unit (divide total by qty if supplier quotes a lump sum)' : 'By Lot/Batch: enter total lump-sum amount for the whole shipment'}
-      />
-      <div className="doc-fee-basis-toggle" role="group" aria-label={`${field.label} basis`}>
-        <button
-          type="button"
-          className={`doc-fee-basis-btn${!isByLot ? ' active' : ''}`}
-          onClick={() => onBasisChange('PER_EACH')}
-          title="Per Each — included in OP1"
-        >
-          /Ea
-        </button>
-        <button
-          type="button"
-          className={`doc-fee-basis-btn${isByLot ? ' active by-lot' : ''}`}
-          onClick={() => onBasisChange('BY_LOT_BATCH')}
-          title="By Lot / Batch — separate service line"
-        >
-          Lot
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ChangesTable({
-  changes,
-  onResetField,
-}: {
-  changes: LineChange[];
-  onResetField: (lineKey: string, fieldKey: LineFieldKey) => void;
-}) {
-  if (changes.length === 0) {
-    return (
-      <div className="preview-empty changes-empty">
-        <Info size={28} aria-hidden="true" />
-        <p>No changes from Origin.</p>
-        <small>Latest currently matches the saved/manual baseline.</small>
-      </div>
-    );
-  }
-
-  return (
-    <div className="table-scroll changes-table-scroll">
-      <table className="prototype-table changes-table">
-        <thead>
-          <tr>
-            <th>No</th>
-            <th>Match</th>
-            <th>Field</th>
-            <th>Origin</th>
-            <th>Latest</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {changes.map((change) => (
-            <tr key={`${change.lineKey}-${change.fieldKey}`}>
-              <td>{change.no}</td>
-              <td>{formatMatchStatus(change.itemCode)}</td>
-              <td className="text-left-cell"><strong>{change.label}</strong></td>
-              <td className="text-left-cell change-origin">{change.originValue || '-'}</td>
-              <td className="text-left-cell change-latest">{change.latestValue || '-'}</td>
-              <td>
-                <button
-                  type="button"
-                  className="table-action-button compact"
-                  onClick={() => onResetField(change.lineKey, change.fieldKey)}
-                >
-                  Reset
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SummaryItem({
-  label,
-  value,
-  warning,
-}: {
-  label: string;
-  value: string;
-  warning?: string;
-}) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {warning && <small className="summary-warning">{warning}</small>}
-    </div>
-  );
-}
-
-type FormattedNumberInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & {
-  value: number | null | undefined;
-  nullable?: boolean;
-  focused?: boolean;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-};
-
-function FormattedNumberInput({
-  value,
-  nullable = false,
-  focused,
-  onBlur,
-  onChange,
-  onFocus,
-  ...props
-}: FormattedNumberInputProps) {
-  const [internalFocused, setInternalFocused] = useState(false);
-  const [draft, setDraft] = useState('');
-  const isFocused = focused ?? internalFocused;
-
-  useEffect(() => {
-    if (!isFocused) setDraft(formatDisplayNumber(value, nullable));
-  }, [isFocused, nullable, value]);
-
-  return (
-    <input
-      {...props}
-      inputMode="decimal"
-      value={isFocused ? draft : formatDisplayNumber(value, nullable)}
-      onBlur={(event) => {
-        setInternalFocused(false);
-        setDraft(formatDisplayNumber(value, nullable));
-        onBlur?.(event);
-      }}
-      onChange={(event) => {
-        setDraft(event.target.value);
-        onChange(event);
-      }}
-      onFocus={(event) => {
-        setInternalFocused(true);
-        const editableValue = toEditableNumber(value);
-        const input = event.currentTarget;
-        setDraft(editableValue === '0' ? '' : editableValue);
-        if (editableValue !== '0') {
-          window.requestAnimationFrame(() => input.select());
-        }
-        onFocus?.(event);
-      }}
-    />
-  );
-}
-
-function ResultTable({
-  costs,
-  fullTableSizing,
-  formulaTableSizing,
-  getFinalResultForLine,
-  onEdit,
-  onOpenDraftPreview,
-  preview,
-  resultView,
-  reviewTableSizing,
-  selectedLines,
-}: {
-  costs: BulkCostInput;
-  fullTableSizing: ResizableTableSizing;
-  formulaTableSizing: ResizableTableSizing;
-  getFinalResultForLine: (line: AllocationLineResult) => FinalResultColumns;
-  onEdit: (lineKey: string, key: FinalResultKey, raw: string) => void;
-  onOpenDraftPreview: (mode: DraftPreviewMode, lineKey: string) => void;
-  preview: AllocationPreview;
-  resultView: ResultView;
-  reviewTableSizing: ResizableTableSizing;
-  selectedLines: AllocationLineSource[];
-}) {
-  const sourceByKey = new Map(selectedLines.map((line) => [line.lineKey, line]));
-
-  if (resultView === 'review') {
-    return (
-      <div className="table-scroll">
-        <table
-          className="prototype-table review-result-table"
-          data-resizable-table={reviewTableSizing.tableId}
-          style={reviewTableSizing.tableStyle}
-        >
-          <colgroup>
-            {REVIEW_RESULT_TABLE_COLUMNS.map((column) => (
-              <col key={column.key} style={reviewTableSizing.getColumnStyle(column.key)} />
-            ))}
-          </colgroup>
-          <thead>
-            <tr>
-              <ResizableHeader columnKey="rowNo" label="No" rowSpan={2} sizing={reviewTableSizing} />
-              <ResizableHeader columnKey="itemGroup" label="Group" rowSpan={2} sizing={reviewTableSizing} />
-              <ResizableHeader columnKey="supplierOrderCode" label="Supp Order Code" rowSpan={2} sizing={reviewTableSizing} />
-              <ResizableHeader columnKey="description" label="Description" rowSpan={2} sizing={reviewTableSizing} />
-              <ResizableHeader columnKey="qty" label="Qty" rowSpan={2} sizing={reviewTableSizing} />
-              <ResizableHeader columnKey="uom" label="UOM" rowSpan={2} sizing={reviewTableSizing} />
-              {REVIEW_RESULT_GROUPS.map((group) => (
-                <th key={group.label} colSpan={group.count} className={group.className}>{group.label}</th>
-              ))}
-              <ResizableHeader className="th-final" columnKey="draftPreview" label="Preview" rowSpan={2} sizing={reviewTableSizing} />
-              <ResizableHeader className="th-final" columnKey="status" label="Status" rowSpan={2} sizing={reviewTableSizing} />
-            </tr>
-            <tr>
-              {REVIEW_RESULT_KEYS.map((key) => (
-                <ResizableHeader
-                  className={getReviewColClass(key)}
-                  columnKey={getFinalResultColumnKey(key)}
-                  key={key}
-                  label={REVIEW_LABEL_OVERRIDE[key] ?? FINAL_RESULT_COL_BY_KEY.get(key)?.label ?? key}
-                  sizing={reviewTableSizing}
-                />
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {preview.lines.map((result, index) => {
-              const source = sourceByKey.get(result.lineKey);
-              if (!source) return null;
-              return (
-                <ReviewResultRow
-                  key={result.lineKey}
-                  finalResult={getFinalResultForLine(result)}
-                  index={index}
-                  result={result}
-                  source={source}
-                  tableSizing={reviewTableSizing}
-                  onEdit={onEdit}
-                  onOpenDraftPreview={onOpenDraftPreview}
-                />
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="result-totals-row">
-              <td colSpan={4} className="totals-label-cell">Totals ({preview.lines.length} lines)</td>
-              <td className="numeric-cell">{fmt(preview.lines.reduce((s, l) => s + (sourceByKey.get(l.lineKey)?.qty ?? 0), 0))}</td>
-              <td />
-              {REVIEW_RESULT_KEYS.map((key) => {
-                const skip = key === 'rateExchange' || key === 'op1Source' || key === 'shipWeightCal' || key === 'markup';
-                if (skip) return <td key={key} />;
-                const col = FINAL_RESULT_COL_BY_KEY.get(key);
-                if (!col || col.kind !== 'number') return <td key={key} />;
-                const total = preview.lines.reduce((s, l) => s + (Number(getFinalResultForLine(l)[key]) || 0), 0);
-                return <td key={key} className="numeric-cell">{fmt(total)}</td>;
-              })}
-              <td />
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    );
-  }
-
-  if (resultView === 'formula') {
-    return (
-      <div className="table-scroll">
-        <table
-          className="prototype-table formula-preview-table"
-          data-resizable-table={formulaTableSizing.tableId}
-          style={formulaTableSizing.tableStyle}
-        >
-          <colgroup>
-            {FORMULA_PREVIEW_TABLE_COLUMNS.map((column) => (
-              <col key={column.key} style={formulaTableSizing.getColumnStyle(column.key)} />
-            ))}
-          </colgroup>
-          <thead>
-            <tr>
-              <ResizableHeader columnKey="rowNo" label="No" rowSpan={2} sizing={formulaTableSizing} />
-              <ResizableHeader columnKey="itemGroup" label="Group" rowSpan={2} sizing={formulaTableSizing} />
-              <ResizableHeader columnKey="supplierOrderCode" label="Supp Order Code" rowSpan={2} sizing={formulaTableSizing} />
-              <ResizableHeader columnKey="description" label="Description" rowSpan={2} sizing={formulaTableSizing} />
-              <ResizableHeader columnKey="qty" label="Qty" rowSpan={2} sizing={formulaTableSizing} />
-              <ResizableHeader columnKey="uom" label="UOM" rowSpan={2} sizing={formulaTableSizing} />
-              <ResizableHeader columnKey="amount" label="Amount" rowSpan={2} sizing={formulaTableSizing} />
-              <th colSpan={ALLOC_COLS.length} className="th-group">Allocated Costs</th>
-              <th colSpan={FORMULA_RESULT_KEYS.length} className="th-group th-final">Formula Check</th>
-              <ResizableHeader className="th-final" columnKey="status" label="Status" rowSpan={2} sizing={formulaTableSizing} />
-            </tr>
-            <tr>
-              {ALLOC_COLS.map((column) => (
-                <ResizableHeader columnKey={`alloc-${column.key}`} key={column.key} label={column.label} sizing={formulaTableSizing} />
-              ))}
-              {FORMULA_RESULT_KEYS.map((key) => (
-                <ResizableHeader
-                  className="th-final"
-                  columnKey={getFinalResultColumnKey(key)}
-                  key={key}
-                  label={FINAL_RESULT_COL_BY_KEY.get(key)?.label ?? key}
-                  sizing={formulaTableSizing}
-                />
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {preview.lines.map((result, index) => {
-              const source = sourceByKey.get(result.lineKey);
-              if (!source) return null;
-              return (
-                <FormulaResultRow
-                  key={result.lineKey}
-                  finalResult={getFinalResultForLine(result)}
-                  index={index}
-                  result={result}
-                  source={source}
-                  costs={costs}
-                  tableSizing={formulaTableSizing}
-                  onEdit={onEdit}
-                />
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  return (
-    <div className="table-scroll">
-      <table
-        className="prototype-table final-preview-table"
-        data-resizable-table={fullTableSizing.tableId}
-        style={fullTableSizing.tableStyle}
-      >
-        <colgroup>
-          {FINAL_PREVIEW_TABLE_COLUMNS.map((column) => (
-            <col key={column.key} style={fullTableSizing.getColumnStyle(column.key)} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr>
-            <ResizableHeader columnKey="rowNo" label="No" rowSpan={2} sizing={fullTableSizing} />
-            <ResizableHeader columnKey="itemGroup" label="Group" rowSpan={2} sizing={fullTableSizing} />
-            <ResizableHeader columnKey="supplierOrderCode" label="Supp Order Code" rowSpan={2} sizing={fullTableSizing} />
-            <ResizableHeader columnKey="description" label="Description" rowSpan={2} sizing={fullTableSizing} />
-            <ResizableHeader columnKey="qty" label="Qty" rowSpan={2} sizing={fullTableSizing} />
-            <ResizableHeader columnKey="uom" label="UOM" rowSpan={2} sizing={fullTableSizing} />
-            <ResizableHeader columnKey="amount" label="Amount" rowSpan={2} sizing={fullTableSizing} />
-            <th colSpan={ALLOC_COLS.length} className="th-group">Allocated Costs</th>
-            <th colSpan={FINAL_RESULT_COLS.length} className="th-group th-final">Final Result (one row = one item/term)</th>
-            <ResizableHeader className="th-final" columnKey="status" label="Status" rowSpan={2} sizing={fullTableSizing} />
-          </tr>
-          <tr>
-            {ALLOC_COLS.map((column) => (
-              <ResizableHeader columnKey={`alloc-${column.key}`} key={column.key} label={column.label} sizing={fullTableSizing} />
-            ))}
-            {FINAL_RESULT_COLS.map((column) => (
-              <ResizableHeader className="th-final" columnKey={getFinalResultColumnKey(column.key)} key={column.key} label={column.label} sizing={fullTableSizing} />
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {preview.lines.map((result, index) => {
-            const source = sourceByKey.get(result.lineKey);
-            if (!source) return null;
-            return (
-              <PreviewRow
-                key={result.lineKey}
-                index={index}
-                source={source}
-                result={result}
-                finalResult={getFinalResultForLine(result)}
-                onEdit={onEdit}
-                tableSizing={fullTableSizing}
-              />
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ReviewResultRow({
-  index,
-  source,
-  result,
-  finalResult,
-  onEdit,
-  onOpenDraftPreview,
-  tableSizing,
-}: {
-  index: number;
-  source: AllocationLineSource;
-  result: AllocationLineResult;
-  finalResult: FinalResultColumns;
-  onEdit: (lineKey: string, key: FinalResultKey, raw: string) => void;
-  onOpenDraftPreview: (mode: DraftPreviewMode, lineKey: string) => void;
-  tableSizing: ResizableTableSizing;
-}) {
-  return (
-    <tr className={result.status === 'error' ? 'row-error' : result.status === 'warning' ? 'row-warning' : ''}>
-      <td {...tableSizing.getCellProps('rowNo')} className="center-cell">{String(index + 1).padStart(2, '0')}</td>
-      <td {...tableSizing.getCellProps('itemGroup')} className="center-cell">{formatItemGroup(source.itemGroup)}</td>
-      <td {...tableSizing.getCellProps('supplierOrderCode')} className="text-left-cell">{source.supplierOrderCode}</td>
-      <td {...tableSizing.getCellProps('description')} className="text-left-cell">{source.sapDescription}</td>
-      <td {...tableSizing.getCellProps('qty')} className="center-cell">{fmt(source.qty)}</td>
-      <td {...tableSizing.getCellProps('uom')} className="center-cell">{source.uom}</td>
-      {REVIEW_RESULT_KEYS.map((key) => {
-        const column = FINAL_RESULT_COL_BY_KEY.get(key);
-        if (!column) return null;
-        const isSale = SALE_PRICE_KEYS.has(key);
-        return (
-          <td
-            key={key}
-            {...tableSizing.getCellProps(getFinalResultColumnKey(key))}
-            className={`${column.kind === 'number' ? 'numeric-cell' : ''}${isSale ? ' td-sale-price' : ''}`}
-          >
-            <FinalResultCell lineKey={result.lineKey} column={column} value={finalResult[key]} onEdit={onEdit} />
-          </td>
-        );
-      })}
-      <td {...tableSizing.getCellProps('draftPreview')} className="center-cell">
-        <div className="draft-preview-actions">
-          <button
-            className="draft-preview-action"
-            type="button"
-            onClick={() => onOpenDraftPreview('item', result.lineKey)}
-          >
-            Item
-          </button>
-          <button
-            className="draft-preview-action"
-            type="button"
-            onClick={() => onOpenDraftPreview('term', result.lineKey)}
-          >
-            Term
-          </button>
-        </div>
-      </td>
-      <td {...tableSizing.getCellProps('status')} className="center-cell">
-        <StatusCell result={result} />
-      </td>
-    </tr>
-  );
-}
-
-function FormulaResultRow({
-  costs,
-  index,
-  source,
-  result,
-  finalResult,
-  onEdit,
-  tableSizing,
-}: {
-  costs: BulkCostInput;
-  index: number;
-  source: AllocationLineSource;
-  result: AllocationLineResult;
-  finalResult: FinalResultColumns;
-  onEdit: (lineKey: string, key: FinalResultKey, raw: string) => void;
-  tableSizing: ResizableTableSizing;
-}) {
-  const auditCosts = {
-    ...costs,
-    orderTerm: source.orderTerm || costs.orderTerm,
-    location: source.location || costs.location,
-    subLocation: source.subLocation || costs.subLocation,
-    shipModeNo: source.shipModeNo || costs.shipModeNo,
-  };
-  const audit = buildBulkCostFormulaAudit(source, auditCosts, finalResult, { allocationLine: result });
-  const rowClass = audit.status === 'fail' || result.status === 'error'
-    ? 'row-error'
-    : audit.status === 'warn' || result.status === 'warning'
-      ? 'row-warning'
-      : '';
-
-  return (
-    <tr className={rowClass}>
-      <td {...tableSizing.getCellProps('rowNo')} className="center-cell">{String(index + 1).padStart(2, '0')}</td>
-      <td {...tableSizing.getCellProps('itemGroup')} className="center-cell">{formatItemGroup(source.itemGroup)}</td>
-      <td {...tableSizing.getCellProps('supplierOrderCode')} className="text-left-cell">{source.supplierOrderCode}</td>
-      <td {...tableSizing.getCellProps('description')} className="text-left-cell">{source.sapDescription}</td>
-      <td {...tableSizing.getCellProps('qty')} className="center-cell">{fmt(source.qty)}</td>
-      <td {...tableSizing.getCellProps('uom')} className="center-cell">{source.uom}</td>
-      <td {...tableSizing.getCellProps('amount')} className="numeric-cell">{fmt(source.amount)}</td>
-      {ALLOC_COLS.map((column) => (
-        <td key={column.key} {...tableSizing.getCellProps(`alloc-${column.key}`)} className="numeric-cell">
-          {String(column.key).includes('Ratio') ? pct(result[column.key]) : fmt(result[column.key])}
-        </td>
-      ))}
-      {FORMULA_RESULT_KEYS.map((key) => {
-        const column = FINAL_RESULT_COL_BY_KEY.get(key);
-        if (!column) return null;
-        return (
-          <td key={key} {...tableSizing.getCellProps(getFinalResultColumnKey(key))} className={column.kind === 'number' ? 'numeric-cell' : ''}>
-            <FinalResultCell lineKey={result.lineKey} column={column} value={finalResult[key]} onEdit={onEdit} />
-          </td>
-        );
-      })}
-      <td {...tableSizing.getCellProps('status')} className="center-cell">
-        <FormulaAuditStatusCell audit={audit} />
-      </td>
-    </tr>
-  );
-}
-
-function PreviewRow({
-  index,
-  source,
-  result,
-  finalResult,
-  onEdit,
-  tableSizing,
-}: {
-  index: number;
-  source: AllocationLineSource;
-  result: AllocationLineResult;
-  finalResult: FinalResultColumns;
-  onEdit: (lineKey: string, key: FinalResultKey, raw: string) => void;
-  tableSizing: ResizableTableSizing;
-}) {
-  return (
-    <tr className={result.status === 'error' ? 'row-error' : result.status === 'warning' ? 'row-warning' : ''}>
-      <td {...tableSizing.getCellProps('rowNo')} className="center-cell">{String(index + 1).padStart(2, '0')}</td>
-      <td {...tableSizing.getCellProps('itemGroup')} className="center-cell">{formatItemGroup(source.itemGroup)}</td>
-      <td {...tableSizing.getCellProps('supplierOrderCode')} className="text-left-cell">{source.supplierOrderCode}</td>
-      <td {...tableSizing.getCellProps('description')} className="text-left-cell">{source.sapDescription}</td>
-      <td {...tableSizing.getCellProps('qty')} className="center-cell">{fmt(source.qty)}</td>
-      <td {...tableSizing.getCellProps('uom')} className="center-cell">{source.uom}</td>
-      <td {...tableSizing.getCellProps('amount')} className="numeric-cell">{fmt(source.amount)}</td>
-      <td {...tableSizing.getCellProps('alloc-weightRatioPerItem')} className="numeric-cell">{pct(result.weightRatioPerItem)}</td>
-      <td {...tableSizing.getCellProps('alloc-weightRatioPerEach')} className="numeric-cell">{pct(result.weightRatioPerEach)}</td>
-      <td {...tableSizing.getCellProps('alloc-valueRatioPerItem')} className="numeric-cell">{pct(result.valueRatioPerItem)}</td>
-      <td {...tableSizing.getCellProps('alloc-valueRatioPerEach')} className="numeric-cell">{pct(result.valueRatioPerEach)}</td>
-      <td {...tableSizing.getCellProps('alloc-pkhPerEach')} className="numeric-cell">{fmt(result.pkhPerEach)}</td>
-      <td {...tableSizing.getCellProps('alloc-socPerEach')} className="numeric-cell">{fmt(result.socPerEach)}</td>
-      <td {...tableSizing.getCellProps('alloc-freightPerEach')} className="numeric-cell">{fmt(result.freightPerEach)}</td>
-      <td {...tableSizing.getCellProps('alloc-ccPerEach')} className="numeric-cell">{fmt(result.ccPerEach)}</td>
-      <td {...tableSizing.getCellProps('alloc-wireTTPerEach')} className="numeric-cell">{fmt(result.wireTTPerEach)}</td>
-      {FINAL_RESULT_COLS.map((column) => (
-        <td key={column.key} {...tableSizing.getCellProps(getFinalResultColumnKey(column.key))} className={column.kind === 'number' ? 'numeric-cell' : ''}>
-          <FinalResultCell
-            lineKey={result.lineKey}
-            column={column}
-            value={finalResult[column.key]}
-            onEdit={onEdit}
-          />
-        </td>
-      ))}
-      <td {...tableSizing.getCellProps('status')} className="center-cell">
-        <StatusCell result={result} />
-      </td>
-    </tr>
-  );
-}
-
-function DraftPreviewPanel({
-  costs,
-  finalResult,
-  mode,
-  result,
-  source,
-  onClose,
-}: {
-  costs: BulkCostInput;
-  finalResult: FinalResultColumns;
-  mode: DraftPreviewMode;
-  result: AllocationLineResult;
-  source: AllocationLineSource;
-  onClose: () => void;
-}) {
-  const missingFields = mode === 'item'
-    ? getMissingItemDraftFields(source)
-    : getMissingTermDraftFields(source, finalResult);
-  const statusLabel = result.status === 'error'
-    ? 'Needs correction'
-    : missingFields.length > 0
-      ? 'Needs review'
-      : 'Preview ready';
-  const statusClass = result.status === 'error'
-    ? 'error'
-    : missingFields.length > 0
-      ? 'warning'
-      : result.status;
-
-  return (
-    <div className="draft-preview-panel" aria-label={`${mode === 'item' ? 'Item' : 'Term'} draft preview`}>
-      <div className="draft-preview-header">
-        <div>
-          <p className="eyebrow">Post-CAL Draft</p>
-          <h3>{mode === 'item' ? 'Item Draft Preview' : 'Term Draft Preview'}</h3>
-          <span>
-            Row {String(source.no).padStart(2, '0')} - {source.sapDescription}
-          </span>
-        </div>
-        <button className="draft-preview-close" type="button" onClick={onClose}>
-          Close
-        </button>
-      </div>
-
-      <div className="draft-preview-status-row">
-        <span className={`draft-preview-status ${statusClass}`}>
-          {statusLabel}
-        </span>
-        <span>Save State: Not saved</span>
-        <span>Mode: Read-only preview</span>
-        <span>Missing: {missingFields.length > 0 ? missingFields.join(', ') : '-'}</span>
-      </div>
-
-      {mode === 'item' ? (
-        <ItemDraftPreview source={source} />
-      ) : (
-        <TermDraftPreview costs={costs} finalResult={finalResult} result={result} source={source} />
-      )}
-    </div>
-  );
-}
-
-function ItemDraftPreview({ source }: { source: AllocationLineSource }) {
-  return (
-    <div className="draft-preview-content">
-      <DraftPreviewSection title="Item Master">
-        <DraftPreviewField label="Match" value={formatMatchStatus(source.itemCode)} />
-        <DraftPreviewField label="Item Code" value={source.itemCode.trim() || 'Auto-generated later'} />
-        <DraftPreviewField label="Group" value={formatItemGroup(source.itemGroup)} />
-        <DraftPreviewField label="Category" value={source.itemCategory} />
-        <DraftPreviewField label="Mfr Brand" value={source.manufacturer} />
-        <DraftPreviewField label="Mfr Catalog No" value={source.mfgPartNumber} />
-        <DraftPreviewField label="Stock UOM" value={source.uom} />
-        <DraftPreviewField label="Active" value="Yes" />
-        <DraftPreviewField wide label="Item Description" value={source.sapDescription} />
-      </DraftPreviewSection>
-
-      <DraftPreviewSection title="Compliance and Reference">
-        <DraftPreviewField label="HS Code" value={source.hsCode} />
-        <DraftPreviewField label="Country of Origin" value={source.countryOfOrigin} />
-        <DraftPreviewField label="Permit" value={formatYesNo(source.importPermit)} />
-        <DraftPreviewField label="Shelf Life" value={formatYesNo(source.shelfLifeRequire)} />
-      </DraftPreviewSection>
-    </div>
-  );
-}
-
-function TermDraftPreview({
-  costs,
-  finalResult,
-  result,
-  source,
-}: {
-  costs: BulkCostInput;
-  finalResult: FinalResultColumns;
-  result: AllocationLineResult;
-  source: AllocationLineSource;
-}) {
-  return (
-    <div className="draft-preview-content">
-      <DraftPreviewSection title="Term Context">
-        <DraftPreviewField label="Supplier" value={finalResult.supplierName || source.vendorName} />
-        <DraftPreviewField label="Supp Order Code" value={source.supplierOrderCode} />
-        <DraftPreviewField label="Purchase Term" value={finalResult.purchaseOrderTerm} />
-        <DraftPreviewField label="Location" value={finalResult.termLocation} />
-        <DraftPreviewField label="Ship Mode" value={formatShipMode(source.shipModeNo || costs.shipModeNo)} />
-        <DraftPreviewField label="Sales Term" value={source.salesTerm || ''} />
-        <DraftPreviewField label="Sales Sub Loc" value={source.salesSubLocation || ''} />
-        <DraftPreviewField label="Lead Time" value={source.deliveryLeadTime} />
-        <DraftPreviewField label="Sale Incharge" value={costs.saleIncharge} />
-        <DraftPreviewField label="Contact Person" value={costs.contactPerson} />
-      </DraftPreviewSection>
-
-      <DraftPreviewSection title="Line Source">
-        <DraftPreviewField label="Qty" value={fmt(source.qty)} />
-        <DraftPreviewField label="UOM" value={source.uom} />
-        <DraftPreviewField label="Unit Price" value={fmt(source.unitPrice)} />
-        <DraftPreviewField label="Amount" value={`${source.currency} ${fmt(source.amount)}`} />
-        <DraftPreviewField label="Currency" value={finalResult.currency} />
-        <DraftPreviewField label="Exchange Rate" value={fmt(finalResult.rateExchange)} />
-      </DraftPreviewSection>
-
-      <DraftPreviewSection title="Cost Result">
-        <DraftPreviewField label="PCS" value={fmt(finalResult.productCost)} />
-        <DraftPreviewField label="PKH" value={fmt(finalResult.pkh)} />
-        <DraftPreviewField label="SOC" value={fmt(finalResult.soc)} />
-        <DraftPreviewField label="COC" value={fmt(finalResult.docCOC)} />
-        <DraftPreviewField label="Mill" value={fmt(finalResult.docMill)} />
-        <DraftPreviewField label="Test Cert" value={fmt(finalResult.docTestCert)} />
-        <DraftPreviewField label="COO/COA" value={fmt(finalResult.docCOO)} />
-        <DraftPreviewField label="Any Other" value={fmt(finalResult.docAnyOther)} />
-        <DraftPreviewField label="OP1 (PSC)" value={fmt(finalResult.op1Source)} />
-        <DraftPreviewField label="OP1 (THB)" value={fmt(finalResult.op1)} />
-        <DraftPreviewField label="OP2 (THB)" value={fmt(finalResult.op2)} />
-        <DraftPreviewField label="Round Up" value={fmt(finalResult.roundUp)} />
-      </DraftPreviewSection>
-
-      <DraftPreviewSection title="Weight, Duty, and QLC">
-        <DraftPreviewField label="Item Wt/Ea" value={fmt(source.itemWeightPerEach)} />
-        <DraftPreviewField label="Dim Wt/Ea" value={fmt(source.dimensionWeightPerEach)} />
-        <DraftPreviewField label="Chargeable Wt/Ea" value={fmt(getChargeableWeightPerEach(source))} />
-        <DraftPreviewField label="Ship Wt/Ea" value={fmt(finalResult.shipWeightCal)} />
-        <DraftPreviewField label="Duty %" value={fmt(finalResult.importDutyPercent)} />
-        <DraftPreviewField label="Insurance %" value={fmt(finalResult.insPercent)} />
-        <DraftPreviewField label="FR QTEC" value={fmt(finalResult.frQTEC)} />
-        <DraftPreviewField label="Zone Rate" value={fmt(finalResult.frZoneRate)} />
-        <DraftPreviewField label="TT (THB)" value={fmt(finalResult.wireTT)} />
-        <DraftPreviewField label="CC (THB)" value={fmt(finalResult.customClear)} />
-        <DraftPreviewField label="QLC" value={fmt(finalResult.qlc)} />
-        <DraftPreviewField label="SPK (THB)" value={fmt(finalResult.spk)} />
-        <DraftPreviewField label="QOC (THB)" value={fmt(finalResult.qocVal)} />
-        <DraftPreviewField label="Total QLC" value={fmt(finalResult.totalQLC)} />
-        <DraftPreviewField label="Markup" value={fmt(finalResult.markup)} />
-      </DraftPreviewSection>
-
-      <DraftPreviewSection title="UOM and Conversion">
-        <DraftPreviewField label="Purchase UOM" value={finalResult.purchaseUOM} />
-        <DraftPreviewField label="Stock UOM" value={finalResult.stockUOM} />
-        <DraftPreviewField label="Sales UOM" value={finalResult.saleUOM} />
-        <DraftPreviewField label="Stock Conversion" value={fmt(finalResult.stockConversion)} />
-        <DraftPreviewField label="Sales Conversion" value={fmt(finalResult.saleConversion)} />
-        <DraftPreviewField label="MOQ" value={fmt(finalResult.purchaseMOQ)} />
-      </DraftPreviewSection>
-
-      {result.warnings.length > 0 && (
-        <DraftPreviewSection title="Warnings">
-          <DraftPreviewField
-            wide
-            label="Calculation Warnings"
-            value={result.warnings.map((warning) => warning.message).join('; ')}
-          />
-        </DraftPreviewSection>
-      )}
-    </div>
-  );
-}
-
-function DraftPreviewSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="draft-preview-section">
-      <h4>{title}</h4>
-      <div className="draft-preview-grid">{children}</div>
-    </section>
-  );
-}
-
-function DraftPreviewField({
-  label,
-  value,
-  wide = false,
-}: {
-  label: string;
-  value: ReactNode;
-  wide?: boolean;
-}) {
-  const normalizedValue = typeof value === 'string' ? formatDraftText(value) : value;
-  return (
-    <div className={`draft-preview-field ${wide ? 'draft-preview-field-wide' : ''}`}>
-      <span>{label}</span>
-      <strong>{normalizedValue}</strong>
-    </div>
-  );
-}
-
-function getMissingItemDraftFields(source: AllocationLineSource): string[] {
-  const missing: string[] = [];
-  if (!source.itemGroup.trim()) missing.push('Group');
-  if (!source.sapDescription.trim()) missing.push('Description');
-  if (!source.manufacturer.trim()) missing.push('Mfr Brand');
-  if (!source.mfgPartNumber.trim()) missing.push('Mfr Catalog No');
-  if (!source.uom.trim()) missing.push('UOM');
-  return missing;
-}
-
-function getMissingTermDraftFields(source: AllocationLineSource, finalResult: FinalResultColumns): string[] {
-  const missing: string[] = [];
-  if (!source.supplierOrderCode.trim()) missing.push('Supp Order Code');
-  if (!finalResult.purchaseOrderTerm.trim()) missing.push('Purchase Term');
-  if (!finalResult.termLocation.trim()) missing.push('Location');
-  if (!source.deliveryLeadTime.trim()) missing.push('Lead Time');
-  if (!finalResult.currency.trim()) missing.push('Currency');
-  if (!Number.isFinite(finalResult.rateExchange) || finalResult.rateExchange <= 0) missing.push('Exchange Rate');
-  if (!Number.isFinite(finalResult.productCost) || finalResult.productCost <= 0) missing.push('PCS');
-  return missing;
-}
-
-function formatDraftText(value: string): string {
-  const trimmed = value.trim();
-  return trimmed || '-';
-}
-
-function FinalResultCell({
-  lineKey,
-  column,
-  value,
-  onEdit,
-}: {
-  lineKey: string;
-  column: FinalResultColumnDefinition;
-  value: FinalResultColumns[FinalResultKey];
-  onEdit: (lineKey: string, key: FinalResultKey, raw: string) => void;
-}) {
-  if (column.kind === 'number' && column.editable) {
-    const numericValue = typeof value === 'number' ? value : 0;
-    return (
-      <FormattedNumberInput
-        id={`preview-${lineKey}-${column.key}`}
-        name={`preview.${lineKey}.${column.key}`}
-        className="preview-edit-input"
-        value={numericValue}
-        onChange={(event) => onEdit(lineKey, column.key, event.target.value)}
-        aria-label={`${column.label} for ${lineKey}`}
-      />
-    );
-  }
-
-  if (typeof value === 'number') return <span>{fmt(value)}</span>;
-  return <span>{value ?? '-'}</span>;
-}
-
-function StatusCell({ result }: { result: AllocationLineResult }) {
-  if (result.status === 'error') {
-    return (
-      <span className="table-warning" title={result.warnings.map((warning) => warning.message).join('\n')}>
-        <XCircle size={14} aria-hidden="true" />
-        Error
-      </span>
-    );
-  }
-  if (result.status === 'warning') {
-    return (
-      <span className="table-warning" title={result.warnings.map((warning) => warning.message).join('\n')}>
-        <AlertTriangle size={14} aria-hidden="true" />
-        Warning
-      </span>
-    );
-  }
-  return (
-    <span className="table-ok">
-      <CheckCircle2 size={14} aria-hidden="true" />
-      Ready
-    </span>
-  );
-}
-
-function FormulaAuditStatusCell({ audit }: { audit: ReturnType<typeof buildBulkCostFormulaAudit> }) {
-  const title = audit.rows
-    .filter((row) => row.status !== 'pass')
-    .map((row) => `${row.label}: expected ${fmtAuditValue(row.expectedValue)}, actual ${fmtAuditValue(row.actualValue)}${row.note ? ` - ${row.note}` : ''}`)
-    .join('\n');
-
-  if (audit.status === 'fail') {
-    return (
-      <span className="table-error" title={title || 'Formula audit failed'}>
-        <XCircle size={14} aria-hidden="true" />
-        Fail ({audit.failCount})
-      </span>
-    );
-  }
-  if (audit.status === 'warn') {
-    return (
-      <span className="table-warning" title={title || 'Formula audit has warnings'}>
-        <AlertTriangle size={14} aria-hidden="true" />
-        Warn ({audit.warnCount})
-      </span>
-    );
-  }
-  return (
-    <span className="table-ok" title="Formula audit passed">
-      <CheckCircle2 size={14} aria-hidden="true" />
-      Pass
-    </span>
-  );
-}
-
-function fmt(value: number | null | undefined): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '-';
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtAuditValue(value: number | string | null): string {
-  if (typeof value === 'number') return fmt(value);
-  return value ?? '-';
-}
-
-function fmtPlain(value: number | null | undefined): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '';
-  return fmt(value);
-}
-
-function fmtNullablePlain(value: number | null | undefined): string {
-  return value === null || value === undefined ? '' : fmtPlain(value);
-}
-
-function formatDisplayNumber(value: number | null | undefined, nullable = false): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return nullable ? '' : '0.00';
-  return fmt(value);
-}
-
-function formatMatchStatus(itemCode: string): string {
-  return itemCode.trim() ? 'Existing' : 'New Item';
-}
-
-function toEditableNumber(value: number | null | undefined): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '';
-  return String(round6(value));
-}
-
-function pct(value: number): string {
-  return `${(value * 100).toFixed(2)}%`;
 }

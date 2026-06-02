@@ -88,6 +88,7 @@ interface DraftItemLineRow {
     LineKey: string;
     LatestSnapshotJson: string | null;
     OriginSnapshotJson: string | null;
+    SubLocation: string | null;
 }
 
 interface RevisionContext {
@@ -401,6 +402,7 @@ export async function createBulkCostRun(
             termRequest.input('U_Height', sql.Decimal(19, 6), numberValue(latest.height, 0));
             termRequest.input('U_Weight', sql.Decimal(19, 6), numberValue(latest.itemWeightPerEach, 0));
             termRequest.input('U_CWeight', sql.Decimal(19, 6), numberValue(latest.dimensionWeightPerEach, 0));
+            termRequest.input('U_FreightType', sql.NVarChar(30), nullableText(latest.freightType));
             termRequest.input('U_FreightRate', sql.Decimal(19, 6), numberValue(latest.freightRate, 0));
             termRequest.input('U_FR', sql.Decimal(19, 6), freightFields.uFr);
             termRequest.input('INS_Percent', sql.Decimal(19, 6), numberValue(latest.insPercent, 0));
@@ -413,8 +415,8 @@ export async function createBulkCostRun(
             termRequest.input('U_ASP', sql.Decimal(19, 6), numberValue(latest.scc, 0));
             termRequest.input('U_STK_Percent', sql.Decimal(19, 6), numberValue(latest.stkPercent, 0));
             termRequest.input('U_MK_Percent', sql.Decimal(19, 6), numberValue(latest.markupPercent, 0));
-            termRequest.input('U_SPK', sql.Decimal(19, 6), numberValue(latest.sspk, 0));
-            termRequest.input('U_QOC', sql.Decimal(19, 6), numberValue(latest.qoc, 0));
+            termRequest.input('U_SPK', sql.Decimal(19, 6), numberValue(finalResult.spk, 0));
+            termRequest.input('U_QOC', sql.Decimal(19, 6), numberValue(finalResult.qocVal, 0));
             termRequest.input('BuyUnitMsr', sql.NVarChar(20), nullableText(latest.purchaseUOM));
             termRequest.input('NumInBuy', sql.Decimal(19, 6), numberValue(latest.stockConversion, 1));
             termRequest.input('SalUnitMsr', sql.NVarChar(20), nullableText(latest.saleUOM));
@@ -454,7 +456,13 @@ export async function createBulkCostRun(
         await transaction.commit();
         return toSavedRun(runRow, data.lines.length);
     } catch (err) {
-        await transaction.rollback();
+        try {
+            await transaction.rollback();
+        } catch {
+            // Preserve the original SQL/write error. mssql can throw a secondary
+            // "Transaction has been aborted" during rollback, which hides the
+            // real constraint or conversion failure that needs fixing.
+        }
         throw err;
     }
 }
@@ -522,6 +530,7 @@ export async function loadBulkCostRun(runId: number): Promise<LoadedBulkCostRun 
     const pool = await getPool();
     const runTable = dbObjects.tables.qtec.bulkCostRun;
     const itemTable = dbObjects.tables.qtec.draftItem;
+    const termTable = dbObjects.tables.qtec.draftTerm;
     const runRequest = pool.request().input('RunID', sql.BigInt, runId);
     const lineRequest = pool.request().input('RunIDL', sql.BigInt, runId);
 
@@ -537,10 +546,18 @@ export async function loadBulkCostRun(runId: number): Promise<LoadedBulkCostRun 
             WHERE [RunID] = @RunID
         `),
         lineRequest.query<DraftItemLineRow>(`
-            SELECT [LineNo], [LineKey], [LatestSnapshotJson], [OriginSnapshotJson]
-            FROM ${itemTable}
-            WHERE [RunID] = @RunIDL
-            ORDER BY [LineNo]
+            SELECT
+                di.[LineNo],
+                di.[LineKey],
+                di.[LatestSnapshotJson],
+                di.[OriginSnapshotJson],
+                dt.[SubLocation]
+            FROM ${itemTable} di
+            LEFT JOIN ${termTable} dt
+                ON dt.[RunID] = di.[RunID]
+               AND dt.[LineKey] = di.[LineKey]
+            WHERE di.[RunID] = @RunIDL
+            ORDER BY di.[LineNo]
         `),
     ]);
 
@@ -559,6 +576,7 @@ export async function loadBulkCostRun(runId: number): Promise<LoadedBulkCostRun 
         remark: text(runRow.Remark),
         orderTerm: text(runRow.OrderTerm),
         location: text(runRow.Location),
+        subLocation: text(lineResult.recordset.find((line) => text(line.SubLocation))?.SubLocation),
         shipModeNo: runRow.ShipModeNo ?? -1,
         contactPerson: text(runRow.ContactPerson),
         saleIncharge: text(runRow.SaleIncharge),
@@ -575,12 +593,18 @@ export async function loadBulkCostRun(runId: number): Promise<LoadedBulkCostRun 
         referenceNo: text(runRow.ReferenceNo),
         inputSnapshot: { costs: costsSnapshot },
         previewSnapshot: parseJson(runRow.PreviewSnapshotJson),
-        lines: lineResult.recordset.map((line) => ({
-            lineNo: line.LineNo,
-            lineKey: line.LineKey,
-            latestSnapshot: parseJson(line.LatestSnapshotJson) ?? {},
-            originSnapshot: parseJson(line.OriginSnapshotJson),
-        })),
+        lines: lineResult.recordset.map((line) => {
+            const latestSnapshot = parseJson(line.LatestSnapshotJson) ?? {};
+            if (!text(latestSnapshot.subLocation) && text(line.SubLocation)) {
+                latestSnapshot.subLocation = text(line.SubLocation);
+            }
+            return {
+                lineNo: line.LineNo,
+                lineKey: line.LineKey,
+                latestSnapshot,
+                originSnapshot: parseJson(line.OriginSnapshotJson),
+            };
+        }),
     };
 }
 

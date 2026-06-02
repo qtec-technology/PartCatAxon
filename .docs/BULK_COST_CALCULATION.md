@@ -77,6 +77,14 @@ allocatedCostItem  = totalCost × weightRatioPerItem   (last line gets residual)
 allocatedCostEach  = allocatedCostItem / qty
 ```
 
+> [!WARNING]
+> **Excel Unit-Weight Allocation Bug (Detected during E2E testing on 2026-05-29)**
+> During automated Playwright E2E verification using `.datatest/Example_Cal_Cost.xlsx`, a critical formula bug was discovered in the customer's Excel sheet.
+> Weight-based allocations (PKH, SOC, Freight, Customs Fee) in Excel incorrectly use the ratio of *unit weights* (`shippingWeightPerEach / SUM(shippingWeightPerEach)`) instead of *total line weights* (`(shippingWeightPerEach * qty) / SUM(shippingWeightPerEach * qty)`).
+> This means quantity has no effect on weight allocation in the Excel sheet, which is mathematically and physically incorrect (e.g., a line with 10 units taking 10 times more physical weight is allocated costs as if it were only 1 unit).
+>
+> The web application's calculation engine correctly utilizes total-weight-based allocation as the authoritative source of truth. When verified against a corrected mathematical model, the API outputs match with **0.0000 THB deviation**.
+
 ### 3.2 Value-Based Allocation (Wire TT / Bank Fee)
 
 ```text

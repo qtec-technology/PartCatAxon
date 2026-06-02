@@ -9,22 +9,22 @@ import type { ResizableTableColumn } from './useResizableTableColumns';
 
 const ALLOCATION_TABLE_COLUMNS: ResizableTableColumn[] = [
   { key: 'runId',       defaultWidth: 92,  minWidth: 72 },
+  { key: 'referenceNo', defaultWidth: 160, minWidth: 80 },
   { key: 'supplier',    defaultWidth: 220, minWidth: 100 },
   { key: 'vendorCode',  defaultWidth: 100, minWidth: 60 },
   { key: 'lines',       defaultWidth: 60,  minWidth: 50 },
   { key: 'amount',      defaultWidth: 130, minWidth: 80 },
   { key: 'currency',    defaultWidth: 80,  minWidth: 60 },
-  { key: 'updatedAt',   defaultWidth: 110, minWidth: 80 },
+  { key: 'updatedAt',   defaultWidth: 160, minWidth: 120 },
   { key: 'updatedBy',   defaultWidth: 120, minWidth: 80 },
   { key: 'status',      defaultWidth: 170, minWidth: 150 },
-  { key: 'referenceNo', defaultWidth: 160, minWidth: 80 },
   { key: 'action',      defaultWidth: 80,  minWidth: 70 },
 ];
 
 const COL_LABELS: Record<string, string> = {
-  runId: 'Run / Rev', supplier: 'Supplier', vendorCode: 'Code', lines: 'Lines',
-  amount: 'Total Amount', currency: 'Currency', updatedAt: 'Updated',
-  updatedBy: 'Updated By', status: 'Status', referenceNo: 'Reference No.', action: '',
+  runId: 'Run / Rev', referenceNo: 'Chain ID', supplier: 'Supplier', vendorCode: 'Code', lines: 'Lines',
+  amount: 'Total Amount', currency: 'Currency', updatedAt: 'Updated Date',
+  updatedBy: 'Updated By', status: 'Status', action: '',
 };
 
 type WorkspaceRunSummaryCard = {
@@ -46,7 +46,10 @@ function formatDate(iso: string): string {
   const day = String(d.getDate()).padStart(2, '0');
   const month = d.toLocaleString('en-US', { month: 'short' });
   const year = d.getFullYear();
-  return `${day}-${month}-${year}`;
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
 }
 
 interface AllocationListProps {
@@ -293,6 +296,9 @@ export function AllocationList({ onOpen }: AllocationListProps) {
                           <td className="center-cell allocation-list-run-id" {...tableSizing.getCellProps('runId')}>
                             #{run.runId} / R{run.revisionNo}
                           </td>
+                          <td className="text-left-cell" {...tableSizing.getCellProps('referenceNo')}>
+                            {run.referenceNo || <span style={{ color: 'var(--pc-muted)' }}>—</span>}
+                          </td>
                           <td className="text-left-cell" {...tableSizing.getCellProps('supplier')}>{run.vendorName || run.vendorCode}</td>
                           <td className="text-left-cell allocation-list-vendor-code-cell" {...tableSizing.getCellProps('vendorCode')}>{run.vendorCode}</td>
                           <td className="center-cell" {...tableSizing.getCellProps('lines')}>{run.totalLines}</td>
@@ -302,9 +308,6 @@ export function AllocationList({ onOpen }: AllocationListProps) {
                           <td className="center-cell" {...tableSizing.getCellProps('updatedBy')}>{run.updatedBy}</td>
                           <td className="center-cell" {...tableSizing.getCellProps('status')}>
                             <RunStatusBadge status={run.status} />
-                          </td>
-                          <td className="text-left-cell" {...tableSizing.getCellProps('referenceNo')}>
-                            {run.referenceNo || <span style={{ color: 'var(--pc-muted)' }}>—</span>}
                           </td>
                           <td className="center-cell" {...tableSizing.getCellProps('action')}>
                             <button

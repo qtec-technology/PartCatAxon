@@ -402,14 +402,14 @@ export function CategoryBrandView() {
       {/* Filter Section */}
       <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2 min-w-0">
-          <label htmlFor={categoryInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">Category:</label>
+          <label htmlFor={categoryInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">หมวดหมู่ (Category):</label>
           <Select
             key={selectedCategory ? 'category-selected' : 'category-empty'}
             value={selectedCategory || ''}
             onValueChange={handleCategoryChange}
           >
             <SelectTrigger id={categoryInputId} name="categorySearch" className="w-[220px] sm:w-[280px] h-10 bg-white border-gray-300 text-base">
-              <SelectValue placeholder="Please select category" />
+              <SelectValue placeholder="กรุณาเลือกหมวดหมู่" />
             </SelectTrigger>
             <SelectContent>
               {categoryOptions.map((cat) => (
@@ -419,7 +419,7 @@ export function CategoryBrandView() {
           </Select>
         </div>
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <label htmlFor={brandInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">Brand:</label>
+          <label htmlFor={brandInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">แบรนด์ (Brand):</label>
           <div className="relative w-full sm:w-[360px] max-w-full" ref={brandRef}>
               <input
                 id={brandInputId}
@@ -427,7 +427,7 @@ export function CategoryBrandView() {
                 aria-label="Brand search by category"
                 type="text"
                 value={brandInput}
-                placeholder={selectedCategory ? 'Please select brand' : 'Select category first'}
+                placeholder={selectedCategory ? 'กรุณาเลือกแบรนด์' : 'กรุณาเลือกหมวดหมู่ก่อน'}
                 disabled={!selectedCategory || loadingBrands}
                 onChange={(event) => {
                   const next = event.target.value;
@@ -464,7 +464,7 @@ export function CategoryBrandView() {
                   </div>
                 ))}
                 {filteredBrands.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-400 text-center">No brand found</div>
+                  <div className="px-3 py-2 text-sm text-gray-400 text-center">ไม่พบแบรนด์</div>
                 )}
               </div>
             )}
@@ -472,18 +472,18 @@ export function CategoryBrandView() {
         </div>
         <div className="text-base text-gray-500 ml-auto flex items-center gap-2 w-full lg:w-auto lg:justify-end">
           {(selectedCategory || selectedBrand) && (
-            <button onClick={handleClearAll} className="text-sm text-blue-600 hover:underline">Clear Filter</button>
+            <button onClick={handleClearAll} className="text-sm text-blue-600 hover:underline">ล้างตัวกรอง</button>
           )}
           <span>
             {loadingMap
-              ? 'Loading category list...'
+              ? 'กำลังโหลดข้อมูลหมวดหมู่...'
               : loadingBrands
-                ? 'Loading brand list...'
+                ? 'กำลังโหลดรายชื่อแบรนด์...'
               : !selectedCategory
-                ? 'Please select category first'
+                ? 'กรุณาเลือกหมวดหมู่ก่อน'
                 : !selectedBrand
-                  ? 'Please select brand'
-                  : `${totalItems} vendors found`}
+                  ? 'กรุณาเลือกแบรนด์'
+                  : `พบผู้จัดจำหน่าย ${totalItems} ราย`}
           </span>
         </div>
       </div>
@@ -525,25 +525,25 @@ export function CategoryBrandView() {
             {loading ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  Loading...
+                  กำลังโหลดข้อมูล...
                 </td>
               </tr>
             ) : !selectedCategory ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  Please select category first.
+                  กรุณาเลือกหมวดหมู่ก่อน
                 </td>
               </tr>
             ) : !selectedBrand ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  Please select brand.
+                  กรุณาเลือกแบรนด์
                 </td>
               </tr>
             ) : paginatedItems.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  No vendors found.
+                  ไม่พบรายชื่อผู้จัดจำหน่าย
                 </td>
               </tr>
             ) : (
@@ -573,8 +573,8 @@ export function CategoryBrandView() {
       <div className="flex items-center justify-between px-4 py-2 border-t border-[#DDDDDD] bg-white text-sm" style={{ flexShrink: 0 }}>
         <span className="text-xs text-gray-500">
           {selectedBrand && totalItems > 0
-            ? `Showing ${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalItems)} of ${totalItems} vendors`
-            : 'No vendors'}
+            ? `แสดง ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, totalItems)} จากทั้งหมด ${totalItems} ผู้จัดจำหน่าย`
+            : 'ไม่พบผู้จัดจำหน่าย'}
         </span>
 
         <div className="flex items-center gap-1">
@@ -630,7 +630,7 @@ export function CategoryBrandView() {
           </Button>
         </div>
 
-        <span className="text-xs text-gray-400">{pageSize} per page</span>
+        <span className="text-xs text-gray-400">{pageSize} รายการต่อหน้า</span>
       </div>
     </div>
   );

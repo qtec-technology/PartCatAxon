@@ -54,7 +54,7 @@ function makeLine(overrides: Partial<AllocationLineSource> = {}): AllocationLine
     saleUOM: 'EA',
     stockConversion: 1,
     saleConversion: 1,
-    moq: 100,
+    moq: '100',
     insPercent: 0.5,
     shipModeNo: 1,
     freightRate: 120,
@@ -68,8 +68,8 @@ function makeLine(overrides: Partial<AllocationLineSource> = {}): AllocationLine
     scc: 0,
     stkPercent: 0,
     markupPercent: 15,
-    sspk: 0,
-    qoc: 0,
+    spkPercent: 0,
+    qocRate: 0,
     ...overrides,
     customerStockCode: overrides.customerStockCode ?? '',
     permitType: overrides.permitType ?? '',
@@ -291,7 +291,7 @@ describe('Final Result (OP1 → Round Up)', () => {
   });
 
   it('should compute markup and round up correctly', () => {
-    const lines = [makeLine({ markupPercent: 20, unitPrice: 10, stockConversion: 1, saleConversion: 1, sspk: 0, qoc: 0 })];
+    const lines = [makeLine({ markupPercent: 20, unitPrice: 10, stockConversion: 1, saleConversion: 1, spkPercent: 0, qocRate: 0 })];
     const costs = makeCosts({ pkh: 0, soc: 0, freight: 0, customs: 0, wireTT: 0, exchangeRate: 1 });
     const result = calculateAllocationPreview(lines, costs);
     const fr = result.lines[0].finalResult;
@@ -304,24 +304,26 @@ describe('Final Result (OP1 → Round Up)', () => {
     }
   });
 
-  it('treats SPK as a THB amount added after QLC conversion, not a percentage', () => {
+  it('treats SPK as a percentage of QLC, and QOC as a rate per shipping weight', () => {
     const lines = [makeLine({
-      unitPrice: 123,
+      unitPrice: 100,
       qty: 1,
       stockConversion: 1,
       saleConversion: 1,
-      sspk: 5,
-      qoc: 2,
+      spkPercent: 5,
+      qocRate: 2,
       markupPercent: 0,
       insPercent: 0,
       importDutyPercent: 0,
+      itemWeightPerEach: 10,
     })];
     const costs = makeCosts({ pkh: 0, soc: 0, freight: 0, customs: 0, wireTT: 0, exchangeRate: 1 });
     const result = calculateAllocationPreview(lines, costs);
     const fr = result.lines[0].finalResult;
 
-    expect(fr.totalQLC).toBeCloseTo(fr.qlc + 5 + 2, 4);
-    expect(fr.totalQLC).not.toBeCloseTo(fr.qlc * 1.05 + 2, 4);
+    expect(fr.spk).toBeCloseTo(5, 4);
+    expect(fr.qocVal).toBeCloseTo(20, 4);
+    expect(fr.totalQLC).toBeCloseTo(125, 4);
   });
 
   it('should pass through doc fees from source line', () => {

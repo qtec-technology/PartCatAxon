@@ -262,7 +262,7 @@ export function BrandVendorView() {
       {/* Filter Section */}
       <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <label htmlFor={brandInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">Brand Search:</label>
+          <label htmlFor={brandInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">ค้นหาแบรนด์ (Brand Search):</label>
           <div className="relative w-full sm:w-[360px] max-w-full" ref={brandRef}>
             <input
               id={brandInputId}
@@ -292,7 +292,7 @@ export function BrandVendorView() {
                     className="px-3 py-2 text-sm cursor-pointer hover:bg-[#E8F0F8] text-[#2264A0] border-b border-[#EEF4FA]"
                     onClick={handleClearBrand}
                   >
-                    Clear selection
+                    ล้างข้อมูลที่เลือก
                   </div>
                 )}
                 {filteredBrands.map((brand) => (
@@ -313,9 +313,9 @@ export function BrandVendorView() {
         </div>
         <div className="text-base text-gray-500 ml-auto flex items-center gap-2 w-full sm:w-auto sm:justify-end">
           {selectedBrand && (
-            <button onClick={handleClearBrand} className="text-sm text-blue-600 hover:underline">Clear Filter</button>
+            <button onClick={handleClearBrand} className="text-sm text-blue-600 hover:underline">ล้างตัวกรอง</button>
           )}
-          <span>{selectedBrand ? `${totalItems} vendors found` : 'Please select a brand to search'}</span>
+          <span>{selectedBrand ? `พบผู้จัดจำหน่าย ${totalItems} ราย` : 'กรุณาเลือกแบรนด์เพื่อแสดงรายชื่อผู้จัดจำหน่าย'}</span>
         </div>
       </div>
 
@@ -356,19 +356,19 @@ export function BrandVendorView() {
             {loading ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  Loading...
+                  กำลังโหลดข้อมูล...
                 </td>
               </tr>
             ) : !selectedBrand ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  Please select a brand to search.
+                  กรุณาเลือกแบรนด์เพื่อแสดงรายชื่อผู้จัดจำหน่าย
                 </td>
               </tr>
             ) : paginatedItems.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  No vendors found.
+                  ไม่พบรายชื่อผู้จัดจำหน่าย
                 </td>
               </tr>
             ) : (
@@ -398,8 +398,8 @@ export function BrandVendorView() {
       <div className="flex items-center justify-between px-4 py-2 border-t border-[#DDDDDD] bg-white text-sm" style={{ flexShrink: 0 }}>
         <span className="text-xs text-gray-500">
           {totalItems > 0
-            ? `Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, totalItems)} of ${totalItems} vendors`
-            : 'No vendors'}
+            ? `แสดง ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, totalItems)} จากทั้งหมด ${totalItems} ผู้จัดจำหน่าย`
+            : 'ไม่พบผู้จัดจำหน่าย'}
         </span>
 
         <div className="flex items-center gap-1">
@@ -454,7 +454,7 @@ export function BrandVendorView() {
           </Button>
         </div>
 
-        <span className="text-xs text-gray-400">{pageSize} per page</span>
+        <span className="text-xs text-gray-400">{pageSize} รายการต่อหน้า</span>
       </div>
     </div>
   );

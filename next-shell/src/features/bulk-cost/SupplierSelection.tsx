@@ -85,9 +85,9 @@ export function SupplierSelection({ onSelectSupplier }: SupplierSelectionProps) 
         <div className="supplier-selection-copy">
           <div>
             <p className="eyebrow">Manual Cost Workspace</p>
-            <h2>Select supplier to start a manual workspace</h2>
+            <h2>เลือกผู้จัดจำหน่ายเพื่อเริ่มต้นคำนวณต้นทุน</h2>
           </div>
-          <span>Search vendor master, then open an empty workspace for manual line entry.</span>
+          <span>ค้นหาชื่อหรือรหัสผู้จัดจำหน่ายในระบบ เพื่อเปิดพื้นที่ป้อนข้อมูลต้นทุนใหม่</span>
         </div>
 
         <div className="supplier-search-bar">

@@ -12,7 +12,7 @@ function makeInput(overrides: Partial<CalcInput>): CalcInput {
         insPercent: 0, zoneRate: 0, dtPercent: 0, etPercent: 0, miscTax: 0,
         wtt: 0, cc: 0, scc: 0, stkPercent: 0,
         numInBuy: 1, numInSale: 1,
-        markupPercent: 0, sspk: 0, qoc: 0,
+        markupPercent: 0, spkPercent: 0, qocRate: 0,
         ...overrides,
     };
 }
@@ -41,7 +41,7 @@ describe('Golden Cases — real production data', () => {
             dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 0, cc: 0, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         expect(result.U_OP).toBe(21593);
         expect(result.U_OP_THB).toBe(21593);
@@ -60,7 +60,7 @@ describe('Golden Cases — real production data', () => {
             productCost: 610, pkh: 0, soc: 150, exchangeRate: 1,
             orderTerm: 'DDP', shipModeNo: 3,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         expect(result.U_OP).toBe(760);
         expect(result.U_OP_THB).toBe(760);
@@ -83,7 +83,7 @@ describe('Golden Cases — real production data', () => {
             etPercent: 0, miscTax: 0,
             wtt: 50, cc: 100, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // OP = 41.37 + 0 + 20 = 61.37
         expect(result.U_OP).toBeCloseTo(61.37, 2);
@@ -108,7 +108,7 @@ describe('Golden Cases — real production data', () => {
             etPercent: 0, miscTax: 0,
             wtt: 100, cc: 100, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 15, sspk: 0, qoc: 0,
+            markupPercent: 15, spkPercent: 0, qocRate: 0,
         }));
         // Exwork + mode 6 → surcharge 1.03
         // OP = 57.41, OP_THB = 57.41 * 33.3 * 1.03 = 1969.10559
@@ -139,7 +139,7 @@ describe('Golden Cases — real production data', () => {
             etPercent: 0, miscTax: 0,
             wtt: 25.87, cc: 13.8, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // OP = 1.31 + 0 + 0.52 = 1.83
         expect(result.U_OP).toBeCloseTo(1.83, 2);
@@ -163,7 +163,7 @@ describe('Golden Cases — real production data', () => {
             etPercent: 0, miscTax: 0,
             wtt: 1500, cc: 800, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // Exwork + mode 6 → surcharge 1.03
         // OP = 690, OP_THB = 690 * 45 * 1.03 = 31981.5
@@ -196,7 +196,7 @@ describe('Golden Cases — real production data', () => {
             etPercent: 0, miscTax: 0,
             wtt: 14, cc: 72, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // OP = 207 + 0 + 4.39 = 211.39
         expect(result.U_OP).toBeCloseTo(211.39, 2);
@@ -218,7 +218,7 @@ describe('Golden Cases — real production data', () => {
             dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 0, cc: 0, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 14, sspk: 0, qoc: 0.022,
+            markupPercent: 14, spkPercent: 0, qocRate: 0.022,
         }));
         expect(result.U_OP).toBeCloseTo(1.8, 2);
         // EX-FACTORY-Thailand + Truck → no surcharge
@@ -239,7 +239,7 @@ describe('Golden Cases — real production data', () => {
             etPercent: 0, miscTax: 0,
             wtt: 1500, cc: 800, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // Exwork + mode 6 → surcharge 1.03
         // OP = 4012.75 + 30 = 4042.75
@@ -262,7 +262,7 @@ describe('Golden Cases — real production data', () => {
             productCost: 85, pkh: 0, soc: 56.67, exchangeRate: 1,
             orderTerm: 'DDP', shipModeNo: 3,
             numInBuy: 1, numInSale: 25,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // OP = 85 + 56.67 = 141.67
         expect(result.U_OP).toBeCloseTo(141.67, 2);
@@ -284,7 +284,7 @@ describe('Golden Cases — real production data', () => {
             orderTerm: 'DDP', shipModeNo: 3,
             insPercent: 1, dtPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         expect(result.U_OP).toBe(690);
         // DDP → no duty
@@ -309,7 +309,7 @@ describe('Golden Cases — real production data', () => {
             etPercent: 0, miscTax: 0,
             wtt: 16.21, cc: 0, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 6, sspk: 0, qoc: 0,
+            markupPercent: 6, spkPercent: 0, qocRate: 0,
         }));
         // OP = 60
         expect(result.U_OP).toBe(60);

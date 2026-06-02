@@ -39,6 +39,8 @@ vite.config.ts.timestamp-*
 # ------------------------------
 coverage/
 .nyc_output/
+next-shell/playwright-report/
+next-shell/test-results/
 
 # ------------------------------
 # Logs / runtime
@@ -78,6 +80,7 @@ Desktop.ini
 # ------------------------------
 .agents/
 .codex/
+.playwright-cli/
 skills-lock.json
 
 # ------------------------------
@@ -89,5 +92,7 @@ docs/
 # Local data exports / scratch files
 # ------------------------------
 .datatest/
+.meetingdata/
+output/
 answer.md
 parth_list.txt

@@ -4,6 +4,7 @@ import { resolveUpdatedByFirstName } from '#src/utils/auth.js';
 import * as bulkCostOps from '#src/services/bulk-cost-operation.service.js';
 import { calculateBulkCostPreview } from '#src/services/bulk-cost-calculation.service.js';
 import { resolveBulkCostCWeightPrefill } from '#src/services/bulk-cost-cweight.service.js';
+import { sandboxFinalizeRun } from '#src/services/sandbox-finalize.service.js';
 import type {
     CalculateBulkCostBodyDTO,
     BulkCostCWeightPrefillBodyDTO,
@@ -100,6 +101,29 @@ export async function updateRunStatus(req: Request, res: Response, next: NextFun
         const actor = bulkCostOps.humanActor(resolveUpdatedByFirstName(req));
         await bulkCostOps.markBulkCostRunStatus(runId, body.status, actor);
         res.json(success(null, `Run #${runId} marked as ${body.status}`));
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * POST /api/bulk-cost/runs/:id/sandbox-finalize
+ * Sandbox Finalize — writes Item/Term to PART_CATALOG_AIX mirror
+ * (dry-run, NOT PartCatalog/SAP production).
+ */
+export async function sandboxFinalizeRunHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+        const runId = Number(req.params['id']);
+        if (!Number.isInteger(runId) || runId <= 0) {
+            res.status(400).json({ success: false, message: 'Invalid run ID' });
+            return;
+        }
+        const writtenBy = resolveUpdatedByFirstName(req) || (req.body as { user?: string }).user || 'unknown';
+        const result = await sandboxFinalizeRun(runId, writtenBy);
+        res.status(result.success ? 200 : 207).json(success(result, result.success
+            ? `Sandbox Finalize: ${result.written.length} item(s) written to ${result.sandboxDb}`
+            : `Sandbox Finalize completed with ${result.errors.length} error(s)`,
+        ));
     } catch (err) {
         next(err);
     }

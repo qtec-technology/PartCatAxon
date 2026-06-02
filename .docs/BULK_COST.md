@@ -1,6 +1,6 @@
 # BULK_COST.md — Bulk Cost Allocation Feature Guide
 
-ปรับปรุงล่าสุด: 22 พฤษภาคม 2026 (Cost Workspace decision)
+ปรับปรุงล่าสุด: 27 พฤษภาคม 2026 (PartCatalog/SAP master wording alignment)
 **Agent: อัปเดตไฟล์นี้เมื่อมีการเปลี่ยนแปลง Bulk Cost ทุกชนิด**
 
 ---
@@ -43,8 +43,9 @@ inside Cost Workspace.
 | Mock data | ⚠️ Tests/demo only — Grainger baseline + 12 supplier quotes remain for regression tests; active New Allocation no longer reads mock supplier rows |
 | Item/Term preview | ✅ Done — localStorage bridge → `/item/preview`, `/term/preview` |
 | Viewport-locked layout | ✅ Done — `/bulk-cost` uses app-shell-locked layout (internal scroll matching `/partcatalog`) |
-| Backend API | ✅ Phase 3A Live — `POST /api/bulk-cost/calculate`, `POST /api/bulk-cost/runs` revision snapshot save, `GET /runs`, `GET /runs/:id`, `PATCH /runs/:id/status` |
-| DB persistence | ✅ Live — Manual Bulk Cost save/load uses `BulkCostRun` / `DraftItem` / `DraftTerm` snapshots; it does not write `@POITM` / `@PITM1` |
+| Backend API | ✅ Phase 3A Live — `POST /api/bulk-cost/calculate`, `POST /api/bulk-cost/runs` revision snapshot save, `GET /runs`, `GET /runs/:id`, `PATCH /runs/:id/status`, `POST /runs/:id/sandbox-finalize` |
+| Sandbox Finalize (AIX Mirror Write) | ✅ Done — `POST /api/bulk-cost/runs/:id/sandbox-finalize` writes Item+Term to `[PART_CATALOG_AIX].[dbo].[@POITM/@PITM1]` only; hard DB guard blocks SBOQTEC writes; this is not a PartCatalog/SAP master write; trace in `Updatedby`/`U_Remark`; UI confirm flow in Review panel; idempotency guard reuses existing same Run/Revision/Line rows instead of inserting duplicates; validation aligned with subLocation fallback and covered by unit tests |
+| DB persistence | ✅ Live — Manual Bulk Cost save/load uses `BulkCostRun` / `DraftItem` / `DraftTerm` snapshots; it does not write production PartCatalog/SAP master records in `[SBOQTEC].[dbo].[@POITM]` / `[@PITM1]` |
 | Grainger CWeight source | ✅ Existing DB source — use `[GRAINGER].[dbo].[@GRAINGER_CWEIGHT]`; AIX `GraingerWeightData` staging is obsolete for the active path |
 | CWeight / Weight module | 🚧 Evaluated — local-only CWeight policy report added; exact identifiers are `AUTO_ACCEPT`, description matches remain `REVIEW_SUGGESTION`, and any future API fallback is review-only after local `NOT_FOUND` |
 | Real AXON data source | ❌ Not Started |
@@ -128,7 +129,10 @@ Both flows must preserve calculation history instead of locking one fixed row.
 | `next-shell/tests/unit/bulk-cost-calc.test.ts` | Unit tests |
 | `next-shell/tests/unit/bulk-cost-document-fees.test.ts` | Document-fee basis golden tests |
 | `next-shell/tests/unit/bulk-cost-api.test.ts` | Save payload unit test |
-| `server/src/routes/bulk-cost.routes.ts` | Express routes: save, list, get, patch status |
+| `server/src/routes/bulk-cost.routes.ts` | Express routes: save, list, get, patch status, sandbox-finalize |
+| `server/src/repositories/sandbox-master.repository.ts` | Sandbox AIX @POITM/@PITM1 INSERT; includes assertNotSapTarget() guard |
+| `server/src/services/sandbox-finalize.service.ts` | sandboxFinalizeRun() — load run, validate lines, write to AIX mirror |
+| `server/src/queries/domains/bulk-cost/sandbox-finalize.write.ts` | SQL builders for INSERT @POITM and @PITM1 into PART_CATALOG_AIX |
 | `server/src/repositories/bulk-cost.repository.ts` | Transactional insert/query — no mock fallbacks |
 | `server/sql/20260519_bulk_cost_manual_revision.sql` | `BulkCostRun` revision metadata only; line snapshots remain in `DraftItem` / `DraftTerm` |
 | `server/sql/20260512_axon_ai_tables.sql` | Legacy AXON queue/helper tables; not used by active Bulk Cost route |
@@ -235,6 +239,78 @@ The current frontend formula assumes one quote currency per run. If a supplier
 quote mixes THB freight/CC/TT with foreign-currency item prices, users must
 normalize the amounts before CAL, or the run must be split/held until a shared
 backend calculation path supports mixed-currency costs explicitly.
+
+---
+
+## 6. Sandbox Finalize / Dry-run Master Write
+
+**Always called "Sandbox Finalize" — NOT a PartCatalog/SAP production write.**
+
+### What it does
+
+`POST /api/bulk-cost/runs/:id/sandbox-finalize` reads a saved `BulkCostRun` and
+writes Item + Term sandbox records into `[PART_CATALOG_AIX].[dbo].[@POITM]` and
+`[@PITM1]`. This is a mirror of the SBOQTEC schema used as a staging/validation
+environment only. Production PartCatalog uses the same master tables as SAP in
+`[SBOQTEC].[dbo].[@POITM]` and `[@PITM1]`, so a real PartCatalog master write is
+also a real SAP master write.
+
+### Hard guards
+
+- `assertNotSapTarget()` in `sandbox-master.repository.ts` throws unless
+  `DB_NAME_SANDBOX` resolves exactly to `PART_CATALOG_AIX` (case-insensitive).
+- The guard also rejects if the generated sandbox object prefix is not
+  `[PART_CATALOG_AIX].[dbo]`.
+- Neither the repository nor the service has any code path that writes to
+  `[SBOQTEC].[dbo].[@POITM]` or `[@PITM1]`.
+- The `DB_NAME_SANDBOX` env defaults to `PART_CATALOG_AIX`; do not point it to
+  any other database for this sandbox flow.
+- Before inserting, the service searches `[PART_CATALOG_AIX].[dbo].[@POITM]`
+  by the Run/Revision/Line trace. If a matching Item + Term already exists, it
+  returns the existing sandbox IDs with `reused: true` and does not insert
+  duplicates.
+- If a matching Item exists without a matching Term, the service returns an
+  error for that line and stops that line from creating another duplicate item.
+
+### Trace fields
+
+Each sandbox write embeds its trace into the standard @POITM/@PITM1 schema
+(no custom columns added to the mirror):
+
+| Field | Content |
+|---|---|
+| `Updatedby` (50 chars) | `SBX\|R<runId>\|V<revisionNo>\|<user>` e.g. `SBX\|R42\|V2\|Kit` |
+| `U_Remark` (200 chars) | `SBX-Finalize\|RunID:<runId>\|RevGroup:<revisionGroupId>\|Rev:<revisionNo>\|Line:<lineKey>\|By:<user>\|At:<timestamp>` |
+
+Server-side winston `info` log is also emitted per written line.
+
+### UI flow
+
+1. Run must be saved first (Save Revision).
+2. In the Review panel, click **Sandbox Finalize (AIX Dry-run)**.
+3. Confirmation dialog appears. Click **ยืนยัน Sandbox Finalize** to proceed.
+4. Result shows written lines (sandboxItemId, sandboxTermId per lineKey) and any
+   validation errors for lines that could not be written.
+5. If the same saved revision is finalized again, existing sandbox rows are
+   reused and the UI indicates that duplicate rows were not created.
+
+### Line validation before write
+
+`sandbox-finalize.service.ts` validates each `DraftItem` snapshot:
+
+| Field | Rule |
+|---|---|
+| `sapDescription` | Required |
+| `itemGroup` | Required |
+| `stockUOM` or `uom` | Required |
+| `vendorCode` | Required |
+| `currency` | Required |
+| `unitPrice` | Must be > 0 |
+| `orderTerm` | Required |
+| `location` | Required |
+
+Lines that fail validation are returned in the `errors` array; the service
+continues writing valid lines and returns HTTP 207 if any errors occurred.
 
 ### Step 3 Term Mapping Display
 
@@ -356,7 +432,7 @@ Flow:
 - **ItemCode** ไม่ใช่ user-entered field — ระบบ generate จาก ItemGroup prefix + SP
 - **Manual Save Revision** บันทึก `BulkCostRun` พร้อม `DraftItem` / `DraftTerm` line
   snapshots ใน `PART_CATALOG_AIX` เท่านั้น; ไม่สร้าง Item/Term master จริง
-  และยังไม่เขียน `@POITM` / `@PITM1`
+  และยังไม่เขียน production PartCatalog/SAP master ใน `[SBOQTEC].[dbo].[@POITM]` / `[@PITM1]`
 - **Document fee basis is mandatory**: Per Each / UOM By Each fees enter OP1;
   item-line totals must be normalized to per-each first; By Lot / Batch fees
   become separate new line items and must not be allocated into product OP1.

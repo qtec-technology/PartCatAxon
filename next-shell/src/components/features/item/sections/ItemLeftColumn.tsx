@@ -112,7 +112,6 @@ export function ItemLeftColumn({
                     isReadOnly && "bg-[#F5F5F5] text-gray-500",
                     error && "border-[#C12B2B]"
                   )}
-                  placeholder="Select or type brand..."
                   value={brandInput}
                   disabled={isReadOnly}
                   onChange={(e) => {

@@ -38,20 +38,20 @@ function BulkCostContent() {
       {
         id: 'runs' as const,
         label: 'Workspace Runs',
-        description: 'Saved revisions',
+        description: 'รายการคำนวณที่บันทึกไว้',
         icon: LayoutDashboard,
-      },
-      {
-        id: 'new' as const,
-        label: 'New Manual',
-        description: 'Blank workspace',
-        icon: Plus,
       },
       {
         id: 'axon' as const,
         label: 'AXON Awarded',
-        description: 'Future Award = Y intake',
+        description: 'รายการผู้ขายที่ได้รับเลือก',
         icon: Upload,
+      },
+      {
+        id: 'new' as const,
+        label: 'New Manual',
+        description: 'สร้างรายการคำนวณใหม่ (ป้อนข้อมูลเอง)',
+        icon: Plus,
       },
     ],
     [],
@@ -97,18 +97,26 @@ function BulkCostContent() {
     [setParams],
   );
 
+  // From AXON tab: import mock supplier data and redirect to editor
+  const handleImportSupplier = useCallback(
+    (vendor: { code: string; name: string }) => {
+      setParams({ supplier: vendor.code, supplierName: vendor.name, tab: null, from: 'axon', runId: null });
+    },
+    [setParams],
+  );
+
   const viewContent = selectedSupplier ? (
     <BulkCostWorkspace
       supplierCode={selectedSupplier.code}
       supplierName={selectedSupplier.name}
       savedRunId={runIdFromUrl ? Number(runIdFromUrl) : null}
-      backLabel={fromTab === 'runs' ? 'Back to Workspace Runs' : 'Back to Supplier List'}
+      backLabel={fromTab === 'runs' ? 'Back to Workspace Runs' : fromTab === 'axon' ? 'Back to AXON Awarded' : 'Back to Supplier List'}
       onBack={handleBack}
     />
   ) : tabFromUrl === 'new' ? (
     <SupplierSelection onSelectSupplier={handleSelectSupplier} />
   ) : tabFromUrl === 'axon' ? (
-    <AxonAwardedIntake />
+    <AxonAwardedIntake onImportSupplier={handleImportSupplier} />
   ) : (
     <AllocationList onOpen={handleOpenRun} />
   );
@@ -124,7 +132,7 @@ function BulkCostContent() {
             {!sidebarCollapsed && (
               <div className="cost-workspace-sidebar-title">
                 <strong>Cost Workspace</strong>
-                <span>Manual + AXON awarded sources</span>
+                <span>AXON & Manual Cost</span>
               </div>
             )}
             <button
@@ -177,8 +185,8 @@ function BulkCostContent() {
 
           {!sidebarCollapsed && (
             <div className="cost-workspace-sidebar-note">
-              <strong>Safety Gate</strong>
-              <span>No Item/Term master write until Review/Finalize, reverse mapping, and business/order gate are approved.</span>
+              <strong>ข้อมูลฉบับร่าง (Draft)</strong>
+              <span>Save Revision บันทึกเป็นร่างการคำนวณเท่านั้น ยังไม่เข้า PartCatalog/SAP จริง</span>
             </div>
           )}
         </aside>

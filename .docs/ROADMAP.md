@@ -144,8 +144,9 @@ are ready.
 
 **งานที่ต้องทำ:**
 - [x] ออกแบบ DB schema: `BulkCostRun`, `DraftItem`, `DraftTerm`
-- [ ] Redesign schema as Cost Workspace: `CostWorkspaceRun`,
-      `CostWorkspaceLine`, `CostWorkspaceSnapshot`
+- [x] Redesign schema as Cost Workspace: `CostWorkspaceRun`,
+      `CostWorkspaceLine`, `CostWorkspaceSnapshot` — M1 SQL created in
+      `server/sql/migration/M1_create_cost_workspace.sql`; pending DB execution
 - [ ] Review `.docs/COST_WORKSPACE_FIELD_COVERAGE.md` with owner and mark each
       field as main grid, review/finalize, system, deferred, or not needed
 - [ ] Lock Calculation Template for Cost Workspace: inputs, allocation basis,
@@ -314,10 +315,16 @@ Deploy: NSSM + Nginx reverse proxy + standalone Next.js
 
 | รายการ | สถานะ |
 |---|---|
-| `biome.json` (linting) | ❌ ยังไม่มี |
+| `biome.json` (linting) | ✅ สร้างแล้ว (2026-05-27) |
 | `CLAUDE.md` (~70 lines) | ✅ สร้างแล้ว |
 | `.github/workflows/lint.yml` | ❌ ยังไม่มี |
-| `lefthook.yml` (pre-commit) | ❌ ยังไม่มี |
+| `lefthook.yml` (pre-commit) | ✅ สร้างแล้ว (2026-05-27) |
+| `.gitattributes` (LF normalization) | ✅ สร้างแล้ว (2026-05-27) |
+| `.editorconfig` | ✅ สร้างแล้ว (2026-05-27) |
+| npm workspaces (`packages/*`) | ✅ เพิ่มแล้ว (2026-05-27) |
+| `@partcatalog/shared-types` package | ✅ สร้างแล้ว (2026-05-27) |
+| Cost Workspace M1 SQL script | ✅ สร้างแล้ว; ⏸ รอ execute บน DB |
+
 | Unit tests pass | ดู count ล่าสุดใน `.docs/FEATURE_STATUS.md` |
 | TypeScript strict | ✅ |
 

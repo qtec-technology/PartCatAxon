@@ -86,6 +86,8 @@ export function useResizableTableColumns(tableId: string, columns: readonly Resi
   const getCellProps = useCallback(
     (key: string) => ({
       'data-col-key': key,
+      'data-col': key,
+      'data-testid': `cell-${key}`,
     }),
     [],
   );
@@ -104,11 +106,11 @@ export function useResizableTableColumns(tableId: string, columns: readonly Resi
   );
 
   const autoFit = useCallback(
-    (key: string) => {
+    (key: string, tableElement?: HTMLTableElement | null) => {
       if (typeof document === 'undefined') return;
 
       const column = columnMap.get(key);
-      const table = document.querySelector(`[data-resizable-table="${tableId}"]`);
+      const table = tableElement || document.querySelector(`[data-resizable-table="${tableId}"]`);
       if (!table) return;
 
       const cells = Array.from(table.querySelectorAll<HTMLElement>(`[data-col-key="${key}"]`));
@@ -179,7 +181,8 @@ export function useResizableTableColumns(tableId: string, columns: readonly Resi
         onDoubleClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          autoFit(key);
+          const tableEl = event.currentTarget.closest('table');
+          autoFit(key, tableEl);
         }}
       />
     ),

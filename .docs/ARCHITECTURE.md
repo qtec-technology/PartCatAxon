@@ -189,16 +189,19 @@ hasElevatedAccess = isManager || isSupervisor
 
 - Default database: `PART_CATALOG_AIX`
 - Cross-database access via fully-qualified name: `SBOQTEC.dbo.@POITM`
+- Production PartCatalog master records are SAP master records: the real Item
+  and Term write targets are `SBOQTEC.dbo.@POITM` and `SBOQTEC.dbo.@PITM1`.
+  The same-shaped tables in `PART_CATALOG_AIX` are sandbox/mirror targets only.
 
 ### SBOQTEC (SAP-side)
 
 | Object | Type | ใช้งาน |
 |---|---|---|
-| `@POITM` | Table | Item master (write target) |
+| `@POITM` | Table | PartCatalog/SAP Item master (production write target) |
 | `VWIT_@POITM` | View | Item read (หน้า Search, Item page) |
 | `VWIT_@POITM_PARTNO` | View | Item autocomplete by brand |
 | `VWIT_@POITM_CATEGORY_BRAND` | View | Category → Brand mapping |
-| `@PITM1` | Table | Term master (write target) |
+| `@PITM1` | Table | PartCatalog/SAP Term master (production write target) |
 | `@tblAttachment` | Table | Attachment metadata |
 | `@BRAND` | Table | Brand lookup |
 | `@UOM` | Table | Unit of measure lookup |

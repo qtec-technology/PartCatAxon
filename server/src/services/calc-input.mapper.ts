@@ -1,4 +1,4 @@
-import type { CalcInput } from '#src/services/calculation.service.js';
+import { normalizeOrderTerm, type CalcInput } from '#src/services/calculation.service.js';
 
 /**
  * Map raw request body → CalcInput with safe defaults.
@@ -23,7 +23,7 @@ export function toCalcInput(data: Record<string, any>): CalcInput {
         exchangeRate: data.U_PurRate != null ? Number(data.U_PurRate) : 1,
 
         // ─── Freight to QTEC (FR) ───────────────────────────────────────
-        orderTerm: String(data.U_OrderTerm ?? 'Exwork'),
+        orderTerm: normalizeOrderTerm(data.U_OrderTerm ?? 'Exwork'),
         shipModeNo: Number(data.U_ShipModeNo) || 1,        // 0 not valid
         dimUnit: Number(data.U_DimUnitNo) || 1,          // 0 not valid
         length: Number(data.U_Length) || 0,
@@ -47,8 +47,8 @@ export function toCalcInput(data: Record<string, any>): CalcInput {
         stkPercent: Number(data.U_STK_Percent) || 0,
 
         // ─── Sales Calculation ──────────────────────────────────────────
-        sspk: Number(data.U_SPK) || 0,
-        qoc: Number(data.U_QOC) || 0,
+        spkPercent: 0,
+        qocRate: 0,
         markupPercent: Number(data.U_MK_Percent) || 0,
 
         // ─── UOM Conversion ─────────────────────────────────────────────

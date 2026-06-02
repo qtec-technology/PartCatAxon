@@ -92,6 +92,7 @@ export function SearchCriteriaPanel({
   const [exactMatch, setExactMatch] = useState(initialExactMatch);
   const [myItems, setMyItems] = useState(initialMyItems);
   const [criteriaText, setCriteriaText] = useState(DEFAULT_CRITERIA_TEXT);
+  const [showUserPicture, setShowUserPicture] = useState(false);
   const isFTSMode = searchType === 'FTS';
   const waitState = isSearching;
   const addItemDisabled = disableAddItem ?? disableMutations;
@@ -116,6 +117,22 @@ export function SearchCriteriaPanel({
       }
     };
     void fetchBrands();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const image = new window.Image();
+    image.onload = () => {
+      if (active) setShowUserPicture(true);
+    };
+    image.onerror = () => {
+      if (active) setShowUserPicture(false);
+    };
+    image.src = '/api/auth/user-picture';
+
     return () => {
       active = false;
     };
@@ -343,25 +360,29 @@ export function SearchCriteriaPanel({
           className="bg-white border border-[#A0C0E0] rounded shadow-sm flex items-center justify-center overflow-hidden"
           style={{ width: 67, height: 85 }}
         >
-          <img
-            src="/api/auth/user-picture"
-            alt="User"
-            style={{ width: 67, height: 85, objectFit: 'cover' }}
-            onError={(e) => {
-              const target = e.currentTarget;
-              target.style.display = 'none';
-              target.parentElement!.innerHTML = '<span style="color:#2264A0;font-size:11px;font-weight:bold;text-align:center">USER<br/>PICTURE</span>';
-            }}
-          />
+          {showUserPicture ? (
+            <img
+              src="/api/auth/user-picture"
+              alt="User"
+              style={{ width: 67, height: 85, objectFit: 'cover' }}
+              onError={() => setShowUserPicture(false)}
+            />
+          ) : (
+            <span className="text-center text-[11px] font-bold leading-tight text-[#2264A0]">
+              USER
+              <br />
+              PICTURE
+            </span>
+          )}
         </div>
       </div>
 
       {/* Right Column: Search Inputs & Actions */}
       <div className="flex-1 flex flex-col gap-2 min-w-0">
         {/* Row 1: Search Inputs & Primary Actions */}
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-2 flex-wrap">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-2 flex-wrap md:flex-nowrap">
           {/* Main Search Input */}
-          <div className="w-full md:flex-1 min-w-[200px]" ref={keywordRef}>
+          <div className="w-full md:flex-[1.5] min-w-[150px]" ref={keywordRef}>
             {isFTSMode ? (
               <div className="relative">
                 <Input
@@ -440,10 +461,10 @@ export function SearchCriteriaPanel({
             )}
           </div>
 
-          <div className="flex items-center gap-1 w-full md:w-auto whitespace-nowrap">
+          <div className="flex items-center gap-1 w-full md:w-auto md:flex-1 md:min-w-[120px] whitespace-nowrap">
             <span className="text-xs font-bold text-[#555555]">SEARCH BY:</span>
             <Select value={searchType} onValueChange={(v) => handleSearchTypeChange(v as SearchType)}>
-              <SelectTrigger id={ids.searchType} name="searchType" aria-label="Search type" className="h-8 flex-1 md:w-[200px] bg-white border-[#A0C0E0] text-xs">
+              <SelectTrigger id={ids.searchType} name="searchType" aria-label="Search type" className="h-8 flex-1 bg-white border-[#A0C0E0] text-xs min-w-0">
                 <SelectValue placeholder="Full-Text Search" />
               </SelectTrigger>
               <SelectContent>
@@ -457,9 +478,9 @@ export function SearchCriteriaPanel({
           </div>
 
           {/* Brand / MFG — Autocomplete */}
-          <div className="flex items-center gap-1 w-full md:w-auto whitespace-nowrap" ref={brandRef}>
+          <div className="flex items-center gap-1 w-full md:w-auto md:flex-1 md:min-w-[140px] whitespace-nowrap" ref={brandRef}>
             <span className="text-xs font-bold text-[#555555]">BRAND/MFG:</span>
-            <div className="relative flex-1 md:w-[250px]">
+            <div className="relative flex-1 min-w-0">
               <input
                 id={ids.brand}
                 name="brand"
@@ -504,7 +525,7 @@ export function SearchCriteriaPanel({
           </div>
 
           {/* Buttons Row (grouped for mobile) */}
-          <div className="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
+          <div className="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0 flex-shrink-0">
             {/* Search Button */}
             <Button
               onClick={handleSearch}

@@ -46,7 +46,8 @@ const BASE_CALC_DEFAULTS = {
   scc: 0,
   stkPercent: 0,
   markupPercent: 15,
-  sspk: 0,
+  spkPercent: 0,
+  qocRate: 0,
 } as const;
 
 export interface BulkCostMockQuote {
@@ -90,6 +91,7 @@ type MockQuoteSeed = {
   paymentTerms?: string;
   validityDays?: string;
   freightRate?: number;
+  freightType?: string;
   costs: MockQuoteCostSeed;
   lines: MockLineSeed[];
 };
@@ -132,9 +134,10 @@ type MockLineSeed = {
   saleUOM?: string;
   stockConversion?: number;
   saleConversion?: number;
-  moq?: number | null;
+  moq?: string | number | null;
   insPercent?: number;
   freightRate?: number;
+  freightType?: string;
   dimUnit?: number;
   length?: number;
   width?: number;
@@ -145,8 +148,8 @@ type MockLineSeed = {
   scc?: number;
   stkPercent?: number;
   markupPercent?: number;
-  sspk?: number;
-  qoc?: number;
+  spkPercent?: number;
+  qocRate?: number;
 };
 
 function buildQuote(seed: MockQuoteSeed, quoteIndex: number): BulkCostMockQuote {
@@ -231,10 +234,11 @@ function buildQuote(seed: MockQuoteSeed, quoteIndex: number): BulkCostMockQuote 
       saleUOM: line.saleUOM ?? line.uom ?? seed.uom ?? 'EA',
       stockConversion: line.stockConversion ?? 1,
       saleConversion: line.saleConversion ?? 1,
-      moq: line.moq ?? qty,
+      moq: line.moq !== undefined ? (line.moq !== null ? String(line.moq) : null) : String(qty),
       insPercent: line.insPercent ?? BASE_CALC_DEFAULTS.insPercent,
       shipModeNo,
       freightRate: line.freightRate ?? seed.freightRate ?? SHIP_MODE_DEFAULT_FREIGHT_RATE[shipModeNo] ?? 0,
+      freightType: line.freightType ?? seed.freightType ?? '',
       dimUnit: line.dimUnit ?? BASE_CALC_DEFAULTS.dimUnit,
       length: line.length ?? 0,
       width: line.width ?? 0,
@@ -245,8 +249,8 @@ function buildQuote(seed: MockQuoteSeed, quoteIndex: number): BulkCostMockQuote 
       scc: line.scc ?? BASE_CALC_DEFAULTS.scc,
       stkPercent: line.stkPercent ?? BASE_CALC_DEFAULTS.stkPercent,
       markupPercent: line.markupPercent ?? BASE_CALC_DEFAULTS.markupPercent,
-      sspk: line.sspk ?? BASE_CALC_DEFAULTS.sspk,
-      qoc: line.qoc ?? Number((resolvedWeight * 10).toFixed(6)),
+      spkPercent: line.spkPercent ?? BASE_CALC_DEFAULTS.spkPercent,
+      qocRate: line.qocRate ?? BASE_CALC_DEFAULTS.qocRate,
     };
   });
 

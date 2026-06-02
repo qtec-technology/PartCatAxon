@@ -1,0 +1,10 @@
+# Lefthook Git Hook Manager Configuration
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    biome-lint:
+      glob: "*.{js,ts,jsx,tsx,json}"
+      run: npx @biomejs/biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true

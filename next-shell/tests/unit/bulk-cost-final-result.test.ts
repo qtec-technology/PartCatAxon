@@ -39,7 +39,7 @@ function makeFinalResult(overrides: Partial<FinalResultColumns> = {}): FinalResu
     saleUOM: 'EA',
     stockConversion: 2,
     saleConversion: 1,
-    purchaseMOQ: 1,
+    purchaseMOQ: '1',
     wireTT: 3,
     customClear: 4,
     op1Source: 103,
@@ -114,7 +114,7 @@ function makeSource(): AllocationLineSource {
     saleUOM: 'EA',
     stockConversion: 2,
     saleConversion: 1,
-    moq: 1,
+    moq: '1',
     insPercent: 0.5,
     shipModeNo: 1,
     freightRate: 720,
@@ -128,8 +128,8 @@ function makeSource(): AllocationLineSource {
     scc: 0,
     stkPercent: 0,
     markupPercent: 0,
-    sspk: 0,
-    qoc: 0,
+    spkPercent: 0,
+    qocRate: 0,
   };
 }
 

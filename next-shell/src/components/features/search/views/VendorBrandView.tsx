@@ -278,7 +278,7 @@ export function VendorBrandView() {
       {/* Filter Section */}
       <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <label htmlFor={vendorInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">Vendor Search:</label>
+          <label htmlFor={vendorInputId} className="text-base font-semibold text-gray-700 whitespace-nowrap">ค้นหาผู้จัดจำหน่าย (Vendor Search):</label>
           <div className="relative w-full sm:w-[360px] max-w-full" ref={vendorRef}>
             <input
               id={vendorInputId}
@@ -286,7 +286,7 @@ export function VendorBrandView() {
               aria-label="Vendor search"
               type="text"
               value={vendorInput}
-              placeholder="Please select vendor"
+              placeholder="กรุณาเลือกผู้จัดจำหน่าย"
               onChange={(event) => {
                 const next = event.target.value;
                 setVendorInput(next);
@@ -314,11 +314,11 @@ export function VendorBrandView() {
                     className="px-3 py-2 text-sm cursor-pointer hover:bg-[#E8F0F8] text-[#2264A0] border-b border-[#EEF4FA]"
                     onClick={handleClearVendor}
                   >
-                    Clear selection
+                    ล้างข้อมูลที่เลือก
                   </div>
                 )}
                 {loadingVendors && (
-                  <div className="px-3 py-2 text-sm text-gray-500 text-center">Loading vendor list...</div>
+                  <div className="px-3 py-2 text-sm text-gray-500 text-center">กำลังโหลดผู้จัดจำหน่าย...</div>
                 )}
                 {!loadingVendors && filteredVendors.map((vendor) => (
                   <div
@@ -330,7 +330,7 @@ export function VendorBrandView() {
                   </div>
                 ))}
                 {!loadingVendors && filteredVendors.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-400 text-center">No vendor found</div>
+                  <div className="px-3 py-2 text-sm text-gray-400 text-center">ไม่พบรายชื่อผู้จัดจำหน่าย</div>
                 )}
               </div>
             )}
@@ -338,14 +338,14 @@ export function VendorBrandView() {
         </div>
         <div className="text-base text-gray-500 ml-auto flex items-center gap-2 w-full sm:w-auto sm:justify-end">
           {selectedSupplierName && (
-            <button onClick={handleClearVendor} className="text-sm text-blue-600 hover:underline">Clear Filter</button>
+            <button onClick={handleClearVendor} className="text-sm text-blue-600 hover:underline">ล้างตัวกรอง</button>
           )}
           <span>
             {loadingVendors
-              ? 'Loading vendor list...'
+              ? 'กำลังโหลดผู้จัดจำหน่าย...'
               : !selectedSupplierName
-                ? 'Please select vendor first'
-                : `${totalItems} records found`}
+                ? 'กรุณาเลือกผู้จัดจำหน่ายก่อน'
+                : `พบรายการสินค้า ${totalItems} รายการ`}
           </span>
         </div>
       </div>
@@ -387,19 +387,19 @@ export function VendorBrandView() {
             {loading ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  Loading...
+                  กำลังโหลดข้อมูล...
                 </td>
               </tr>
             ) : !selectedSupplierName ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  Please select vendor first.
+                  กรุณาเลือกผู้จัดจำหน่ายก่อน
                 </td>
               </tr>
             ) : paginatedItems.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="h-32 text-center text-gray-500 bg-white">
-                  No records found.
+                  ไม่พบรายการสินค้า
                 </td>
               </tr>
             ) : (
@@ -429,8 +429,8 @@ export function VendorBrandView() {
       <div className="flex items-center justify-between px-4 py-2 border-t border-[#DDDDDD] bg-white text-sm" style={{ flexShrink: 0 }}>
         <span className="text-xs text-gray-500">
           {selectedSupplierName && totalItems > 0
-            ? `Showing ${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalItems)} of ${totalItems} records`
-            : 'No records'}
+            ? `แสดง ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, totalItems)} จากทั้งหมด ${totalItems} รายการ`
+            : 'ไม่พบรายการสินค้า'}
         </span>
 
         <div className="flex items-center gap-1">
@@ -486,7 +486,7 @@ export function VendorBrandView() {
           </Button>
         </div>
 
-        <span className="text-xs text-gray-400">{pageSize} per page</span>
+        <span className="text-xs text-gray-400">{pageSize} รายการต่อหน้า</span>
       </div>
     </div>
   );

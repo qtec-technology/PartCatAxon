@@ -10,7 +10,7 @@ function makeInput(overrides: Partial<CalcInput>): CalcInput {
         insPercent: 0, zoneRate: 0, dtPercent: 0, etPercent: 0, miscTax: 0,
         wtt: 0, cc: 0, scc: 0, stkPercent: 0,
         numInBuy: 1, numInSale: 1,
-        markupPercent: 0, sspk: 0, qoc: 0,
+        markupPercent: 0, spkPercent: 0, qocRate: 0,
         ...overrides,
     };
 }
@@ -31,7 +31,7 @@ describe('Golden Cases — CIF order term', () => {
             dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 24.75, cc: 120, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // OP = 31 + 0 + 9 = 40
         expect(result.U_OP).toBe(40);
@@ -56,7 +56,7 @@ describe('Golden Cases — CIF order term', () => {
             dtPercent: 10, etPercent: 0, miscTax: 0,
             wtt: 1500, cc: 14000, scc: 2000, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // OP = 3900 + 0 + 150 = 4050
         expect(result.U_OP).toBe(4050);
@@ -77,7 +77,7 @@ describe('Golden Cases — FOB order term', () => {
             dtPercent: 10, etPercent: 0, miscTax: 0,
             wtt: 375, cc: 200, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // FOB is FOBType → surcharge 1.03 with mode 6
         // OP = 36.31 + 0 + 8.75 = 45.06
@@ -101,7 +101,7 @@ describe('Golden Cases — CFR order term', () => {
             dtPercent: 10, etPercent: 0, miscTax: 0,
             wtt: 10.63, cc: 83.2, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // OP = 8.2 + 0 + 1.8 = 10
         expect(result.U_OP).toBe(10);
@@ -120,7 +120,7 @@ describe('Golden Cases — CFR order term', () => {
             dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 17.045, cc: 181.818, scc: 0, stkPercent: 5,
             numInBuy: 60, numInSale: 1,
-            markupPercent: 10, sspk: 5, qoc: 5,
+            markupPercent: 10, spkPercent: 5, qocRate: 5,
         }));
         // OP = 705 + 0 + 7.63 = 712.63
         expect(result.U_OP).toBeCloseTo(712.63, 2);
@@ -145,7 +145,7 @@ describe('Golden Cases — FAS order term', () => {
             dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 0, cc: 0, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // FAS + mode 6 → surcharge 1.03
         // OP_THB = 5.8 * 26.25 * 1.03 = 156.8175
@@ -162,7 +162,7 @@ describe('Golden Cases — FAS order term', () => {
             dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 5, cc: 0, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // FAS + mode 3 → surcharge 1.03
         // OP_THB = 6 * 35.5 * 1.03 = 219.39
@@ -182,7 +182,7 @@ describe('Golden Cases — CPT/CIP/DAT/DDU order terms', () => {
             dtPercent: 10, etPercent: 0, miscTax: 0,
             wtt: 133.33, cc: 2133.33, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // CPT → no surcharge
         // OP = 200.61 + 0 + 113.66 = 314.27
@@ -197,7 +197,7 @@ describe('Golden Cases — CPT/CIP/DAT/DDU order terms', () => {
             productCost: 1705.86, pkh: 0, soc: 0, exchangeRate: 1,
             orderTerm: 'DDU', shipModeNo: 3,
             numInBuy: 12, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         expect(result.U_OP).toBeCloseTo(1705.86, 2);
         expect(result.U_OP_THB).toBeCloseTo(1705.86, 2);
@@ -219,7 +219,7 @@ describe('Golden Cases — STK (Stock Fee)', () => {
             etPercent: 0, miscTax: 0,
             wtt: 20, cc: 20, scc: 0, stkPercent: 3,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 0, sspk: 0, qoc: 0,
+            markupPercent: 0, spkPercent: 0, qocRate: 0,
         }));
         // STK = 3% * preQLC
         expect(result.U_STK).toBeGreaterThan(0);
@@ -239,7 +239,7 @@ describe('Golden Cases — STK (Stock Fee)', () => {
             etPercent: 0, miscTax: 0,
             wtt: 100, cc: 50, scc: 0, stkPercent: 5,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 0, sspk: 0, qoc: 0,
+            markupPercent: 0, spkPercent: 0, qocRate: 0,
         }));
         expect(result.U_STK).toBeCloseTo(result.U_preQLC * 0.05, 0);
     });
@@ -255,7 +255,7 @@ describe('Golden Cases — STK (Stock Fee)', () => {
             etPercent: 0, miscTax: 0,
             wtt: 150, cc: 100, scc: 0, stkPercent: 20,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 0, sspk: 0, qoc: 0,
+            markupPercent: 0, spkPercent: 0, qocRate: 0,
         }));
         expect(result.U_STK).toBeCloseTo(result.U_preQLC * 0.20, 0);
     });
@@ -274,7 +274,7 @@ describe('Golden Cases — SCC (Special Custom Clear / U_ASP)', () => {
             etPercent: 0, miscTax: 0,
             wtt: 750, cc: 400, scc: 1250, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 0, sspk: 0, qoc: 0,
+            markupPercent: 0, spkPercent: 0, qocRate: 0,
         }));
         // SCC is added to preQLC
         // preQLC = OP*ExRate + INS + FR + DT + ... + WTT + CC + SCC
@@ -296,7 +296,7 @@ describe('Golden Cases — MiscTax', () => {
             etPercent: 0, miscTax: 12,
             wtt: 66.66, cc: 33.33, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 0, sspk: 0, qoc: 0,
+            markupPercent: 0, spkPercent: 0, qocRate: 0,
         }));
         // MiscTax is added into preQLC
         // Without miscTax, preQLC would be 12 less
@@ -315,12 +315,13 @@ describe('Golden Cases — MiscTax', () => {
             etPercent: 0, miscTax: 2500,
             wtt: 80, cc: 80, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 500, qoc: 0,
+            markupPercent: 10, spkPercent: 5, qocRate: 0,
         }));
         // MiscTax=2500 in preQLC
         expect(result.U_preQLC).toBeGreaterThan(2500);
         // SPK is added to totalPrice
-        expect(result.U_QLC3).toBeCloseTo(result.U_QLC2 + 500, 0);
+        const expectedSPK = Math.round(result.U_QLC2 * 0.05 * 1000000) / 1000000;
+        expect(result.U_QLC3).toBeCloseTo(result.U_QLC2 + expectedSPK, 0);
     });
 });
 
@@ -336,7 +337,7 @@ describe('Golden Cases — INCH dimension (dimUnit=2)', () => {
             dtPercent: 10, etPercent: 0, miscTax: 0,
             wtt: 200, cc: 3207.7951, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         // INCH → vol * 17, then / 6000 for mode 1
         // vol = 8 * 26 * 96 = 19968

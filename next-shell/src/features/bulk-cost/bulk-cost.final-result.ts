@@ -32,7 +32,7 @@ export const BULK_COST_AY_CP_COLUMNS: FinalResultColumnDefinition[] = [
   { excelColumn: 'BQ', key: 'saleUOM', label: 'Sale UOM', kind: 'text' },
   { excelColumn: 'BR', key: 'stockConversion', label: 'Stk Conv', kind: 'number', editable: true },
   { excelColumn: 'BS', key: 'saleConversion', label: 'Sale Conv', kind: 'number', editable: true },
-  { excelColumn: 'BT', key: 'purchaseMOQ', label: 'MOQ', kind: 'number', editable: true },
+  { excelColumn: 'BT', key: 'purchaseMOQ', label: 'MOQ', kind: 'text', editable: true },
   { excelColumn: 'BU', key: 'wireTT', label: 'TT (THB)', kind: 'number', editable: true },
   { excelColumn: 'BV', key: 'customClear', label: 'CC (THB)', kind: 'number', editable: true },
   { excelColumn: 'BW', key: 'op1', label: 'OP1 (THB)', kind: 'number', editable: true },

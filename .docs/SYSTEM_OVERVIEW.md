@@ -233,9 +233,9 @@ architecture decision changes.
 
 | Object | Role |
 |---|---|
-| `SBOQTEC.dbo.@POITM` | Item master write target |
+| `SBOQTEC.dbo.@POITM` | PartCatalog/SAP Item master production write target |
 | `SBOQTEC.dbo.VWIT_@POITM` | Item read view |
-| `SBOQTEC.dbo.@PITM1` | Term master write target |
+| `SBOQTEC.dbo.@PITM1` | PartCatalog/SAP Term master production write target |
 | `PART_CATALOG_AIX.dbo.vw@PITM1` | Term read view |
 | `PART_CATALOG_AIX.dbo.@OCRD` | Vendor lookup |
 | `PART_CATALOG_AIX.dbo.@LOCATION` | Location / zone lookup |
@@ -243,6 +243,11 @@ architecture decision changes.
 | `SBOQTEC.dbo.@CURRENCY` | Currency and exchange-rate lookup |
 | `SBOQTEC.dbo.@ORDERTERM` | Purchase/sales term lookup |
 | `GRAINGER.dbo.@GRAINGER_CWEIGHT` | Active trusted CWeight source |
+
+PartCatalog master data and SAP master data are the same production records for
+Item/Term: writing to `SBOQTEC.dbo.@POITM` or `SBOQTEC.dbo.@PITM1` is both a
+PartCatalog master write and an SAP master write. `PART_CATALOG_AIX` mirror
+tables with matching names are sandbox validation targets only.
 
 ### 6.3 Current Cost Workspace Related Tables
 

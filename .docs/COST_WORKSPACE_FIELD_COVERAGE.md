@@ -14,7 +14,11 @@ This is the planning source before designing `CostWorkspaceRun`,
 | Draft / RAM | Current editable workspace state | Yes | No |
 | Save Revision | Immutable snapshot of current draft + result | No | Yes |
 | Review / Finalize | Validated candidates before master write | No direct overwrite | Uses saved revision |
-| Item/Term master | Real PartCatalog/SAP-side records | Controlled by final rules | No, separate master flow |
+| Item/Term master | Real PartCatalog/SAP-side records in `[SBOQTEC].[dbo].[@POITM]` / `[@PITM1]` | Controlled by final rules | No, separate master flow |
+
+PartCatalog master write and SAP master write are the same action for Item/Term:
+both target `SBOQTEC.dbo.@POITM` and `SBOQTEC.dbo.@PITM1`. AIX mirror writes are
+sandbox validation only.
 
 ## 2. Source And Mode Dimensions
 

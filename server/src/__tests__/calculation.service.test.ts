@@ -14,7 +14,7 @@ function makeInput(overrides: Partial<CalcInput> = {}): CalcInput {
         insPercent: 1, zoneRate: 15, dtPercent: 5, etPercent: 0, miscTax: 0,
         wtt: 50, cc: 100, scc: 30, stkPercent: 2,
         numInBuy: 1, numInSale: 1,
-        markupPercent: 30, sspk: 0, qoc: 0,
+        markupPercent: 30, spkPercent: 0, qocRate: 0,
         ...overrides,
     };
 }
@@ -160,23 +160,28 @@ describe('Calculation Engine — calculate()', () => {
     // ────────────────────────────────────────────────────────────────────────
 
     it('U_QLC3 stores Total Price = (QLC2 * numInSale) + SPK + QOC', () => {
-        const result = calculate(makeInput({ numInBuy: 10, numInSale: 5, sspk: 2, qoc: 3 }));
+        const result = calculate(makeInput({ numInBuy: 10, numInSale: 5, spkPercent: 2, qocRate: 3 }));
         expect(result.U_QLC2).toBeCloseTo(result.U_QLC / 10, 4);
-        expect(result.U_QLC3).toBeCloseTo((result.U_QLC2 * 5) + 2 + 3, 4);
+        const qlc3Base = result.U_QLC2 * 5;
+        const spkAmount = r6(qlc3Base * 0.02);
+        const qocAmount = r6(result.U_ShipWeightCal * 3);
+        expect(result.U_QLC3).toBeCloseTo(qlc3Base + spkAmount + qocAmount, 4);
         expect(result.U_TotalPrice).toBeCloseTo(result.U_QLC3, 4);
     });
 
     it('QLC2 should be 0 when numInBuy = 0', () => {
-        const result = calculate(makeInput({ numInBuy: 0, sspk: 4, qoc: 6 }));
+        const result = calculate(makeInput({ numInBuy: 0, spkPercent: 4, qocRate: 6 }));
         expect(result.U_QLC2).toBe(0);
-        expect(result.U_QLC3).toBe(10);
-        expect(result.U_TotalPrice).toBe(10);
+        const qocAmount = r6(result.U_ShipWeightCal * 6);
+        expect(result.U_QLC3).toBe(qocAmount);
+        expect(result.U_TotalPrice).toBe(qocAmount);
     });
 
     it('U_QLC3 should fall back to SPK + QOC when numInSale = 0', () => {
-        const result = calculate(makeInput({ numInBuy: 10, numInSale: 0, sspk: 4, qoc: 6 }));
-        expect(result.U_QLC3).toBe(10);
-        expect(result.U_TotalPrice).toBe(10);
+        const result = calculate(makeInput({ numInBuy: 10, numInSale: 0, spkPercent: 4, qocRate: 6 }));
+        const qocAmount = r6(result.U_ShipWeightCal * 6);
+        expect(result.U_QLC3).toBe(qocAmount);
+        expect(result.U_TotalPrice).toBe(qocAmount);
     });
 
     // ────────────────────────────────────────────────────────────────────────
@@ -195,7 +200,7 @@ describe('Calculation Engine — calculate()', () => {
     });
 
     it('Markup 30% should return correct sales price', () => {
-        const result = calculate(makeInput({ markupPercent: 30, sspk: 0, qoc: 0 }));
+        const result = calculate(makeInput({ markupPercent: 30, spkPercent: 0, qocRate: 0 }));
         // SalesPrice = TotalPrice / (1 - 0.30)
         const expected = r6(result.U_TotalPrice / 0.7);
         expect(result.U_SalesPrice).toBeCloseTo(expected, 4);
@@ -213,7 +218,7 @@ describe('Calculation Engine — calculate()', () => {
             insPercent: 0, zoneRate: 0, dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 0, cc: 0, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 0, sspk: 0, qoc: 0,
+            markupPercent: 0, spkPercent: 0, qocRate: 0,
         }));
         expect(result.U_OP).toBe(0);
         expect(result.U_OP_THB).toBe(0);

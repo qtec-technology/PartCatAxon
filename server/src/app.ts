@@ -50,15 +50,17 @@ app.get('/api/health', (_req, res) => {
     });
 });
 
-// Rate limiting applies to all API routes.
-app.use('/api', apiLimiter);
-app.use('/api', (req, res, next) => {
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-        writeLimiter(req, res, next);
-        return;
-    }
-    next();
-});
+// Rate limiting applies to all API routes, except in development.
+if (!env.isDev) {
+    app.use('/api', apiLimiter);
+    app.use('/api', (req, res, next) => {
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+            writeLimiter(req, res, next);
+            return;
+        }
+        next();
+    });
+}
 
 // CSRF protection requires X-Requested-With on mutation requests.
 app.use('/api', csrfProtection(

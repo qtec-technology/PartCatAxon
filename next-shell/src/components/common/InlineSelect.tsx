@@ -118,7 +118,7 @@ export const InlineSelect = React.forwardRef<HTMLButtonElement, InlineSelectProp
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent side="bottom" avoidCollisions={false} className={contentClassName}>
+        <SelectContent side="bottom" className={contentClassName}>
           {allowClear && !hasBuiltInClearOption ? (
             <SelectItem value={EMPTY_OPTION_VALUE} className={itemClassName}>
               {clearLabel || placeholder}

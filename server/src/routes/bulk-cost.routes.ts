@@ -18,5 +18,7 @@ router.get('/runs', requireAuth, validate(listBulkCostRunsQuerySchema, 'query'),
 router.get('/runs/:id', requireAuth, ctrl.getRunById);
 router.post('/runs', requireAuth, validate(saveBulkCostRunBodySchema, 'body'), ctrl.createBulkCostRun);
 router.patch('/runs/:id/status', requireAuth, validate(updateBulkCostRunStatusBodySchema, 'body'), ctrl.updateRunStatus);
+// Sandbox Finalize — writes to PART_CATALOG_AIX mirror only, never SBOQTEC
+router.post('/runs/:id/sandbox-finalize', requireAuth, ctrl.sandboxFinalizeRunHandler);
 
 export default router;

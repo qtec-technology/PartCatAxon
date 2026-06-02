@@ -101,9 +101,9 @@ function TermPreviewContent() {
         <div className="bg-[#F0F2F5] font-sans text-gray-900">
             <div className="bulk-cost-preview-banner">
                 <div className="bulk-cost-preview-banner-content">
-                    <span className="bulk-cost-preview-banner-title">Cost Workspace Preview - Term</span>
+                    <span className="bulk-cost-preview-banner-title">ตัวอย่างแบบร่างเงื่อนไขการจัดซื้อ (Term Preview)</span>
                     <span className="bulk-cost-preview-banner-sub">
-                        {meta.description || meta.lineKey} · {meta.supplierName} · Read-only · Not saved
+                        {meta.description || meta.lineKey} · {meta.supplierName} · อ่านอย่างเดียว (Read-only) · ยังไม่บันทึก
                     </span>
                 </div>
                 <button
@@ -111,7 +111,7 @@ function TermPreviewContent() {
                     type="button"
                     onClick={() => window.close()}
                 >
-                    Close Tab
+                    ปิดหน้าต่าง
                 </button>
             </div>
             <TermHeader

@@ -348,7 +348,9 @@ function computeFinalResult(
   // ── Total QLC ─────────────────────────────────────────────────────────────
   const qlc2 = line.stockConversion > 0 ? round6(qlc / line.stockConversion) : 0;
   const qlc3Base = line.saleConversion > 0 ? round6(qlc2 * line.saleConversion) : 0;
-  const totalQLC = round6(qlc3Base + line.sspk + line.qoc);
+  const spkAmount = round6(qlc3Base * (line.spkPercent / 100));
+  const qocAmount = round6(swCal * line.qocRate);
+  const totalQLC = round6(qlc3Base + spkAmount + qocAmount);
 
   // ── Markup ────────────────────────────────────────────────────────────────
   const denom = 1 - (line.markupPercent / 100);
@@ -403,8 +405,8 @@ function computeFinalResult(
     preQLC,
     stk,
     qlc,
-    spk: line.sspk,
-    qocVal: line.qoc,
+    spk: spkAmount,
+    qocVal: qocAmount,
     totalQLC,
     markup,
     roundUp,

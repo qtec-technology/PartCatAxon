@@ -1,4 +1,4 @@
-import { calculate } from '#src/services/calculation.service.js';
+import { calculate, normalizeOrderTerm } from '#src/services/calculation.service.js';
 import type { SaveBulkCostRunInput } from '#src/types/bulk-cost.types.js';
 
 const DOC_FEE_KEYS = ['coc', 'millCert', 'testCert', 'coa', 'coo', 'anyOther'] as const;
@@ -78,8 +78,8 @@ interface AllocationLineSource {
     scc: number;
     stkPercent: number;
     markupPercent: number;
-    sspk: number;
-    qoc: number;
+    spkPercent: number;
+    qocRate: number;
 }
 
 type AllocationWarningCode =
@@ -468,7 +468,7 @@ function computeFinalResult(
     const docFeeTotal = round6(
         line.docFee.coc + line.docFee.millCert + line.docFee.testCert + docCOO + line.docFee.anyOther,
     );
-    const orderTerm = line.orderTerm || costs.orderTerm;
+    const orderTerm = normalizeOrderTerm(line.orderTerm || costs.orderTerm);
     const location = line.location || costs.location;
     const shipModeNo = line.shipModeNo || costs.shipModeNo;
     const calculated = calculate({
@@ -498,8 +498,8 @@ function computeFinalResult(
         numInBuy: line.stockConversion,
         numInSale: line.saleConversion,
         markupPercent: line.markupPercent,
-        sspk: line.sspk,
-        qoc: line.qoc,
+        spkPercent: line.spkPercent,
+        qocRate: line.qocRate,
     });
     const exworkCase = calculated.U_OP_SUM !== 0 ? round6(calculated.U_OP_THB / calculated.U_OP_SUM) : 1;
     const vatPercent = numberValue(line.vatPercent);
@@ -555,8 +555,8 @@ function computeFinalResult(
         stk: calculated.U_STK,
         qlc: calculated.U_QLC,
         qlc2: calculated.U_QLC2,
-        spk: line.sspk,
-        qocVal: line.qoc,
+        spk: calculated.U_SPK,
+        qocVal: calculated.U_QOC,
         totalQLC: calculated.U_TotalPrice,
         markup: calculated.U_MK_THB,
         roundUp: calculated.U_SalesPrice,
@@ -577,7 +577,7 @@ function normalizeCosts(raw: Record<string, unknown>): BulkCostInput {
         exchangeRate: numberValue(raw.exchangeRate, 1),
         referenceNo: text(raw.referenceNo),
         remark: text(raw.remark),
-        orderTerm: text(raw.orderTerm),
+        orderTerm: normalizeOrderTerm(text(raw.orderTerm)),
         location: text(raw.location),
         subLocation: text(raw.subLocation),
         shipModeNo: intValue(raw.shipModeNo, -1),
@@ -615,7 +615,7 @@ function normalizeLine(raw: Record<string, unknown>): AllocationLineSource {
             anyOther: numberValue(docFee.anyOther),
         },
         deliveryLeadTime: text(raw.deliveryLeadTime),
-        orderTerm: text(raw.orderTerm),
+        orderTerm: normalizeOrderTerm(text(raw.orderTerm)),
         location: text(raw.location),
         subLocation: text(raw.subLocation),
         importPermit: text(raw.importPermit),
@@ -648,8 +648,8 @@ function normalizeLine(raw: Record<string, unknown>): AllocationLineSource {
         scc: numberValue(raw.scc),
         stkPercent: numberValue(raw.stkPercent),
         markupPercent: numberValue(raw.markupPercent),
-        sspk: numberValue(raw.sspk),
-        qoc: numberValue(raw.qoc),
+        spkPercent: numberValue(raw.spkPercent ?? raw.sspk),
+        qocRate: numberValue(raw.qocRate ?? raw.qoc),
     };
 }
 

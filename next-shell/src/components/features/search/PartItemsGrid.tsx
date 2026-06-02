@@ -137,8 +137,8 @@ function TermsGrid({ terms, onTermDoubleClick, parentItemId }: { terms: TermItem
   return (
     <div className="bg-white rounded border border-gray-300 overflow-hidden">
       <div className="bg-[#E8F0F8] px-4 py-1 border-b border-blue-200 flex items-center gap-2">
-        <span className="text-[#2264A0] font-bold text-sm">Terms List (Resizable)</span>
-        <span className="text-xs text-gray-500">({terms.length} records)</span>
+        <span className="text-[#2264A0] font-bold text-sm">รายการเงื่อนไขการจัดซื้อ (Terms List)</span>
+        <span className="text-xs text-gray-500">({terms.length} รายการ)</span>
       </div>
       <div className="overflow-x-auto">
         <Table style={{ width: table.getTotalSize(), minWidth: '100%', tableLayout: 'fixed' }}>
@@ -409,7 +409,7 @@ export function PartItemsGrid({
                         {isTermsLoading && (
                           <div className="h-16 flex items-center justify-center text-sm text-gray-500 gap-2">
                             <Loader2 size={16} className="animate-spin" />
-                            Loading terms...
+                            กำลังโหลดข้อมูลเงื่อนไข...
                           </div>
                         )}
                         {!isTermsLoading && terms.length > 0 && (
@@ -441,8 +441,8 @@ export function PartItemsGrid({
         {/* Left: record range info */}
         <span className="text-xs text-gray-500">
           {totalItems > 0
-            ? `Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, totalItems)} of ${totalItems} records`
-            : 'No records'}
+            ? `แสดง ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, totalItems)} จากทั้งหมด ${totalItems} รายการ`
+            : 'ไม่พบข้อมูล'}
         </span>
 
         {/* Center: page buttons */}
@@ -501,7 +501,7 @@ export function PartItemsGrid({
         </div>
 
         {/* Right: page size info */}
-        <span className="text-xs text-gray-400">{pageSize} per page</span>
+        <span className="text-xs text-gray-400">{pageSize} รายการต่อหน้า</span>
       </div>
     </div>
   );

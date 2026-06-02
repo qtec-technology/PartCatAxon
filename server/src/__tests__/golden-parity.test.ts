@@ -12,7 +12,7 @@ function makeInput(o: Partial<CalcInput>): CalcInput {
         insPercent: 0, zoneRate: 0, dtPercent: 0, etPercent: 0, miscTax: 0,
         wtt: 0, cc: 0, scc: 0, stkPercent: 0,
         numInBuy: 1, numInSale: 1,
-        markupPercent: 0, sspk: 0, qoc: 0,
+        markupPercent: 0, spkPercent: 0, qocRate: 0,
         ...o,
     };
 }
@@ -55,7 +55,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 24.75, cc: 120, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         compareAll('897455', result, {
             U_OP: 40,
@@ -85,7 +85,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             productCost: 21593, pkh: 0, soc: 0, exchangeRate: 1,
             orderTerm: 'DDP', shipModeNo: 3,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         compareAll('839905', result, {
             U_OP: 21593,
@@ -114,7 +114,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             dtPercent: 10, etPercent: 0, miscTax: 0,
             wtt: 375, cc: 200, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         compareAll('872671', result, {
             U_OP: 45.06,
@@ -141,7 +141,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             dtPercent: 10, etPercent: 0, miscTax: 0,
             wtt: 10.63, cc: 83.2, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         compareAll('879373', result, {
             U_OP: 10,
@@ -168,7 +168,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 0, cc: 0, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         compareAll('858854', result, {
             U_OP: 5.8,
@@ -194,7 +194,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             etPercent: 0, miscTax: 0,
             wtt: 20, cc: 20, scc: 0, stkPercent: 3,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 0, sspk: 0, qoc: 0,
+            markupPercent: 0, spkPercent: 0, qocRate: 0,
         }));
         // CSV: OP=71.23, OP_THB=2351.409145 (Exwork+mode6 → *1.03)
         compareAll('5407', result, {
@@ -223,7 +223,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             dtPercent: 10, etPercent: 0, miscTax: 0,
             wtt: 133.33, cc: 2133.33, scc: 0, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         compareAll('898665', result, {
             U_OP: 314.27,
@@ -250,7 +250,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             dtPercent: 10, etPercent: 0, miscTax: 0,
             wtt: 1500, cc: 14000, scc: 2000, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 10, sspk: 0, qoc: 0,
+            markupPercent: 10, spkPercent: 0, qocRate: 0,
         }));
         compareAll('896274', result, {
             U_OP: 4050,
@@ -277,7 +277,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             etPercent: 0, miscTax: 0,
             wtt: 750, cc: 400, scc: 1250, stkPercent: 0,
             numInBuy: 1, numInSale: 1,
-            markupPercent: 0, sspk: 0, qoc: 0,
+            markupPercent: 0, spkPercent: 0, qocRate: 0,
         }));
         compareAll('33417', result, {
             U_OP: 598.64,
@@ -304,7 +304,7 @@ describe('Exact Parity — engine output vs CSV persisted values', () => {
             dtPercent: 0, etPercent: 0, miscTax: 0,
             wtt: 17.045, cc: 181.818, scc: 0, stkPercent: 5,
             numInBuy: 60, numInSale: 1,
-            markupPercent: 10, sspk: 5, qoc: 5,
+            markupPercent: 10, spkPercent: 1.17526117, qocRate: 0.005,
         }));
         compareAll('865676', result, {
             U_OP: 712.63,

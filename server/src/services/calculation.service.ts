@@ -47,8 +47,8 @@ export interface CalcInput {
 
     // ─── Sales Calculation ──────────────────────────────────────────────────
     markupPercent: number;          // Markup %
-    sspk: number;                   // SPK
-    qoc: number;                    // QOC
+    spkPercent: number;             // SPK percentage of QLC
+    qocRate: number;                // QOC rate in THB/kg
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,6 +84,29 @@ export interface CalcResult {
     U_TotalPrice: number;           // Compatibility alias ของ Total Price
     U_MK_THB: number;               // Markup เป็นเงินบาท
     U_SalesPrice: number;           // ราคาขายสุดท้าย
+    U_SPK: number;                  // Calculated SPK Amount (THB)
+    U_QOC: number;                  // Calculated QOC Amount (THB)
+    U_SPK_Percent: number;          // SPK Input Percentage
+    U_QOC_Rate: number;             // QOC Input Rate (THB/kg)
+}
+
+export function normalizeOrderTerm(term: string | null | undefined): string {
+    const t = String(term || '').trim().toLowerCase();
+    if (['exwork', 'ex-work', 'ex-factory', 'exw'].includes(t)) {
+        return 'Exwork';
+    }
+    if (t === 'fca') return 'FCA';
+    if (t === 'fas') return 'FAS';
+    if (t === 'fob') return 'FOB';
+    if (t === 'cif') return 'CIF';
+    if (t === 'cfr') return 'CFR';
+    if (t === 'cpt') return 'CPT';
+    if (t === 'ddp') return 'DDP';
+    if (t === 'dap') return 'DAP';
+    if (t.length > 0) {
+        return term!.trim();
+    }
+    return 'Exwork';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,12 +114,14 @@ export interface CalcResult {
 // ─────────────────────────────────────────────────────────────────────────────
 export function calculate(input: CalcInput): CalcResult {
     const {
-        productCost, pkh, soc, docFees = 0, exchangeRate, orderTerm, shipModeNo,
+        productCost, pkh, soc, docFees = 0, exchangeRate, orderTerm: rawOrderTerm, shipModeNo,
         dimUnit, length, width, height, itemWeight, freightRate, freight,
         insPercent, zoneRate, dtPercent, etPercent, miscTax,
-        wtt, cc, scc, stkPercent, sspk, qoc,
+        wtt, cc, scc, stkPercent, spkPercent, qocRate,
         markupPercent, numInBuy, numInSale,
     } = input;
+
+    const orderTerm = normalizeOrderTerm(rawOrderTerm);
 
     // ─── Order Price (OP) ───────────────────────────────────────────────────
     // OP = Product Cost + PKH + SOC + Documents Fees
@@ -157,7 +182,9 @@ export function calculate(input: CalcInput): CalcResult {
     // SalesPrice = Total/(1-Markup%)
     const qlc2 = calcQLCPerStockUOM(qlc, numInBuy);
     const qlc3Base = calcQLCPerSalesUOM(qlc2, numInSale);
-    const totalPrice = calcTotalPrice(qlc3Base, sspk, qoc);
+    const spkAmount = round6(qlc3Base * (spkPercent / 100));
+    const qocAmount = round6(swCal * qocRate);
+    const totalPrice = calcTotalPrice(qlc3Base, spkAmount, qocAmount);
     const mkTHB = calcMarkupTHB(totalPrice, markupPercent);
     const salesPrice = calcSalesPrice(totalPrice, markupPercent);
 
@@ -187,6 +214,10 @@ export function calculate(input: CalcInput): CalcResult {
         U_TotalPrice: round6(totalPrice),
         U_MK_THB: round6(mkTHB),
         U_SalesPrice: round6(salesPrice),
+        U_SPK: round6(spkAmount),
+        U_QOC: round6(qocAmount),
+        U_SPK_Percent: round6(spkPercent),
+        U_QOC_Rate: round6(qocRate),
     };
 }
 

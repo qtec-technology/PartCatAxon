@@ -230,3 +230,35 @@ export async function updateBulkCostRunStatus(
     body: { status },
   });
 }
+
+// ─── Sandbox Finalize ────────────────────────────────────────────────────────
+
+export interface SandboxFinalizeWritten {
+  lineKey: string;
+  sandboxItemId: number;
+  sandboxTermId: number;
+  reused?: boolean;
+}
+
+export interface SandboxFinalizeResult {
+  success: boolean;
+  written: SandboxFinalizeWritten[];
+  errors: Array<{ lineKey: string; message: string; field?: string }>;
+  sandboxDb: string;
+}
+
+/**
+ * POST /api/bulk-cost/runs/:runId/sandbox-finalize
+ * Writes Item/Term to PART_CATALOG_AIX mirror — Sandbox Finalize / Dry-run only.
+ * NOT a production PartCatalog/SAP master write.
+ */
+export async function sandboxFinalizeLines(
+  runId: number,
+  user: string,
+): Promise<SandboxFinalizeResult> {
+  const response = await requestJson<SandboxFinalizeResult>(
+    `/api/bulk-cost/runs/${runId}/sandbox-finalize`,
+    { method: 'POST', body: { user } },
+  );
+  return response.data;
+}

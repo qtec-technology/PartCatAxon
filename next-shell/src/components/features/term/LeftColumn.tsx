@@ -249,7 +249,7 @@ export const LeftColumn = memo(function LeftColumn({
                   >
                     <SelectValue placeholder="" className="w-full justify-center text-center" />
                   </SelectTrigger>
-                  <SelectContent side="bottom" avoidCollisions={false}>
+                  <SelectContent side="bottom">
                     {currencyOptions.map((row) => (
                       <SelectItem key={row.value} value={row.value} subLabel={fmtExRate(row.exRate)}>
                         {row.name}
@@ -402,7 +402,7 @@ export const LeftColumn = memo(function LeftColumn({
                   <SelectTrigger id={ids.freightType} name="freightType" className={`w-full min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs bg-white ${f} disabled:opacity-100 disabled:bg-gray-200 disabled:text-gray-900`}>
                     <SelectValue placeholder="- Please Select -" />
                   </SelectTrigger>
-                  <SelectContent side="bottom" avoidCollisions={false}>
+                  <SelectContent side="bottom">
                     {freightOptions.map((row) => (
                       <SelectItem key={row.value} value={row.value} subLabel={fmtExRate(row.rate)}>
                         {row.name}

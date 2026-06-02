@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "ระบบ Part Catalog แบบ Web Application สำหรับใช้งานภายในเครือข่ายองค์กร แทนระบบเดิมที่ทำงานบน Microsoft Access โดยยังคง business flow หลักของ `Item`, `Term`, `Search`, `Attachment`, และ `Calculation` ไว้",
   "main": "index.js",
+  "workspaces": [
+    "packages/*",
+    "server",
+    "next-shell"
+  ],
   "scripts": {
     "dev": "concurrently -n server,next -c blue,magenta \"npm --prefix server run dev\" \"npm --prefix next-shell run dev\"",
     "dev:server": "npm --prefix server run dev",
@@ -13,7 +18,10 @@
     "start:server": "npm --prefix server start",
     "start:next": "npm --prefix next-shell start",
     "typecheck": "npm --prefix server run build && npm --prefix next-shell run typecheck",
-    "test": "npm --prefix server test -- --run && npm --prefix next-shell test -- --run"
+    "test": "npm --prefix server test -- --run && npm --prefix next-shell test -- --run",
+    "lint": "npx @biomejs/biome check --write .",
+    "lint:check": "npx @biomejs/biome check .",
+    "prepare": "npx -y lefthook install"
   },
   "repository": {
     "type": "git",
@@ -28,6 +36,7 @@
   },
   "homepage": "https://github.com/qtec-technology/PartCatalog#readme",
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "@biomejs/biome": "^2.4.0"
   }
 }

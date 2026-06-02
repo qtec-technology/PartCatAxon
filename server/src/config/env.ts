@@ -118,6 +118,7 @@ export const env = {
     DB_PORT: parseNumberEnv('DB_PORT', 1433),
     DB_NAME_QTEC: getRequiredEnv('DB_NAME_QTEC'),
     DB_NAME_SAP: getRequiredEnv('DB_NAME_SAP'),
+    DB_NAME_SANDBOX: String(process.env.DB_NAME_SANDBOX || 'PART_CATALOG_AIX').trim(),
     DB_USER: getRequiredEnv('DB_USER'),
     DB_PASSWORD: getRequiredEnv('DB_PASSWORD'),
     DB_POOL_MAX: parseNumberEnv('DB_POOL_MAX', 30),
